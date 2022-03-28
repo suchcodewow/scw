@@ -16,7 +16,8 @@
   --ifm-color-primary-lightest: #196ff2;
   --ifm-alert-border-width: 0px;
   --ifm-alert-background-color: rgba(255, 255, 255, 0.3);
-  --ifm-code-font-size: 95%;
+  --ifm-code-font-size: 105%;
+  --ifm-font-size-base: 100%;
 }
 
 .alert {

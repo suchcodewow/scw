@@ -7,45 +7,42 @@ pagination_next:
 
 # Introduction
 
-This is the beginning of the thing.
+Personally I think "quickstart" tutorials that install everything by script or have a dense string of imcomprehensible code blocks to copy/paste are frustrating.
 
-:::info
+Frequently I felt helpless when something inevitably failed because I had no idea what I built. Attempts to fix things made it worse and eventually I would delete the whole project pretending I never wanted to understand that topic anyway.
 
-This is some info
+On the other hand- I don't have weeks to study topics that aren't part of my current IT role. Plus I get bored entirely too easily and YouTube eerily knows what "recommended videos" to sneak into _up next_ queue and distract my ADHD brain.
 
-:::
+It's awesome if you are capable of teaching people with those uploaded tutorial playlists on YouTube. Bless you good sir/madam & godspeed.
 
-And this is the end.
+If you are looking for something in-between, I hope this tutorial series will split the extremes and give you something to use long term. LFG!
 
-<details>
-  <summary>Summary</summary>
-  Some details
-</details>
+## Overview
 
-```js
-import bob from "bob";
-```
+This tutorial series was designed to give you a solid, usable kubernetes platform demonstrating key concepts without extending into days of content.
 
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -\n
+The tutorial is modular. Work from step 1 through step 4 making 1 choice in each category depending on your needs.
 
-mkdir ~/.kube\n
+By the end, you'll have a kubernetes platform running where you can load any of the examples shown in the Deployment Library- and know how to fix/undo things that break along the way.
 
-sudo chmod -R 700 ~/.kube
+:clock10: All 4 steps of this tutorial could be completed in as little as 30m if you are familiar with kubernetes and have a host available. On average, it will take 60-120m to setup a host and check out the key kubernetes concepts.
 
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+### Step 1: Setup a Host
 
-sudo chown -R $USER ~/.kube
+You can choose from different methods to setup a host. The options range from using resources on a computer you already have, through setting up a host or using a virtual machine in any of the major cloud providers.
 
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+### Step 2: Deploy Kubernetes on your host
 
-curl -LO "https://dl.k8s.io/release/$\(curl -L -s https://dl.k8s.io/release/stable.txt\)/bin/linux/amd64/kubectl"
+Different kubernetes distributions offer different advantages. The options range from small footprint running only critical functions to fully featured larger installations.
 
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+### Step 3: Deploy Dynatrace
 
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/cloud/deploy.yaml
+Any of the kubernetes platforms shown can be monitored by Dynatrace to provide unrivaled observability and A.I. driven insights. If you don't have Dynatrace now, consider setting up your own free trial in just a few minutes at https://www.dynatrace.com/trial.
 
-kubectl create deployment demo --image=httpd --port=80
+### Step 4: First Application
 
-kubectl expose deployment demo
+With the platform running, deploy a simple web service to confirm that everything works.
 
-kubectl create ingress demo-localhost --class=nginx --rule="demo.192.168.1.206.nip.io/\_=demo:80"
+### Add Deployments
+
+With your finished kubernetes platform, check out the projects you can deploy and share with team members.

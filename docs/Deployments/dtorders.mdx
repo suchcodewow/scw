@@ -1,0 +1,19 @@
+# DT-Orders
+
+kubectl create ns dtorders
+
+kubectl create -f manifests/dynatrace-oneagent-metadata-viewer.yaml
+
+kubectl -n dtorders apply -f manifests/catalog-service.yml
+
+kubectl -n dtorders apply -f manifests/customer-service.yml
+
+kubectl -n dtorders apply -f manifests/order-service.yml
+
+kubectl -n dtorders apply -f manifests/frontend.yml
+
+kubectl -n dtorders apply -f manifests/browser-traffic.yml
+
+kubectl -n dtorders apply -f manifests/load-traffic.yml
+
+kubectl -n dtorders get pods
