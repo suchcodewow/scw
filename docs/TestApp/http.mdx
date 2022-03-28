@@ -66,7 +66,7 @@ Remember kubectl is tricksy sometimes. If you don't specify `-A` or another name
 The application is running in our kubernetes cluster but currently has no way to communicate with other pods. We need to expose it with:
 
 ```bash
-kubectl expose deployment demo
+kubectl expose deployment demo -n demo
 ```
 
 It's now running as a usuable service within the cluster. You can see what's open for internal communication with:
