@@ -5,6 +5,7 @@
  */
 
 /* You can override the default Infima variables here. */
+
 :root {
   --ifm-color-primary: #0b54c2;
   --ifm-color-primary-dark: #0a4caf;
@@ -13,7 +14,17 @@
   --ifm-color-primary-light: #0c5cd5;
   --ifm-color-primary-lighter: #0d61df;
   --ifm-color-primary-lightest: #196ff2;
+  --ifm-alert-border-width: 0px;
+  --ifm-alert-background-color: rgba(255, 255, 255, 0.3);
   --ifm-code-font-size: 95%;
+}
+
+.alert {
+  --ifm-alert-background-color: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .alert {
+  --ifm-alert-background-color: rgba(255, 255, 255, 0.03);
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
@@ -25,6 +36,7 @@
   --ifm-color-primary-light: #7daef8;
   --ifm-color-primary-lighter: #8db8f9;
   --ifm-color-primary-lightest: #bdd6fb;
+  --ifm-alert-background-color: rgba(255, 255, 255, 0.05);
 }
 
 .docusaurus-highlight-code-line {

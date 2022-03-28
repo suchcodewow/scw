@@ -1,5 +1,8 @@
 ---
 sidebar_position: 1
+slug: /
+pagination_prev:
+pagination_next:
 ---
 
 # Introduction
@@ -22,3 +25,27 @@ And this is the end.
 ```js
 import bob from "bob";
 ```
+
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -\n
+
+mkdir ~/.kube\n
+
+sudo chmod -R 700 ~/.kube
+
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+
+sudo chown -R $USER ~/.kube
+
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+
+curl -LO "https://dl.k8s.io/release/$\(curl -L -s https://dl.k8s.io/release/stable.txt\)/bin/linux/amd64/kubectl"
+
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/cloud/deploy.yaml
+
+kubectl create deployment demo --image=httpd --port=80
+
+kubectl expose deployment demo
+
+kubectl create ingress demo-localhost --class=nginx --rule="demo.192.168.1.206.nip.io/\_=demo:80"
