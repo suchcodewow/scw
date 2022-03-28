@@ -6,7 +6,9 @@ kubectl create -f manifests/dynatrace-oneagent-metadata-viewer.yaml
 
 kubectl -n dtorders apply -f manifests/catalog-service.yml
 
-kubectl -n dtorders apply -f manifests/customer-service.yml
+```bash
+kubectl -n dtorders apply -f https://github.commanifests/customer-service.yml
+```
 
 kubectl -n dtorders apply -f manifests/order-service.yml
 
