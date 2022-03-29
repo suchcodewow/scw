@@ -1,6 +1,8 @@
 # DT-Orders
 
+```bash
 kubectl create ns dtorders
+```
 
 kubectl create -f manifests/dynatrace-oneagent-metadata-viewer.yaml
 
@@ -11,7 +13,7 @@ kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/m
 ```
 
 ```bash
-ubectl create ingress catalog-service --class=nginx --rule="dtorders-catalog.192.168.1.232.nip.io/*=customer:8080" -n dtorders
+kubectl create ingress catalog-service --class=nginx --rule="dtorders-catalog.192.168.1.232.nip.io/*=customer:8080" -n dtorders
 ```
 
 kubectl -n dtorders apply -f manifests/order-service.yml
