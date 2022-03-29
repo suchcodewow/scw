@@ -47,4 +47,4 @@ spec:
   selector:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: frontend
-  type: LoadBalancer
+  type: ClusterIP
