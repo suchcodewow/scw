@@ -1,5 +1,10 @@
 # DT-Orders
 
+## commands
+
+attach to a running pod
+kubectl exec --stdin --tty shell-demo -- /bin/bash
+
 ### Create a namespace
 
 ```bash
@@ -15,7 +20,7 @@ kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/m
 ```
 
 ```bash
-kubectl create ingress catalog-service --class=nginx --rule="dtorders-catalog.192.168.1.232.nip.io/*=customer:8080" -n dtorders
+kubectl create ingress catalog --class=nginx --rule="dtorders-catalog.192.168.1.232.nip.io/*=customer:8080" -n dtorders
 ```
 
 ### Order service
@@ -25,7 +30,7 @@ kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/m
 ```
 
 ```bash
-kubectl create ingress order-service --class=nginx --rule="dtorders-orders.192.168.1.232.nip.io/*=order:8080" -n dtorders
+kubectl create ingress orders --class=nginx --rule="dtorders-orders.192.168.1.232.nip.io/*=order:8080" -n dtorders
 ```
 
 ### frontend
@@ -35,7 +40,7 @@ kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/m
 ```
 
 ```bash
-kubectl create ingress order-frontend --class=nginx --rule="dtorders-frontend.192.168.1.232.nip.io/*=frontend:8080" -n dtorders
+kubectl create ingress frontend --class=nginx --rule="dtorders-frontend.192.168.1.232.nip.io/*=frontend:8080" -n dtorders
 ```
 
 kubectl -n dtorders apply -f manifests/browser-traffic.yml

@@ -22,7 +22,7 @@ spec:
         chat-channel: dev-team-services
     spec:
       containers:
-        - name: order
+        - name: orders
           image: dtdemos/dt-orders-order-service:1
           imagePullPolicy: Always
           ports:
@@ -35,7 +35,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: order
+  name: orders
   labels:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: order-service
@@ -43,7 +43,7 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-      name: order
+      name: orders
   selector:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: order-service
