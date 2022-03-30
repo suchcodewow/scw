@@ -1,14 +1,7 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: dtorders
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: customer
-  namespace: dtorders
 spec:
   replicas: 1
   selector:
@@ -44,7 +37,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: customer
-  namespace: dtorders
   labels:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: customer-service
@@ -59,31 +51,10 @@ spec:
   type: ClusterIP
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: customer-ingress
-  namespace: dtorders
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: dtorders-customer.192.168.1.232.nip.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: customer
-                port:
-                  number: 8080
-            path: /
-            pathType: Prefix
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: catalog
-  namespace: dtorders
 spec:
   replicas: 1
   selector:
@@ -114,13 +85,11 @@ spec:
           env:
             - name: DT_CUSTOM_PROP
               value: "project=dt-orders service=catalog-service"
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: catalog
-  namespace: dtorders
   labels:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: catalog-service
@@ -135,31 +104,10 @@ spec:
   type: ClusterIP
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: catalog-ingress
-  namespace: dtorders
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: dtorders-catalog.192.168.1.232.nip.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: catalog
-                port:
-                  number: 8080
-            path: /
-            pathType: Prefix
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: order
-  namespace: dtorders
 spec:
   replicas: 1
   selector:
@@ -180,7 +128,7 @@ spec:
         chat-channel: dev-team-services
     spec:
       containers:
-        - name: order
+        - name: orders
           image: dtdemos/dt-orders-order-service:1
           imagePullPolicy: Always
           ports:
@@ -189,13 +137,11 @@ spec:
           env:
             - name: DT_CUSTOM_PROP
               value: "project=dt-orders service=order-service"
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: order
-  namespace: dtorders
+  name: orders
   labels:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: order-service
@@ -203,38 +149,17 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-      name: order
+      name: orders
   selector:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: order-service
   type: ClusterIP
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: orders-ingress
-  namespace: dtorders
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: dtorders-order.192.168.1.232.nip.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: order
-                port:
-                  number: 8080
-            path: /
-            pathType: Prefix
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: dtorders
 spec:
   replicas: 1
   selector:
@@ -264,13 +189,11 @@ spec:
           env:
             - name: DT_CUSTOM_PROP
               value: "project=dt-orders service=frontend"
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: dtorders
   labels:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: frontend
@@ -283,89 +206,3 @@ spec:
     app.kubernetes.io/part-of: dt-orders
     app.kubernetes.io/name: frontend
   type: ClusterIP
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: frontend-ingress
-  namespace: dtorders
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: dtorders-frontend.192.168.1.232.nip.io
-      http:
-        paths:
-          - backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
-            path: /
-            pathType: Prefix
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: load-traffic
-  namespace: dtorders
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/part-of: dt-orders
-      app.kubernetes.io/name: load-traffic
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: load-traffic
-        app.kubernetes.io/version: "1"
-        app.kubernetes.io/component: traffic-simulation
-        app.kubernetes.io/part-of: dt-orders
-        app.kubernetes.io/managed-by: helm
-        app.kubernetes.io/created-by: dynatrace-demos
-    spec:
-      containers:
-        - name: load-traffic
-          image: dtdemos/dt-orders-load:1
-          imagePullPolicy: Always
-          env:
-            - name: HOSTNAME
-              value: "frontend"
-            - name: NUM_LOOPS
-              value: "100000"
-            - name: TEST_DEBUG
-              value: "false"
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: browser-traffic
-  namespace: dtorders
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/part-of: dt-orders
-      app.kubernetes.io/name: browser-traffic
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: browser-traffic
-        app.kubernetes.io/version: "1"
-        app.kubernetes.io/component: traffic-simulation
-        app.kubernetes.io/part-of: dt-orders
-        app.kubernetes.io/managed-by: helm
-        app.kubernetes.io/created-by: dynatrace-demos
-    spec:
-      containers:
-        - name: browser-traffic
-          image: dtdemos/dt-orders-browser:1
-          imagePullPolicy: Always
-          env:
-            - name: APP_URL
-              value: "http://frontend"
-            - name: SCRIPT_NUM_LOOPS
-              value: "15000"
