@@ -99,6 +99,14 @@ We skipped the k3s ingress controller during install. We'll install nginx with t
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/cloud/deploy.yaml
 ```
 
+When the installation is done, you'll have 2 pods in a _completed_ state. You can clean up your cluster with:
+
+```bash
+kubectl delete pod --field-selector=status.phase==Succeeded -A
+```
+
+> These pods were used to build the nginx controller. Like scaffolding used to build a house, it's safe to remove once the house is done.
+
 ## Next steps
 
 With kubernetes running, deploying an application to test is the next step.
