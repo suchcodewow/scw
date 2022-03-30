@@ -6,56 +6,6 @@
 kubectl apply -f https://suchcodewow.io/manifests/dtorders/deployall.yaml
 ```
 
-### Create a namespace
-
-```bash
-kubectl create ns dtorders
-```
-
-kubectl create -f manifests/dynatrace-oneagent-metadata-viewer.yaml
-
-```bash
-kubectl -n dtorders apply -f manifests/catalog-service.yml
-```
-
-```bash
-kubectl create ingress catalog-service --class=nginx --rule="dtorders-catalog.192.168.1.232.nip.io/*=customer:8080" -n dtorders
-```
-
-```bash
-kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/master/manifests/dtorders/catalog-service.yaml
-```
-
-```bash
-kubectl create ingress catalog --class=nginx --rule="dtorders-catalog.192.168.1.232.nip.io/*=customer:8080" -n dtorders
-```
-
-### Order service
-
-```bash
-kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/master/manifests/dtorders/order-service.yaml
-```
-
-```bash
-kubectl create ingress orders --class=nginx --rule="dtorders-orders.192.168.1.232.nip.io/*=order:8080" -n dtorders
-```
-
-### frontend
-
-```bash
-kubectl -n dtorders apply -f https://raw.githubusercontent.com/suchcodewow/scw/master/manifests/dtorders/frontend.yaml
-```
-
-```bash
-kubectl create ingress frontend --class=nginx --rule="dtorders-frontend.192.168.1.232.nip.io/*=frontend:8080" -n dtorders
-```
-
-kubectl -n dtorders apply -f manifests/browser-traffic.yml
-
-kubectl -n dtorders apply -f manifests/load-traffic.yml
-
-kubectl -n dtorders get pods
-
 ## commands
 
 attach to a running pod
