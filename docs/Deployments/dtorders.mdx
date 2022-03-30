@@ -1,9 +1,10 @@
 # DT-Orders
 
-## commands
+## Quickstart
 
-attach to a running pod
-kubectl exec --stdin --tty shell-demo -- /bin/bash
+```bash
+kubectl apply -f https://suchcodewow.io/manifests/dtorders/deployall.yaml
+```
 
 ### Create a namespace
 
@@ -54,3 +55,8 @@ kubectl -n dtorders apply -f manifests/browser-traffic.yml
 kubectl -n dtorders apply -f manifests/load-traffic.yml
 
 kubectl -n dtorders get pods
+
+## commands
+
+attach to a running pod
+kubectl exec --stdin --tty shell-demo -- /bin/bash
