@@ -20,7 +20,7 @@
   --ifm-font-size-base: 100%;
 }
 
-.alert {
+.alert-info {
   --ifm-alert-background-color: rgba(0, 0, 0, 0.03);
 }
 

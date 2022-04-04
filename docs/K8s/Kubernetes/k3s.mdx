@@ -21,6 +21,8 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -
 - `INSTALL_K3S_EXEC...` sets an environment variable instructing the install to skip k3s' default ingress controller traefik.
 - `sh -` runs the result of the previous step in a shell (in this case, the k3s install).
 
+### Copy config file to default spot & install kubectl
+
 Create a folder and move the kubernetes config file to a default location to help further standardize this kubernetes install.
 
 <details>
@@ -32,7 +34,7 @@ Create a folder and move the kubernetes config file to a default location to hel
     </li>
     <li>
       k3s doesn't store the config file where kubectl normally looks for it.
-      These last few steps move the file to the default spot where kubectl will
+      These next few steps move the file to the default spot where kubectl will
       look.
     </li>
   </ul>
@@ -89,7 +91,9 @@ To check that everything works, run the following.
 kubectl get nodes
 ```
 
-If you see a response indicating a `READY` status, congratulations :tada:! You've built an operational kubernetes installation.
+If you see a response indicating a `READY` status, congratulations :tada:! You have kubernetes.
+
+![node_ready](/img/node_ready.png)
 
 ### Final config for k3s
 
