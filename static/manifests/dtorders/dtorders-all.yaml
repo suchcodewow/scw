@@ -67,7 +67,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: dtorders-customer.192.168.1.232.nip.io
+    - host: dtorders-customer.dev.local.nip.io
       http:
         paths:
           - backend:
@@ -143,7 +143,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: dtorders-catalog.192.168.1.232.nip.io
+    - host: dtorders-catalog.dev.local.nip.io
       http:
         paths:
           - backend:
@@ -218,7 +218,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: dtorders-order.192.168.1.232.nip.io
+    - host: dtorders-order.dev.local.nip.io
       http:
         paths:
           - backend:
@@ -293,7 +293,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: dtorders-frontend.192.168.1.232.nip.io
+    - host: dtorders-frontend.dev.local.nip.io
       http:
         paths:
           - backend:
