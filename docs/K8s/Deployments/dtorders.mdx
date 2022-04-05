@@ -10,7 +10,7 @@ pagination_next:
 Download the dtorders application manifest.
 
 ```bash
-kubectl apply -f https://suchcodewow.io/manifests/dtorders/dtorders-all.yaml
+curl https://suchcodewow.io/manifests/dtorders/dtorders-all.yaml -L -o dtorders-all.yaml
 ```
 
 Replace `dev.local` in this yaml file with the IP address of your nginx load balancer.
