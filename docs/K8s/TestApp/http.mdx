@@ -11,7 +11,7 @@ If you run into unfamiliar concepts on this page, check out the [previous page](
 
 :::
 
-## Deploy the Demo app
+## Deploy
 
 Create a demo namespace.
 
@@ -25,19 +25,19 @@ Deploy the apache httpd server.
 kubectl create deployment demo --image=httpd --port=80 -n demo
 ```
 
-- **demo** is the name of our deployment. Feel free to use your favorite's pet name here instead. Just remember you rebelled slightly for other commands that reference SirFluffyRoyalToeBeans.
+- **demo** is the name of our deployment. Feel free to use your favorite pet's name instead. Just remember you rebelled slightly for other commands that might reference SirFluffyRoyalToeBeans.
 - **- - image** tells kubectl we want to use the [httpd docker image :arrow_upper_right:](https://hub.docker.com/_/httpd).
-- **- - port=80** tell kubectl which port it should run on.
+- **- - port=80** tell kubectl which port it should run on. Port 80 is the standard for web traffic- but you could pick any valid port #.
 
 ## :checkered_flag: Checkpoint
 
-You can check on what you've deployed and the status of each deployment with:
+Check deployment status with:
 
 ```bash
 kubectl get deploy -A
 ```
 
-While that shows what you've deployed (blueprints), you can see all running pods (the entities actually doing work) with:
+While that shows what you've deployed (blueprints), you can see all running pods (entities created from blueprints that do the work) with:
 
 ```bash
 kubectl get pods -A
