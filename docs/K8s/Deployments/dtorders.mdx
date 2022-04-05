@@ -1,15 +1,28 @@
+---
+pagination_prev:
+pagination_next:
+---
+
 # DT-Orders
 
 ## Quickstart
 
+Download the dtorders application manifest.
+
 ```bash
-kubectl apply -f https://suchcodewow.io/manifests/dtorders/deployall.yaml
+kubectl apply -f https://suchcodewow.io/manifests/dtorders/dtorders-all.yaml
 ```
 
-Get the load balanced IP of your cluster.
+Replace `dev.local` in this yaml file with the IP address of your nginx load balancer.
 
 ```bash
-kubectl get svc ingress-nginx-controller -n ingress-nginx -o=custom-columns=EXTERNAL-IP:.status.loadBalancer.ingress[0].ip --no-headers
+sed -i "s/dev.local/$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o=custom-columns=EXTERNAL-IP:.status.loadBalancer.ingress[0].ip --no-headers)/g" dtorders-all.yaml
+```
+
+Apply the updated yaml file.
+
+```bash
+kubectl apply -f dtorders-all.yaml
 ```
 
 ### command reference

@@ -8,7 +8,7 @@ pagination_next:
 These steps build a kubernetes cluster using k3s.  
 k3s is an extremely light-weight but capable kubernetes distribution.
 
-### Install Kubernetes
+## Install Kubernetes
 
 Start by installing the base k3s package.
 
@@ -16,12 +16,12 @@ Start by installing the base k3s package.
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -
 ```
 
-- `curl` downloads the k3s installer.
-- `|` is the pipe command chaining multiple commands together.
-- `INSTALL_K3S_EXEC...` sets an environment variable instructing the install to skip k3s' default ingress controller traefik.
-- `sh -` runs the result of the previous step in a shell (in this case, the k3s install).
+- **curl** downloads the k3s installer.
+- **|** is the pipe command chaining multiple commands together.
+- **INSTALL_K3S_EXEC...** sets an environment variable instructing the install to skip k3s' default ingress controller traefik.
+- **sh -** runs the result of the previous step in a shell (in this case, the k3s install).
 
-### Copy config file to default spot & install kubectl
+## Copy config file to default spot & install kubectl
 
 Create a folder and move the kubernetes config file to a default location to help further standardize this kubernetes install.
 
@@ -44,9 +44,9 @@ Create a folder and move the kubernetes config file to a default location to hel
 mkdir -m700 ~/.kube
 ```
 
-- `mkdir` is the linux **make directory** command.
-- `-m700` limits the permissions to just our user (preventing security warnings later)
-- `~/.kube` is the standard folder location for the config file.
+- **mkdir** is the linux **make directory** command.
+- **-m700** limits the permissions to just our user (preventing security warnings later)
+- **~/.kube** is the standard folder location for the config file.
 
 Export the config file to the folder you created.
 
@@ -60,7 +60,7 @@ Ensure you are the file's owner (prevents security warnings/issues later).
 sudo chown -R $USER ~/.kube
 ```
 
-### Install kubectl
+## Install kubectl
 
 k3s comes with a slightly modified kubectl command. There's nothing wrong with it-
 but to make sure kubernetes works in a standard way across all tutorials, we'll install and use the official kubectl.
@@ -83,7 +83,7 @@ Install.
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 ```
 
-### :checkered_flag: Checkpoint
+## :checkered_flag: Checkpoint
 
 To check that everything works, run the following.
 
@@ -95,7 +95,7 @@ If you see a response indicating a `READY` status, congratulations :tada:! You h
 
 ![node_ready](/img/node_ready.png)
 
-### Final config for k3s
+## Final config for k3s
 
 We skipped the k3s ingress controller during install. We'll install nginx with the command below.
 

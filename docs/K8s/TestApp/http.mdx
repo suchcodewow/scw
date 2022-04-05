@@ -1,5 +1,6 @@
 ---
 pagination_prev:
+pagination_next:
 ---
 
 # demo app
@@ -24,9 +25,9 @@ Deploy the apache httpd server.
 kubectl create deployment demo --image=httpd --port=80 -n demo
 ```
 
-- `demo` is the name of our deployment. Feel free to use your favorite's pet name here instead. Just remember you rebelled slightly for other commands that reference SirFluffyRoyalToeBeans.
-- `--image` tells kubectl we want to use the [httpd docker image :arrow_upper_right:](https://hub.docker.com/_/httpd).
-- `--port=80` tell kubectl which port it should run on.
+- **demo** is the name of our deployment. Feel free to use your favorite's pet name here instead. Just remember you rebelled slightly for other commands that reference SirFluffyRoyalToeBeans.
+- **- - image** tells kubectl we want to use the [httpd docker image :arrow_upper_right:](https://hub.docker.com/_/httpd).
+- **- - port=80** tell kubectl which port it should run on.
 
 ## :checkered_flag: Checkpoint
 
@@ -44,14 +45,13 @@ kubectl get pods -A
 
 You should see your hard working demo pod running right next to the other kubernetes components.
 
-```bash
+```bash {3}
 NAMESPACE       NAME                                       READY   STATUS      RESTARTS   AGE
 kube-system     coredns-96cc4f57d-52nqb                    1/1     Running     0          46m
 kube-system     local-path-provisioner-84bb864455-8hpzb    1/1     Running     0          46m
 kube-system     metrics-server-ff9dbcb6c-zz7k5             1/1     Running     0          46m
 ingress-nginx   svclb-ingress-nginx-controller-w5vhb       2/2     Running     0          42m
 ingress-nginx   ingress-nginx-controller-cb87575f5-xsm7l   1/1     Running     0          42m
-//highlight-next-line
 demo            demo-654c477f6d-r9558                      1/1     Running     0          12m
 ```
 
@@ -113,3 +113,5 @@ kubectl create ingress demo --class=nginx --rule="demo.192.168.1.232.nip.io/*=de
 If successful, you'll reach a simple page saying "It works!" when you connect to your URL.
 
 ![works image](/img/works.png)
+
+## :fast_forward: Next Steps
