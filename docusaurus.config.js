@@ -63,6 +63,12 @@ const config = {
             position: "left",
             label: "Tutorials",
           },
+          {
+            type: "doc",
+            docId: "k8s/index",
+            position: "left",
+            label: "k8s",
+          },
 
           {
             href: "https://github.com/suchcodewow/scw",
