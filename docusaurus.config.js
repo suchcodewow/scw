@@ -58,16 +58,26 @@ const config = {
         },
         items: [
           {
-            type: "doc",
-            docId: "intro",
-            position: "left",
+            type: "dropdown",
             label: "Tutorials",
-          },
-          {
-            type: "doc",
-            docId: "k8s/index",
             position: "left",
-            label: "k8s",
+            items: [
+              {
+                type: "doc",
+                docId: "intro",
+                label: "Welcome",
+              },
+              {
+                type: "doc",
+                docId: "k8s/index",
+                label: "k8s",
+              },
+              {
+                type: "doc",
+                docId: "fastTrack/index",
+                label: "FastTrack: Azure",
+              },
+            ],
           },
 
           {
