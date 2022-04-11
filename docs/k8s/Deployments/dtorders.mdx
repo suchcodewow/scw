@@ -24,7 +24,7 @@ sed "s/dev.local/$(cat myip)/g" dtorders-all.yaml > dtorders-all-hasIP.yaml
 Apply the updated yaml file.
 
 ```bash
-kubectl apply -f dtorders-all.yaml
+kubectl apply -f dtorders-all-hasIP.yaml
 ```
 
 You can see the pods that make up the application with:
