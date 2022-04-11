@@ -74,8 +74,8 @@ const config = {
               },
               {
                 type: "doc",
-                docId: "fastTrack/index",
-                label: "FastTrack: Azure",
+                docId: "accelerators/index",
+                label: "Accelerator: Azure",
               },
             ],
           },
