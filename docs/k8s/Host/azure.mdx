@@ -7,7 +7,9 @@ pagination_next:
 
 ## Log in to your Azure Portal
 
+:::info Prerequisites
 You'll need to have rights to create and modify virtual machines.
+:::
 
 ## Open the Azure CLI
 
@@ -16,6 +18,15 @@ Open an azure client shell by clicking the shell button at the top of the page.
 
 **Either:** select "bash" as the terminal type **-or-** ensure Bash is selected at the top of the terminal window.  
 ![azure bash](/img/bash.png)
+
+:::tip Which subscription am I using?
+Your shell is attached to a subscription which determines where commands run. You can check to see which subscription is selected with:
+
+```bash
+az account show -o table
+```
+
+:::
 
 ## Create the VM
 
