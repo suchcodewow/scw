@@ -5,6 +5,8 @@ pagination_next:
 
 # DT-Orders
 
+This deployment will create an application for you in the **dtorders** namespace and automatically generate synthetic traffic for you.
+
 ## Quickstart
 
 Download the dtorders application manifest.
@@ -13,10 +15,10 @@ Download the dtorders application manifest.
 curl https://suchcodewow.io/manifests/dtorders/dtorders-all.yaml -L -o dtorders-all.yaml
 ```
 
-Replace `dev.local` in this yaml file with the IP address of your nginx load balancer.
+Replace `dev.local` in this yaml file with your public IP address.
 
 ```bash
-sed -i "s/dev.local/$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o=custom-columns=EXTERNAL-IP:.status.loadBalancer.ingress[0].ip --no-headers)/g" dtorders-all.yaml
+sed "s/dev.local/$(cat myip)/g" dtorders-all.yaml > dtorders-all-hasIP.yaml
 ```
 
 Apply the updated yaml file.
@@ -25,10 +27,28 @@ Apply the updated yaml file.
 kubectl apply -f dtorders-all.yaml
 ```
 
-### command reference
-
-attach to a running pod
+You can see the pods that make up the application with:
 
 ```bash
-kubectl exec --stdin --tty shell-demo -- /bin/bash
+kubectl get pods -n dtorders
 ```
+
+The deployment uses the IP address you provided to create URL's to the various components of your application. You can see the links with:
+
+```bash
+kubectl get ingress -n dtorders
+```
+
+The **HOSTS** column shows the URL's of your services. You can copy and paste these in your browser to directly access the various components.
+
+The various components:
+
+- **frontend** shows the main UI of the application.
+- **customer** is the API for the customer list. Add `/customer` to the end of the URL to retrieve the current customers.
+- **catalog** is the API for the various items for sale. Add `/catalog` to the end of the URL to see the current items.
+- **order** lists the orders that have been submitted from the front end. You can manually add orders here as well.
+
+:::info What is nip.io?
+Real applications have names like 'booksforyou.com' and configure several networking components to route users to many different hosts to serve requests. into Companies will configure
+
+:::

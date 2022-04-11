@@ -2,3 +2,9 @@
 pagination_prev:
 pagination_next:
 ---
+
+## Public IP address
+
+```bash
+$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o=custom-columns=EXTERNAL-IP:.status.loadBalancer.ingress[0].ip --no-headers)
+```

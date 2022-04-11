@@ -20,9 +20,18 @@ const sidebars = {
       type: "category",
       label: "Accelerator: Azure",
       items: [
-        { type: "doc", id: "accelerators/index" },
-        { type: "doc", id: "accelerators/azure", label: "1- Setup Azure VM" },
-        { type: "doc", id: "k8s/Kubernetes/k3s", label: "2- Install k3s" },
+        { type: "doc", id: "accelerator-azure/index" },
+        { type: "doc", id: "k8s/Host/azure", label: "1- Setup Azure VM" },
+        {
+          type: "doc",
+          id: "k8s/Kubernetes/k3s",
+          label: "2- Install k3s",
+        },
+        {
+          type: "doc",
+          id: "k8s/Deployments/dtorders",
+          label: "3- Deploy DtOrders",
+        },
       ],
     },
   ],

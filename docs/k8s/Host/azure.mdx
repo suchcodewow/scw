@@ -1,0 +1,72 @@
+---
+pagination_prev:
+pagination_next:
+---
+
+# Create Azure Host
+
+## Log in to your Azure Portal
+
+You'll need to have rights to create and modify virtual machines.
+
+## Open the Azure CLI
+
+Open an azure client shell by clicking the shell button at the top of the page.  
+![azure cli](/img/azure_cli.png)
+
+**Either:** select "bash" as the terminal type **-or-** ensure Bash is selected at the top of the terminal window.  
+![azure bash](/img/bash.png)
+
+## Create the VM
+
+Start by creating a resource group for this series.
+
+:::tip
+You can list the various azure regions with the command below if _eastus_ isn't close to you. Replace the `location` part of the command below.
+
+```bash
+az account list-locations -o table
+```
+
+:::
+
+```bash
+az group create --name K8platform --location eastus
+```
+
+Create the virtual machine. You'll need to change `updateme` below to a password that meets [azure vm requirements](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/faq#what-are-the-password-requirements-when-creating-a-vm-) before submitting the command.
+
+```bash
+az vm create --resource-group K8platform --name k8host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser -o tsv --query publicIpAddress --admin-password updateme > myip
+```
+
+- We're using the long term support (LTS) version of Ubuntu linux for the **image**.
+- The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpun 8gb mem) to run kubernetes.
+- **public-ip-sku** assigns a public IP address so we can access our machine remotely.
+- The **-o**, **- - query**, **> myip** components get the public IP address from the output and save it to the _myip_ file.
+
+Copy the **myip** file into your host for later. Type `yes` (if asked) to store the key fingerprint. Enter the password from previous step when asked.
+
+```bash
+scp myip azureuser@$(cat myip):/home/azureuser/myip
+```
+
+## :checkered_flag:
+
+Make sure to note the public IP address of your new host. You'll need it to log in or connect later via web browser. It's available on the details page of your virtual machine in Azure or you can retrieve from the file where we stored it with
+
+```bash
+cat myip
+```
+
+You should be able to ssh into your new host from the azure shell or any internet connected terminal. The format is:
+
+```bash
+ssh azureuser@[your public ip]
+```
+
+If you successfully login, congratulations! You've configured your host.
+
+## Next Steps
+
+Check out the next numbered item on the left sidebar for more.

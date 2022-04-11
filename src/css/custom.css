@@ -23,6 +23,7 @@
   --ifm-font-size-base: 100%;
   --ifm-font-family-base: "Roboto";
   --ifm-pre-padding: 7px;
+
   --ifm-line-height-base: 1.3;
 }
 
@@ -49,6 +50,7 @@ details[class^="details"] {
 div[class^="codeBlock"] {
   margin-left: 6px;
   padding: 5px;
+  box-shadow: none;
 }
 
 .alert {

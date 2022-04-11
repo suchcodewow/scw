@@ -70,11 +70,11 @@ const config = {
               {
                 type: "doc",
                 docId: "k8s/index",
-                label: "k8s",
+                label: "Modular: Kubernetes",
               },
               {
                 type: "doc",
-                docId: "accelerators/index",
+                docId: "accelerator-azure/index",
                 label: "Accelerator: Azure",
               },
             ],
