@@ -49,6 +49,16 @@ The various components:
 - **order** lists the orders that have been submitted from the front end. You can manually add orders here as well.
 
 :::info What is nip.io?
-Real applications have names like 'booksforyou.com' and configure several networking components to route users to many different hosts to serve requests. into Companies will configure
-
+Real applications have names like 'booksforyou.com' and configure several networking components to route users to many different hosts to serve requests. It adds cost and complexity that aren't necessary when starting to deploy kubernetes.  
+For this tutorial series, we're using nip.io to give us similar functionality. It's a great tool that sends anything before **.nip.io** over to the given IP address. This means we can host any number of services on a single IP address.  
+For example, dtorders-frontend.192.168.1.100.nip.io will send **dtorders-frontend.192.168.1.100** to IP address _192.168.100_. With zero configuration, our request reaches the IP address while simultaneously telling nginx to send us to the **dtorders-frontend** service.
+![science](/img/science.png)
 :::
+
+## :checkered_flag: Checkpoint
+
+Find the URL for the application frontend above. Copy and paste the URL into your browser. You should see an application page similar to below.
+
+![dtorders frontend](/img/dtorders-frontend.png)
+
+If you see this page congratulations :tada: ! You've deployed the dtorders application. In Dynatrace, you'll see traffic begin to flow across services and at the application level.

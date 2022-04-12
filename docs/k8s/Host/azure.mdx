@@ -32,7 +32,7 @@ az account show -o table
 
 Start by creating a resource group for this series.
 
-:::tip
+:::tip Selecting a region
 You can list the various azure regions with the command below if _eastus_ isn't close to you. Replace the `location` part of the command below.
 
 ```bash
@@ -62,7 +62,7 @@ Copy the **myip** file into your host for later. Type `yes` (if asked) to store 
 scp myip azureuser@$(cat myip):/home/azureuser/myip
 ```
 
-## :checkered_flag:
+## :checkered_flag: Checkpoint
 
 Make sure to note the public IP address of your new host. You'll need it to log in or connect later via web browser. It's available on the details page of your virtual machine in Azure or you can retrieve from the file where we stored it with
 

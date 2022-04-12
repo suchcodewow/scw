@@ -29,8 +29,13 @@ const sidebars = {
         },
         {
           type: "doc",
+          id: "k8s/Dynatrace/index",
+          label: "3- Install Dynatrace",
+        },
+        {
+          type: "doc",
           id: "k8s/Deployments/dtorders",
-          label: "3- Deploy DtOrders",
+          label: "4- Deploy DtOrders",
         },
       ],
     },
