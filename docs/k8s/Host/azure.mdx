@@ -1,18 +1,16 @@
 ---
 pagination_prev:
 pagination_next:
+title: Setup Azure VM
 ---
-
-## Log in to your Azure Portal
 
 :::info Prerequisites
 You'll need to have rights to create and modify virtual machines.
 :::
 
-## Open the Azure CLI
+## Login to Azure Portal
 
-Open an azure client shell by clicking the shell button at the top of the page.  
-![azure cli](/img/azure_cli.png)
+Click [here](https://portal.azure.com/#cloudshell) to login to Azure and open a cloud shell.
 
 **Either:** select "Powershell" as the terminal type **-or-** ensure Powershell is selected at the top of the terminal window.  
 ![azure ps](/img/powershell.png)
@@ -25,7 +23,7 @@ cd ~/clouddrive
 
 ## Download the helper script
 
-This script shows yours subscriptions, let you pick a new default for this session, and lists common commands used in these tutorials.
+This script lets you pick a subscription, creates a unique resource group for you (critical if others running this tutorial in the same subscription), and provides common commands.
 
 Download the helper script:
 
@@ -33,24 +31,20 @@ Download the helper script:
 curl https://www.suchcodewow.io/manifests/helper.ps1 > ~/clouddrive/helper.ps1
 ```
 
-Run it to set your subscription and execute commands:
-
-```bash
-~/clouddrive/helper.ps1
-```
-
-## Create the VM
+## Create the virtual machine
 
 :::warning Check your subscription!
 Your shell is connected to a subscription. When you create resources (groups/vm's/etc) in Azure, by default, they will be created in your current subscription.
 
-You can check which subscription you're using with the command below- or check out the helper script below.
-
-```bash
-az account show -o table
-```
+Ensure that you are connected to the correct subscription using the helper script below.
 
 :::
+
+Run the helper script to setup your resource group.
+
+```bash
+~/clouddrive/helper.ps1
+```
 
 Start by creating a resource group for this series.
 
