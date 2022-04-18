@@ -13,7 +13,7 @@ function Get-Choice($cmd_choices)
     $cmd_selected = read-host -prompt "Which option to execute? [<enter> to quit]"
     if (-not($cmd_selected))
     {
-        write-host "`r`nbuh bye!" | Out-Host
+        write-host "buh bye!`r`n" | Out-Host
         exit
     }
     return $cmd_choices | Where-Object -FilterScript { $_.Option -eq $cmd_selected } | Select-Object -ExpandProperty Command_Line -first 1 
