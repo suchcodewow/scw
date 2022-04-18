@@ -62,11 +62,10 @@ By default, the helper script shows each command as it runs so you can see what 
 Details on the command used to create the vm are below.
 
 - We're using the long term support (LTS) version of Ubuntu linux for the **image**.
-- The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpun 8gb mem) to run kubernetes.
+- The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpu & 8gb mem) to run kubernetes.
 - **public-ip-sku** assigns a public IP address so we can access our machine remotely.
-- The **-o**, **- - query**, **> myip** components get the public IP address from the output and save it to the _myip_ file.
 
-Once the script presents you with additional options, it's safe to press < enter > and quit. You can run the helper script anytime to show these options.
+Once the script presents you with additional options, it's safe to press < enter > and quit. You can run the helper script at any point going forward- it will skip passed the creation steps and take you directly to the help options.
 
 Copy the **myip** file into your host to reference later.
 

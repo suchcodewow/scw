@@ -95,7 +95,7 @@ if ($(Show-cmd($check_group_command)) -eq "false")
     Show-cmd($create_group_command)
 }
 $cmd_choices = @()
-$cmd_choices += New-object PSCustomObject -Property @{Option = "delgroup"; Name = "Delete group: $target_group"; Command_Line = "az group delete -n $target_group" }
+$cmd_choices += New-object PSCustomObject -Property @{Option = "del"; Name = "Delete group: $target_group"; Command_Line = "az group delete -n $target_group" }
 
 # Create VM if needed
 $target_host = "scw-host-$UserName"
