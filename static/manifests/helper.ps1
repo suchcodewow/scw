@@ -9,7 +9,7 @@ $show_commands = $true
 function Get-Choice($cmd_choices)
 {
     # Present list of options and get selection
-    $cmd_choices | sort-object -property Option | format-table -Property Option, Name, Type, Command_Line | Out-Host
+    $cmd_choices | sort-object -property Option | format-table -Property Option, Name, Command_Line | Out-Host
     $cmd_selected = read-host -prompt "Which option to execute? [<enter> to quit]"
     if (-not($cmd_selected))
     {
