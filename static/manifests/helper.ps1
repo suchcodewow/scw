@@ -11,7 +11,7 @@ function Get-Choice($cmd_choices)
     $cmd_selected = read-host -prompt "Which command to execute? [<enter> to quit]"
     if (-not($cmd_selected))
     {
-        write-host "buh bye!: $($cmd_selected)" | Out-Host
+        write-host "`r`nbuh bye!" | Out-Host
         exit
     }
     return $cmd_choices | Where-Object -FilterScript { $_.Option -eq $cmd_selected } | Select-Object -ExpandProperty Command_Line -first 1 
@@ -46,23 +46,24 @@ if ($subscription_mode)
         }
         $choice = @(
             [PSCustomObject]@{
-                Option = $counter; id = $i.id; name = $i.name; current = $current_account
+                Option = $counter; id = $i.id; subscription = $i.name; current = $current_account
             }
             $account_choices += $choice
         )
-        write-host $choice
     }
 
-    $account_choices | sort-object -property Option | format-table -Property Option, name | Out-Host
+    $account_choices | sort-object -property Option | format-table -Property Option, subscription | Out-Host
     $account_selected = read-host -prompt "Connect which account? [$account_default]"
     if ($account_selected)
     {
-        $new_account_id = $account_choices | Where-Object -FilterScript { $_.Option -eq $account_selected } | Select-Object -Property id -first 1
+        $new_account_id = $account_choices | Where-Object -FilterScript { $_.Option -eq $account_selected } | Select-Object -Property id,name -first 1
         az account set --subscription $new_account_id.id
-        write-Host "set account to $($new_account_id.id)" | Out-Host
+        
 
     }
 }
+$NewSubName = az account show --query 'name' -o tsv
+write-host "Loading command options for: $NewSubName" | Out-Host
 # Add VM connections to list of options using type = ssh (currently the only option)
 $vm_list = az vm list --query '[].{id:id,name:name,user:osProfile.adminUsername}' | ConvertFrom-Json
 $cmd_choices = @()
