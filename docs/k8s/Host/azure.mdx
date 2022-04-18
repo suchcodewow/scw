@@ -40,39 +40,38 @@ Ensure that you are connected to the correct subscription using the helper scrip
 
 :::
 
-Run the helper script to setup your resource group.
+Run the helper script to setup your resource group and add a vm to it.
 
 ```bash
 ~/clouddrive/helper.ps1
 ```
 
-Start by creating a resource group for this series.
+The (name) below comes from the email address of your Azure account up to the '@' symbol. i.e. bob.smith@mail.com would be 'bob.smith'.
 
-:::tip Selecting a region
-You can list the various azure regions with the command below if _eastus_ isn't close to you. Replace the `location` part of the command below.
+The script:
 
-```bash
-az account list-locations -o table
-```
+1. allows you to select a subscription (and set it as default).
+1. creates a resource group in the format: scw-group-(name).
+1. creates a vm in that resource group with the format: scw-host-(name).
+1. saves the public IP of your vm into the _myip_ file.
 
+:::tip Showing the commands
+By default, the helper script shows each command as it runs so you can see what it is doing. This behavior could be changed by opening the script and changing `$show_commands = $true` to `$show_commands = $false` near the top.
 :::
 
-```bash
-az group create --name K8platform --location eastus
-```
-
-Create the virtual machine. You'll need to change `updateme` below to a password that meets [azure vm requirements](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/faq#what-are-the-password-requirements-when-creating-a-vm-) before submitting the command.
-
-```bash
-az vm create --resource-group K8platform --name k8host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser -o tsv --query publicIpAddress --admin-password updateme > myip
-```
+Details on the command used to create the vm are below.
 
 - We're using the long term support (LTS) version of Ubuntu linux for the **image**.
 - The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpun 8gb mem) to run kubernetes.
 - **public-ip-sku** assigns a public IP address so we can access our machine remotely.
 - The **-o**, **- - query**, **> myip** components get the public IP address from the output and save it to the _myip_ file.
 
-Copy the **myip** file into your host for later. Type `yes` (if asked) to store the key fingerprint. Enter the password from previous step when asked.
+Once the script presents you with additional options, it's safe to press < enter > and quit. You can run the helper script anytime to show these options.
+
+Copy the **myip** file into your host to reference later.
+
+> Type `yes` (if asked) to store the key fingerprint.  
+> Enter the password of your new vm when needed.
 
 ```bash
 scp myip azureuser@$(cat myip):/home/azureuser/myip
@@ -80,13 +79,15 @@ scp myip azureuser@$(cat myip):/home/azureuser/myip
 
 ## :checkered_flag: Checkpoint
 
-Make sure to note the public IP address of your new host. You'll need it to log in or connect later via web browser. It's available on the details page of your virtual machine in Azure or you can retrieve from the file where we stored it with
+You can run the helper script at any time with:
 
 ```bash
-cat myip
+~/clouddrive/helper.ps1
 ```
 
-You should be able to ssh into your new host from the azure shell or any internet connected terminal. The format is:
+Once it loads, you'll see options to quickly login to your Azure VM or reset the password. It also shows you the exact command it runs to perform those steps if you want to experiement with it yourself.
+
+The command to connect to your new vm is similar to below. Login and confirm you can access your vm.
 
 ```bash
 ssh azureuser@[your public ip]
