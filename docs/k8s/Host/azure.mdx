@@ -3,8 +3,6 @@ pagination_prev:
 pagination_next:
 ---
 
-# Create Azure Host
-
 ## Log in to your Azure Portal
 
 :::info Prerequisites
@@ -16,14 +14,32 @@ You'll need to have rights to create and modify virtual machines.
 Open an azure client shell by clicking the shell button at the top of the page.  
 ![azure cli](/img/azure_cli.png)
 
-**Either:** select "bash" as the terminal type **-or-** ensure Bash is selected at the top of the terminal window.  
-![azure bash](/img/bash.png)
+**Either:** select "Powershell" as the terminal type **-or-** ensure Powershell is selected at the top of the terminal window.  
+![azure ps](/img/powershell.png)
 
-:::tip Which subscription am I using?
-Your shell is attached to a subscription which determines where commands run. You can check to see which subscription is selected with:
+Switch into your cloud drive so anything you download and run will persist from session to session.
+
+```bash
+cd ~/clouddrive
+```
+
+:::warning Check your subscription!
+Your shell is connected to a subscription. When you create resources (groups/vm's/etc) in Azure, by default, they will be created in your current subscription.
+
+You can check which subscription you're using with the command below- or check out the helper script below.
 
 ```bash
 az account show -o table
+```
+
+:::tip Download the helper script
+
+This script shows yours subscriptions, let you pick a new default for this session, and lists common commands used in these tutorials.
+
+Download this helper script
+
+```bash
+
 ```
 
 :::

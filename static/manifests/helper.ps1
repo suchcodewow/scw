@@ -1,6 +1,6 @@
 # ---Settings--- 
 # $true = ask for subscription, $false=assume current
-$subscription_mode = $false
+$subscription_mode = $true
 
 # ---Functions---
 

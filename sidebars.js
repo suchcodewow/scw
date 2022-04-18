@@ -20,8 +20,12 @@ const sidebars = {
       type: "category",
       label: "Accelerator: Azure",
       items: [
-        { type: "doc", id: "accelerator-azure/index" },
-        { type: "doc", id: "k8s/Host/azure", label: "1- Setup Azure VM" },
+        { type: "doc", id: "accelerator-azure/index", label: "Index" },
+        {
+          type: "doc",
+          id: "k8s/Host/azure",
+          label: "1- Setup Azure VM",
+        },
         {
           type: "doc",
           id: "k8s/Kubernetes/k3s",
