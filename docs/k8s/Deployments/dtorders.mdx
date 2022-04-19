@@ -6,7 +6,9 @@ title: DTOrders
 
 This deployment will create an application in the **dtorders** namespace and automatically generate synthetic traffic for you.
 
-The application consists of:
+The deployment creates the DTORDERS namespace.
+
+A pod, service, and ingress are created for:
 
 - a simple frontend UI
 - a catalog service
@@ -87,4 +89,32 @@ Find the URL for the application frontend above. Copy and paste the URL into you
 
 ![dtorders frontend](/img/dtorders-frontend.png)
 
-If you see this page congratulations :tada: ! You've deployed the dtorders application. In Dynatrace, you'll see traffic begin to flow across services and at the application level.
+In your Dynatrace tenant, go to **services**. You should see catalog, customer, order, and frontend services with significant request rates.
+
+![dtorders frontend](/img/dtorders_services.png)
+
+Under **Frontend** applications, _My Web Application_ should also have traffic and "real user" sessions. (Session replay can be enabled to capture replays.)
+
+If you can connect to the frontend of your application and Dynatrace observability is in place, congratulations :tada: ! You've deployed the dtorders application. In Dynatrace, you'll see traffic begin to flow across services and at the application level.
+
+## Removing DTOrders
+
+There are a couple of ways you can remove DTOrders if you want to recover space in your cluster.
+
+### Option 1: YAML
+
+You can use the same YAML file used to deploy the application to remove it.
+
+```bash
+kubectl delete -f dtorders-all-hasIP.yaml
+```
+
+This will "surgically" remove exactly the elements added during the original deployment.
+
+### Option 2: namespace
+
+Deleting the namespace for DTORDERS will delete the namespace and everything in it.
+
+```bash
+kubectl delete ns dtorders
+```
