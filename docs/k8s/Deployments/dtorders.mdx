@@ -63,7 +63,7 @@ The deployment uses the IP address you provided to create URL's to the various c
 kubectl get ingress -n dtorders
 ```
 
-The **HOSTS** column shows the URL's of your services. You can copy and paste these in your browser to directly access the various components.
+The **HOSTS** column shows the URL's of your services. You can copy and paste any of them into your browser.
 
 The various components:
 
@@ -73,9 +73,11 @@ The various components:
 - **order** lists the orders that have been submitted from the front end. You can manually add orders here as well.
 
 :::info What is nip.io?
-Real applications have names like 'booksforyou.com' and configure several networking components to route users to many different hosts to serve requests. It adds cost and complexity that aren't necessary when starting to deploy kubernetes.  
-For this tutorial series, we're using nip.io to give us similar functionality. It's a great tool that sends anything before **.nip.io** over to the given IP address. This means we can host any number of services on a single IP address.  
-For example, dtorders-frontend.192.168.1.100.nip.io will send **dtorders-frontend.192.168.1.100** to IP address _192.168.100_. With zero configuration, our request reaches the IP address while simultaneously telling nginx to send us to the **dtorders-frontend** service.
+Real applications have names like 'booksforyou.com' and configure several networking components to route users to many different hosts to serve requests. It adds cost and complexity well beyond the scope of these tutorials.
+
+For this tutorial series, we're using nip.io to elegantly provides the same functionality without cost. Anything before **.nip.io** is sent to the IP address. This means we can access any number of services on our single kubernetes cluster. Without nip.io, we'd be limited to hosting a single web service on our cluster's IP address.
+
+For example, **dtorders-frontend.192.168.1.100.nip.io** and **dtorders-customer.192.168.1.100.nip.io** both go to **192.168.100** but nginx sees the entire URL coming in and can route the request to the appropriate service.
 ![science](/img/science.png)
 :::
 
