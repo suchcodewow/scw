@@ -1,10 +1,11 @@
-# ---Settings--- 
+#region ---Settings--- 
 # $true = ask for subscription, $false=assume current
 $subscription_mode = $true
 # $true = show any commands as they run (verbose), $false = hide commands
 $show_commands = $true
+#endregion
 
-# ---Functions---
+#region ---Functions---
 
 function Get-Choice($cmd_choices)
 {
@@ -21,6 +22,7 @@ function Get-Choice($cmd_choices)
 
 function Invoke-Choice($cmd)
 {
+    #Execute menu option selected
     $msg = [regex]::match($cmd, '\[(.*?)\]').Groups[1].value
     $replace = [regex]::match($cmd, '\[(.*?)\]').Groups[0].value
     if ($msg)
@@ -33,14 +35,17 @@ function Invoke-Choice($cmd)
 
 function Show-cmd($str)
 {
+    #Function to execute any command while showing exact command to user if settings is on
     write-host "`r`n$($str.comments)..." | Out-Host
     if ($show_commands) { write-host -ForegroundColor Blue "$($str.cmd)`r`n" | Out-Host }
     Invoke-Expression $str.cmd
 }
-# ---Main Script---
+#endregion
+
 # Startup
 write-host -ForegroundColor Blue "lines in this color show commands exactly as they are executed."
-# Pick subscription
+
+#region ---subscription selection---
 if ($subscription_mode)
 {
     $current_id = az account show --query 'id' -o tsv
@@ -69,11 +74,12 @@ if ($subscription_mode)
     
     }
 }
+#endregion
 
 $NewSub = az account show --query '{name:name,email:user.name,id:id}' | ConvertFrom-Json; $SubName = $NewSub.name; $SubId = $NewSub.id; $UserName = ($NewSub.email).split("@")[0]
 write-host "Loading command options for: $SubName" | Out-Host
 
-# Create resource group if needed
+#region ---Create resource group if needed---
 $target_group = "scw-group-$UserName"
 $check_group_command = @{cmd = "az group exists -g $target_group --subscription $SubId"; comments = "Check if group already exists" }
 if ($(Show-cmd($check_group_command)) -eq "false")
@@ -96,8 +102,9 @@ if ($(Show-cmd($check_group_command)) -eq "false")
 }
 $cmd_choices = @()
 $cmd_choices += New-object PSCustomObject -Property @{Option = "del"; Name = "Delete group: $target_group"; Command_Line = "az group delete -n $target_group" }
+#endregion
 
-# Create VM if needed
+#region ---Create VM if needed---
 $target_host = "scw-host-$UserName"
 $Check_host_command = @{cmd = "az vm list -g $target_group --query ""[?name=='$target_host']"""; comments = "Check if host exists" }
 if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
@@ -110,7 +117,9 @@ if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
         Write-Output $host_result.publicIpAddress > myip
     }
 }
-# Add VM connections to list of options using type = ssh
+#endregion
+
+#region ---Menu: VM Options---
 $vm_list = az vm list --query '[].{id:id,name:name,user:osProfile.adminUsername,publicIP:publicIps}' -g $target_group -d | ConvertFrom-Json
 $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
 {
@@ -120,6 +129,7 @@ $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
     $counter++
     new-object PSCustomObject -Property @{Option = $counter; Name = "reset pw on host: $($i.name)"; Command_Line = "az vm user update -u $($i.user) -p [new password] -n $target_host -g $target_group -o none" }
 }
+#endregion
 
 # Combine choices and show options
 $cmd_choices += $vm_choices
