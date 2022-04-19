@@ -51,15 +51,15 @@ The (name) below comes from the email address of your Azure account up to the '@
 The script:
 
 1. allows you to select a subscription (and set it as default).
-1. creates a resource group in the format: scw-group-(name).
-1. creates a vm in that resource group with the format: scw-host-(name).
+1. [creates a resource group](https://docs.microsoft.com/en-us/cli/azure/group?view=azure-cli-latest) in the format: scw-group-(name).
+1. [creates a vm](https://docs.microsoft.com/en-us/cli/azure/vm?view=azure-cli-latest#az-vm-create) in that resource group with the format: scw-host-(name).
 1. saves the public IP of your vm into the _myip_ file.
 
 :::tip Showing the commands
-By default, the helper script shows each command as it runs so you can see what it is doing. This behavior could be changed by opening the script and changing `$show_commands = $true` to `$show_commands = $false` near the top.
+By default, the helper script shows each command as it runs so you can see what it is doing if you are new to Azure. It can be turned off be editing helper.ps1 and changing `$show_commands = $true` to `$show_commands = $false` near the top.
 :::
 
-Details on the command used to create the vm are below.
+Details on the create vm step:
 
 - We're using the long term support (LTS) version of Ubuntu linux for the **image**.
 - The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpu & 8gb mem) to run kubernetes.
@@ -78,19 +78,13 @@ scp myip azureuser@$(cat myip):/home/azureuser/myip
 
 ## :checkered_flag: Checkpoint
 
-You can run the helper script at any time with:
+Run the helper script:
 
 ```bash
 ~/clouddrive/helper.ps1
 ```
 
-Once it loads, you'll see options to quickly login to your Azure VM or reset the password. It also shows you the exact command it runs to perform those steps if you want to experiement with it yourself.
-
-The command to connect to your new vm is similar to below. Login and confirm you can access your vm.
-
-```bash
-ssh azureuser@[your public ip]
-```
+Once it loads, you'll see options to quickly login to your Azure VM or reset the password. It also shows you the exact command it runs to perform those steps if you want to copy them out to use later.
 
 If you successfully login, congratulations! You've configured your host.
 
