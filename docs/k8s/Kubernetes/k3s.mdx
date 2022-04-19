@@ -8,21 +8,13 @@ These steps build a kubernetes cluster using k3s.
 k3s is an extremely light-weight but capable kubernetes distribution.
 
 :::info Prerequisites
-
-1. Login to your host.
-2. Confirm you've recorded your public IP address with:
-
-```bash
-cat myip
-```
-
-if you don't see your IP address, return to the previous Host Setup page and retry the step to create/copy it.
-
+Ensure you can login to your ubuntu host & that you have administrative ability.  
+If you're following this section from previous tutorials you should be all set.
 :::
 
 ## Install Kubernetes
 
-Install the base k3s package.
+Login to your host and install the base k3s package.
 
 ```bash
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -

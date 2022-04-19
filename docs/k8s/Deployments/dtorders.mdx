@@ -1,11 +1,35 @@
 ---
 pagination_prev:
 pagination_next:
+title: DTOrders
 ---
 
-# DT-Orders
+This deployment will create an application in the **dtorders** namespace and automatically generate synthetic traffic for you.
 
-This deployment will create an application for you in the **dtorders** namespace and automatically generate synthetic traffic for you.
+The application consists of:
+
+- a simple frontend UI
+- a catalog service
+- a customer table
+- an orders table
+
+There are also two other pods:
+
+- a browser traffic generator creating "real" user sessions
+- a load traffic generator creating hits to API's in the application
+
+:::info Prerequisites
+
+1. Login to your host.
+2. Confirm you've recorded your public IP address with:
+
+```bash
+cat myip
+```
+
+if you don't see your IP address, return to the previous Host Setup page and retry the step to create/copy it.
+
+:::
 
 ## Quickstart
 
