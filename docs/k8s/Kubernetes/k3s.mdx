@@ -45,9 +45,8 @@ Create a folder and move the kubernetes config file to a default location to hel
       and how to access it.
     </li>
     <li>
-      k3s doesn't store the config file where kubectl normally looks for it.
-      These next few steps move the file to the default spot where kubectl will
-      look.
+      These next few steps move the k3s config file to the default spot where
+      kubectl will look & secure the file to avoid errors later.
     </li>
   </ul>
 </details>
@@ -83,9 +82,23 @@ Download kubectl.
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 ```
 
+<details>
+  <summary>What is kubectl?</summary>
+  <ul>
+    <li>
+      Kubernetes's interface is an [API](https://en.wikipedia.org/wiki/API). We
+      need a way to interact with it.
+    </li>
+    <li>
+      kubectl is a well organized/documented command line tool to achieve this.
+      Running `kubectl` will show you the myriad of options available.
+    </li>
+  </ul>
+</details>
+
 :::info
 
-The weird bonus curl command in the middle simply gets the most current version number for downloading in the main curl command.
+The weird bonus curl command in the middle simply gets the most current version number for downloading in the main curl command. #InceptionButWithCurl
 
 :::
 
@@ -115,13 +128,23 @@ We skipped the k3s ingress controller during install. We'll install nginx with t
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/cloud/deploy.yaml
 ```
 
-When the installation is done, you'll have 2 pods in a _completed_ state. You can clean up your cluster with:
-
-```bash
-kubectl delete pod --field-selector=status.phase==Succeeded -A
-```
-
-> These pods were used to build the nginx controller. Like scaffolding used to build a house, it's safe to remove once the house is done.
+<details>
+  <summary>New Ingress, who dis?</summary>
+  <ul>
+    <li>
+      By default, Kubernetes sets up a virtual network between the containers.
+      This lets application components communicate with each other and
+      (generally) the internet.
+    </li>
+    <li>
+      We need an [ingress
+      controller](https://www.nginx.com/resources/glossary/kubernetes-ingress-controller/)
+      to control how we access our cluster from the outside. It's like adding a
+      gate to a walled city. It allows access- but we can specify what kind of
+      traffic can get in and where it goes in the cluster.
+    </li>
+  </ul>
+</details>
 
 ## Next steps
 
