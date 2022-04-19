@@ -42,6 +42,13 @@ Ensure that you are connected to the correct subscription using the helper scrip
 
 Run the helper script to setup your resource group and add a vm to it.
 
+:::Warning Azure Passwords!
+You'll need to think up a fairly saucy password for your VM. As of this writing:
+
+- Passwords must be 12 characters long.
+- Have 3 out of 4: lower case, upper case, digit, special character
+  :::
+
 ```bash
 ~/clouddrive/helper.ps1
 ```
@@ -71,6 +78,10 @@ Copy the **myip** file into your host to reference later.
 
 > Type `yes` (if asked) to store the key fingerprint.  
 > Enter the password of your new vm when needed.
+
+:::tip azureuser
+The username IS in fact, by default, azureuser. No need to change it below! You didn't miss anything.
+:::
 
 ```bash
 scp myip azureuser@$(cat myip):/home/azureuser/myip
