@@ -7,7 +7,7 @@ title: 3- Dynatrace
 
 # Dynatrace Install
 
-The steps below summarize installation of the Dynatrace Operator. The only change from default is to set limits on cpu/memory to keep Azure costs down.
+The steps below summarize installation of the Dynatrace Operator. The only change from default is to set limits on cpu/memory to keep resource consumption low in cloud platforms.
 
 For the latest documentation, [click here](https://www.dynatrace.com/support/help/setup-and-configuration/setup-on-container-platforms/kubernetes/set-up-k8s-monitoring).
 
@@ -81,9 +81,9 @@ Follow a similar process for the section starting with **Optional: resource sett
 
 - (Optional) Save the file.
 
-- Copy the entire contents of this file (usually with ctrl+a).
+- Copy the entire contents of this file (usually with _ctrl+a_ then _ctrl+c_).
 
-- In your azure cloud shell window, create and edit the same file with :
+In your linux terminal, create and edit dynakube.yaml with:
 
 ```bash
 nano dynakube.yaml
@@ -93,7 +93,7 @@ nano dynakube.yaml
 
 ## Deploy the Dynatrace manifests
 
-- Back in the Dynatrace tenant, click the **copy** button next to the commands and paste into your azure cloud shell window.
+- Back in the Dynatrace tenant, click the **copy** button next to the commands and paste into your linux terminal.
 
 :::tip
 Make sure to press < enter > once to send all commands. Because there are multiple lines, the shell will start executing the first command immediately but leave the last one hanging.
@@ -117,19 +117,21 @@ scw-4-19-22-activegate-0             1/1     Running   0          3m43s
 scw-4-19-22-oneagent-mk9lt           1/1     Running   0          3m42s
 ```
 
-If one of the pods fails to start there could be several things going on. Checking the logs is a good start when troubleshooting. To look at the logs for a pod, use something like:
+:::tip Troubleshooting
+If one of the pods fails to start try reviewing the logs as a first troubleshooting step with:
 
 ```bash
 kubectl logs [podname] -n dynatrace
 ```
 
+:::
+
 Once 4 pods are ready, return to your Dyantrace tenant.
 
-- Click on **Deployment Status** in the left dark menu bar.
-
-You should see a new host running in your environment on the **OneAgents** page.
-
-By clicking on **ActiveGates** you should also see a new activegate.
+- Select **Deployment Status** in the left dark menu bar.  
+  You should see a new host running in your environment on the **OneAgents** page.
+- Select **ActiveGates** in the grey menu bar.  
+  You should see a new active gate.
 
 If you see both running, congratulations :tada: ! You've successfully connected Dynatrace to your Kubernetes cluster.
 
