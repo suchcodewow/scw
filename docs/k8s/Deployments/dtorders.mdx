@@ -6,6 +6,8 @@ title: DTOrders
 
 This deployment will create an application in the **dtorders** namespace and automatically generate synthetic traffic for you.
 
+<details>
+
 The deployment creates the DTORDERS namespace.
 
 A pod, service, and ingress are created for:
@@ -48,7 +50,7 @@ sed "s/dev.local/$(cat myip)/g" dtorders-all.yaml > dtorders-all-hasIP.yaml
 ```
 
 <details><summary>What is sed?</summary>
-sed is a utility that replaces one string of text with another.  In our case it
+sed is a utility that replaces one string of text with another.  Here we're telling it to search for **dev.local** (a placeholder) in **dtorders-all.yaml** and use the contents of the *myip* file as the replacement.  The **/g** tells sed to replace every instance.  The part starting with **>** means to send the result of all those replacements to the target filename.
 
 </details>
 
