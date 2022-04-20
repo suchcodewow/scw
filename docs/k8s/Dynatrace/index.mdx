@@ -27,7 +27,17 @@ For the latest documentation, [click here](https://www.dynatrace.com/support/hel
 
 ## Modify dynakube.yaml
 
-- Open **dynakube.yaml** in a text editor.
+Open **dynakube.yaml** in a text editor.
+
+:::tip But I love Notepad!
+There's nothing wrong with notepad for these tutorials. But if it is front and center in your mind when hear 'text editor', check out VScode when you have time.  
+It's a free, open-source, and built to work with all kinds of files (not just code as the name implies).
+
+If you want to try it out now, [click here to download](https://code.visualstudio.com/download).  
+We'll hang tight right here while you get it ready. Super excited to have you join in.
+![one of us](/img/oneofus.png)
+
+:::
 
 Find the section starting with **Optional: resource settings for OneAgent container** and remove the # signs so it looks like:
 
@@ -47,6 +57,8 @@ Find the section starting with **Optional: resource settings for OneAgent contai
 
 :::warning YAML gets grumpy easily
 YAML config files are extremely sensitive to spacing/tabs/margins. As of this writing, you'll need to remove the # sign and ONE (1) space so that **oneAgentResources:** lines up with the comments above. If you accidentally delete too much, **always** use spaces when adding more.....uh..... space. #ElegantWording
+
+If you are using vscode [check out this extension to assist with YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
 :::
 
 Follow a similar process for the section starting with **Optional: resource settings for ActiveGate container**. Change the memory limits from `1G` to `500M`. Remove the # signs so it looks like:

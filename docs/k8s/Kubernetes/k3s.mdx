@@ -122,20 +122,14 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 
 <details>
   <summary>New Ingress, who dis?</summary>
-  <ul>
-    <li>
-      By default, Kubernetes sets up a virtual network between the containers.
-      This lets application components communicate with each other and
-      (generally) the internet.
-    </li>
-    <li>
-      We need an [ingress
-      controller](https://www.nginx.com/resources/glossary/kubernetes-ingress-controller/)
-      to control how we access our cluster from the outside. It's like adding a
-      gate to a walled city. It allows access- but we can specify what kind of
-      traffic can get in and where it goes in the cluster.
-    </li>
-  </ul>
+
+By default, Kubernetes sets up a virtual network between the containers. This lets application components communicate with each other and (generally) the internet.
+
+We need an [ingress controller](https://www.nginx.com/resources/glossary/kubernetes-ingress-controller)
+to manage cluster access from the outside. It's like adding a gate
+to a walled city with guards directing traffic. It allows access to approved
+locations and prevents unauthorized requests.
+
 </details>
 
 ## Next steps
