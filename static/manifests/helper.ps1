@@ -116,6 +116,9 @@ if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
         $host_result = Show-cmd($create_host_command) | Convertfrom-json
         Write-Output $host_result.publicIpAddress > myip
     }
+    # open port 80 to the host
+    $open_port_command = @{cmd = "open port 80"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none"; comments = "Open port 80" }
+    Show-cmd($open_port_command)
 }
 #endregion
 
