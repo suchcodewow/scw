@@ -31,6 +31,10 @@ Download the helper script:
 curl https://www.suchcodewow.io/manifests/helper.ps1 > ~/clouddrive/helper.ps1
 ```
 
+:::tip 'show commands' vs 'Y U spam me'
+By default, the helper script shows each command as it runs- helpful if you are new to Azure. It can be turned off by and changing `$show_commands = $true` to `$show_commands = $false` near the top.
+:::
+
 ## Create the virtual machine
 
 :::warning Check your subscription!
@@ -42,8 +46,8 @@ Ensure that you are connected to the correct subscription using the helper scrip
 
 Run the helper script to setup your resource group and add a vm to it.
 
-:::Warning Azure Passwords!
-You'll need to think up a fairly saucy password for your VM. As of this writing:
+:::warning Azure Passwords
+You'll need to think up a fairly saucy password for your host. As of this writing:
 
 - Passwords must be 12 characters long.
 - Have 3 out of 4: lower case, upper case, digit, special character
@@ -55,18 +59,13 @@ You'll need to think up a fairly saucy password for your VM. As of this writing:
 ~/clouddrive/helper.ps1
 ```
 
-The (name) below comes from the email address of your Azure account up to the '@' symbol. i.e. bob.smith@mail.com would be 'bob.smith'.
-
 The script:
 
+1. uses your email up to the '@' as your name.
 1. allows you to select a subscription (and set it as default).
 1. [creates a resource group](https://docs.microsoft.com/en-us/cli/azure/group?view=azure-cli-latest) in the format: scw-group-(name).
 1. [creates a vm](https://docs.microsoft.com/en-us/cli/azure/vm?view=azure-cli-latest#az-vm-create) in that resource group with the format: scw-host-(name).
 1. saves the public IP of your vm into the _myip_ file.
-
-:::tip Showing the commands
-By default, the helper script shows each command as it runs so you can see what it is doing if you are new to Azure. It can be turned off be editing helper.ps1 and changing `$show_commands = $true` to `$show_commands = $false` near the top.
-:::
 
 Details on the create vm step:
 

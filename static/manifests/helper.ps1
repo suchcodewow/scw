@@ -40,13 +40,13 @@ function Show-cmd($str)
 {
     #Function to execute any command while showing exact command to user if settings is on
     write-host "`r`n$($str.comments)..." | Out-Host
-    if ($show_commands) { write-host -ForegroundColor Blue "$($str.cmd)`r`n" | Out-Host }
+    if ($show_commands) { write-host -ForegroundColor Green "$($str.cmd)`r`n" | Out-Host }
     Invoke-Expression $str.cmd
 }
 #endregion
 
 # Startup
-write-host -ForegroundColor Blue "lines in this color show commands exactly as they are executed."
+write-host -ForegroundColor Green "Lines in this color show commands exactly as they are executed."
 
 #region ---subscription selection---
 if ($subscription_mode)
