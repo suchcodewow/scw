@@ -90,3 +90,7 @@ img[class^="img"] {
 ul {
   margin-left: 20px;
 }
+
+ol {
+  margin-left: 20px;
+}

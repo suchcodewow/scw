@@ -37,16 +37,12 @@ By default, the helper script shows each command as it runs- helpful if you are 
 
 ## Create the virtual machine
 
-:::warning Check your subscription!
-Your shell is connected to a subscription. When you create resources (groups/vm's/etc) in Azure, by default, they will be created in your current subscription.
+:::warning Two things...
+**Check your subscription!**  
+Your shell is connected to a subscription. When you create resources (groups/vm's/etc) in Azure they will be created in your current subscription.
+Ensure that you connect to the subscription where you want to build your host.
 
-Ensure that you are connected to the correct subscription using the helper script below.
-
-:::
-
-Run the helper script to setup your resource group and add a vm to it.
-
-:::warning Azure Passwords
+**Azure passwords**  
 You'll need to think up a fairly saucy password for your host. As of this writing:
 
 - Passwords must be 12 characters long.
@@ -55,30 +51,32 @@ You'll need to think up a fairly saucy password for your host. As of this writin
 
 :::
 
+Run the helper script to create a resource group and a host.
+
 ```bash
 ~/clouddrive/helper.ps1
 ```
 
+:::info What's happening here?
 The script:
 
-1. uses your email up to the '@' as your name.
+1. uses your email up to '@' as your name.
 1. allows you to select a subscription (and set it as default).
 1. [creates a resource group](https://docs.microsoft.com/en-us/cli/azure/group?view=azure-cli-latest) in the format: scw-group-(name).
 1. [creates a vm](https://docs.microsoft.com/en-us/cli/azure/vm?view=azure-cli-latest#az-vm-create) in that resource group with the format: scw-host-(name).
-1. saves the public IP of your vm into the _myip_ file.
+1. saves the public IP of your host into the _myip_ file.
 
-Details on the create vm step:
+About the host creation step:
 
 - We're using the long term support (LTS) version of Ubuntu linux for the **image**.
 - The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpu & 8gb mem) to run kubernetes.
 - **public-ip-sku** assigns a public IP address so we can access our machine remotely.
 
-Once the script presents you with additional options, it's safe to press < enter > and quit. You can run the helper script at any point going forward- it will skip passed the creation steps and take you directly to the help options.
+:::
 
-Copy the **myip** file into your host to reference later.
+Once the script presents you with additional options, it's safe to press < enter > and quit. You can run the helper script again at any time.
 
-> Type `yes` (if asked) to store the key fingerprint.  
-> Enter the password of your new vm when needed.
+Copy the **myip** file into your host to reference later typing `yes` if asked to store fingerprint & entering the host password you just created.
 
 :::tip
 The default user is **azureuser**. No need to change it below! You didn't miss anything.
@@ -87,6 +85,15 @@ The default user is **azureuser**. No need to change it below! You didn't miss a
 ```bash
 scp myip azureuser@$(cat myip):/home/azureuser/myip
 ```
+
+<details>
+  <summary>Waiter, there seems to be a cat in my scp?</summary>SCP is the secure
+  copy command. We're using it to copy the myip file to your host to use later.
+  The cat command displays the contents of said file and the $() part means "run
+  whatever command is in here". In the end, scp gets the azure user name and the
+  IP of the host. The part after ':' is the folder and filename where scp saves
+  the file.
+</details>
 
 ## :checkered_flag: Checkpoint
 
