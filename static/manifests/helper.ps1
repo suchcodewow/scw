@@ -31,6 +31,7 @@ function Invoke-Choice($cmd)
 
     }
     Invoke-Expression $cmd
+    if ($cmd.contains("az group delete")) { write-host "Group deleted...exiting"; exit }
 }
 
 function Show-cmd($str)
