@@ -27,10 +27,12 @@ function Invoke-Choice($cmd)
     $replace = [regex]::match($cmd, '\[(.*?)\]').Groups[0].value
     if ($msg)
     {
-        $cmd = $cmd.replace($replace, (read-host -prompt "$($msg)?"))
+        $replacement = read-host -prompt "$($msg)?"
+        $cmd = $cmd.replace($replace, $replacement)
 
     }
-    Invoke-Expression $cmd
+    $menu_command = @{cmd = $cmd; comments = "Executing menu command" }
+    show-cmd($menu_command)
     if ($cmd.contains("az group delete")) { write-host "Group deleted...exiting"; exit }
 }
 
@@ -102,7 +104,7 @@ if ($(Show-cmd($check_group_command)) -eq "false")
     Show-cmd($create_group_command)
 }
 $cmd_choices = @()
-$cmd_choices += New-object PSCustomObject -Property @{Option = "del"; Name = "Delete group: $target_group"; Command_Line = "az group delete -n $target_group" }
+$cmd_choices += New-object PSCustomObject -Property @{Option = "del"; Name = "End Tutorial (delete all)"; Command_Line = "az group delete -n $target_group" }
 #endregion
 
 #region ---Create VM if needed---
@@ -118,7 +120,7 @@ if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
         Write-Output $host_result.publicIpAddress > myip
     }
     # open port 80 to the host
-    $open_port_command = @{cmd = "open port 80"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none"; comments = "Open port 80" }
+    $open_port_command = @{cmd = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none"; comments = "Open port 80" }
     Show-cmd($open_port_command)
 }
 #endregion
@@ -129,11 +131,13 @@ $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
 {
     $counter++
     # $az_list = az vm list-ip-addresses --id $($i.id)  --query '[].{publicIP:virtualMachine.network.publicIpAddresses[0].ipAddress}' | ConvertFrom-Json
-    New-object PSCustomObject -Property @{Option = $counter; Name = "connect to host: $($i.name)"; Command_Line = "ssh $($i.user)@$($i.publicIP)" }
+    New-object PSCustomObject -Property @{Option = $counter; Name = "login to host"; Command_Line = "ssh $($i.user)@$($i.publicIP)" 
+    }
     $counter++
-    new-object PSCustomObject -Property @{Option = $counter; Name = "reset pw on host: $($i.name)"; Command_Line = "az vm user update -u $($i.user) -p [new password] -n $target_host -g $target_group -o none" }
+    new-object PSCustomObject -Property @{Option = $counter; Name = "reset password"; Command_Line = "az vm user update -u $($i.user) -p [new password] -n $target_host -g $target_group -o none" 
+    }
     $counter++
-    new-object PSCustomObject -Property @{Option = $counter; Name = "open port 80 on: $($i.name)"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none" }
+    new-object PSCustomObject -Property @{Option = $counter; Name = "open port 80"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none" }
 }
 #endregion
 
@@ -142,5 +146,9 @@ $cmd_choices += $vm_choices
 while ($true)
 {
     $cmd = Get-Choice($cmd_choices)
-    Invoke-Choice($cmd)
+    if ($cmd)
+    {
+        Invoke-Choice($cmd)
+    }
+    else { write-host -ForegroundColor red "`r`nY U no pick existing option?" }
 }
