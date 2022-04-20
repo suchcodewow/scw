@@ -47,6 +47,11 @@ Replace `dev.local` in this yaml file with your public IP address.
 sed "s/dev.local/$(cat myip)/g" dtorders-all.yaml > dtorders-all-hasIP.yaml
 ```
 
+<details><summary>What is sed?</summary>
+sed is a utility that replaces one string of text with another.  In our case it
+
+</details>
+
 Apply the updated yaml file.
 
 ```bash

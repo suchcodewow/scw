@@ -128,6 +128,8 @@ $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
     New-object PSCustomObject -Property @{Option = $counter; Name = "connect to host: $($i.name)"; Command_Line = "ssh $($i.user)@$($i.publicIP)" }
     $counter++
     new-object PSCustomObject -Property @{Option = $counter; Name = "reset pw on host: $($i.name)"; Command_Line = "az vm user update -u $($i.user) -p [new password] -n $target_host -g $target_group -o none" }
+    $counter++
+    new-object PSCustomObject -Property @{Option = $counter; Name = "open port 80 on: $($i.name)"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none" }
 }
 #endregion
 
