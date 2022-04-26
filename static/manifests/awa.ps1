@@ -165,22 +165,20 @@ function ProcessWebapps
     write-host "$($todo_configure.Count) configurations needed"
     foreach ($i in $todo_configure)
     {
-        write-host $($i.name)
         $header = @{
-            Authorization = "Basic $($i.creds)"; Accept = "Application/JSON"
+            Authorization = "Basic $($i.creds)"; "Content-Type" = "Application/JSON"
         }
         $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
         $kuduSettingsUrl = "$kuduUrl/$dt_azure_baseURL/api/settings"
 
         $body = @{environmentId = $tenantId; apiToken = $token } | ConvertTo-Json
-        $body
         $result = Invoke-RestMethod -Method 'Put' -Body $body -Uri $kuduSettingsUrl -Headers $header
+        $result
     }
 
     #Failed Installs
     write-host "$($fail_list.Count) failed"
 }
-
 function Update-Menu
 {
     #reset things
@@ -252,38 +250,16 @@ function MenuLoop
         Invoke-Option $cmd_to_run
     }
 }
-function blah
-{
-    $Unique_id = -join ((65..90) | get-Random -Count 10 | ForEach-Object { [char]$_ })
-    $create_webapp_command = "az webapp create -n $Unique_id -g $resource_group -p $webapp_plan --runtime $runtime --startup-file $startup_file --query '[]. { id:id }'"
-    write-host -foregroundcolor green $create_webapp_command
-    $results = invoke-expression $create_webapp_command | Convertfrom-Json
-    write-host "Tailing log for $Unique_id" | Out-Host
-    az webapp log tail -n $Unique_id -g $resource_group
-    #Foreach ($i in $(az webapp list -g $resource_group --query '[]. { name:name }' |Convertfrom-Json)){
-    #    write-host "az webapp log show -n $($i.name) -g $resource_group"
-    #}
-}
 #endregion
 
-#region ---Main---
 #Configure Variables
 
-if (-not($url)) { $url = $iUrl }
-If ($url -eq "") { write-host "No URL was specified."; exit }
-if (-not($token)) { $token = $iToken }
-if ($token -eq "") { write-host "No token found"; exit }
+if (-not($url)) { $url = $iUrl }; If ($url -eq "") { write-host "No URL was specified."; exit }
+if (-not($token)) { $token = $iToken }; if ($token -eq "") { write-host "No token found"; exit }
 if ($url.substring($url.length - 1, 1) -eq "/") { $url = $url.substring(0, $url.length - 1) }
-$tenantId = $url.split(".")[0]
-$tenantId = $tenantId.split("//")
-if ($tenantId.Length -eq 2) { $tenantId = $tenantId[1] }
+$tenantId = $url.split(".")[0]; $tenantId = $tenantId.split("//"); if ($tenantId.Length -eq 2) { $tenantId = $tenantId[1] }
 if ($tenantId.Length -ne 8) { write-host "Your tenant ID ($tenantId) isn't the correct length of 8 characters."; exit }
 
 #MenuLoop
 
 ProcessWebapps
-#Generatewebapp
-#endregion
-
-
-#Running STARTUP_COMMAND: curl -o /tmp/installer.sh -s 'https://kge67267.live.dynatrace.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token=dt0c01.WOH3AKM2F2TCU5U32L5C4SD3.RP7VFPYHGMMGU57THONKAKHQBRHRXG6QHAA556VDUHEPXKQSR6NHPG56PWLKY2RL&arch=x86' && sh /tmp/installer.sh /home && LD_PRELOAD='/home/dynatrace/oneagent/agent/lib64/liboneagentproc.so'
