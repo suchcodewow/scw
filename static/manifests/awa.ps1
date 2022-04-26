@@ -1,16 +1,22 @@
+Param(
+    [Parameter(Mandatory = $false)] [string] $url,
+    [Parameter(Mandatory = $false)] [string] $token
+)
 #region ---Settings
 # [Core Setting] Show commands (chatty, but informative)
 $show_commands = $true
 # [Core Setting] Your Dynatrace tenant URL (Ignore after ;)
-$URL = "" ; if ($URL.substring($URL.length - 1, 1) -eq "/") { $URL = $URL.substring(0, $URL.length - 1) }
+$iUrl = "" ; 
 # [Core Setting] Your Dynatrace PAAS token
-$token = ""
+$iToken = ""
 # [Core Setting] The resource group scope for this script
 $resource_group = "scw-group-shawn.pearson"
 # [Azure Web App Settings]
 $webapp_plan = "shawn-projects"
 $runtime = "TOMCAT:10.0-java11"
 $startup_file = """curl -o /tmp/installer.sh -s '$($URL)/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token=$($token)&arch=x86' && sh /tmp/installer.sh /home && LD_PRELOAD='/home/dynatrace/oneagent/agent/lib64/liboneagentproc.so'"""
+$dt_azure_extension = "Dynatrace"
+$dt_azure_baseURL = "dynatrace"
 #endregion
 
 #region ---Functions---
@@ -37,21 +43,155 @@ function Generatewebapp()
     $Unique_id = -join ((65..90) | get-Random -Count 10 | ForEach-Object { [char]$_ })
     az webapp create -g $resource_group -p $webapp_plan -n $Unique_id -o none
 }
-function CreateWebapp()
+
+function Show-cmd($str)
 {
-    write-host $webapp_plan
+    #Function to execute any command while showing exact command to user if settings is on
+    write-host "`r`n$($str.comments)..." | Out-Host
+    if ($show_commands) { write-host -ForegroundColor Green "$($str.cmd)`r`n" | Out-Host }
+    Invoke-Expression $str.cmd
 }
+function ProcessWebapps
+{
+    $todo_baseinstall = @()
+    $todo_configure = @()
+    $todo_upgrade = @()
+    $fail_list = @()
+    $all_webapps = az webapp list -g $resource_group --query '[].{name:name}' | ConvertFrom-Json
+
+    foreach ($i in $all_webapps)
+    {
+        $credentials_command = @{cmd = "az webapp deployment list-publishing-credentials -g $resource_group -n $($i.name) --query '{name:publishingUserName, pass:publishingPassword}' | ConvertFrom-Json"; comments = "Getting credentials" }
+        $login_info = show-cmd($credentials_command)
+        $creds = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("$($login_info.name):$($login_info.pass)")))
+        $header = @{
+            Authorization = "Basic $creds"
+        }
+        #Base webapp connect info
+        $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
+        $kuduDTUrl = "$kuduUrl/$dt_azure_baseURL/api/status"
+        $kuduApiUrl = "$kuduUrl/api/siteextensions/$dt_azure_extension"
+        #$kuduApiUrl = "$kuduUrl/api/extensionfeed";
+        #Get all extensions
+        #$results = Invoke-RestMethod -Method 'Get' -Uri $kuduApiUrl -Headers $header
+        # 1. Check DT extension status
+        #Invoke-RestMethod -Method 'Get' -Uri $kuduDTUrl -Headers $header
+        #try
+        #{
+        $error.Clear()
+        $dt_status = Invoke-RestMethod -Method 'Get' -Uri $kuduDTUrl -Headers $header -ErrorAction Continue
+        if ($error)
+        {
+            write-host "There was an error: $error"
+        }
+        else
+        {
+            Switch ($dt_status.state)
+            {
+                NotInstalled
+                {
+                    $todo_configure += @{name = $i.name; creds = $creds }
+                }
+                Default
+                {
+                    #Shouldn't get here.
+                    write-host "Couldn't identify a solution"
+                }
+            }
+        }
+        #}
+        #catch
+        #{
+        #    if ($_.Exception.Response.StatusCode.value__ -eq 404)
+        #    { 
+        #        #Add this host to the base install list
+        #        $todo_baseinstall += @{name = $i.name }
+        #
+        #            }
+        #            else
+        #            {
+        #                write-host "Unknown status code $($_.Exception.Response.StatusCode.value__) for $($i.name)"
+        #                $fail_list = @{name = $i.name; reason = "HTTPCODE" } 
+        #            }
+        #       }
+        #       finally
+        #       {
+        #          write-host "Error value is $Error"
+        #          if (-not($Error))
+        #          {
+        #              write-host "No error so evaluating $dt_status"
+        #              switch ($dt_status.state)
+        #              {
+        #                  NotInstalled
+        #                  {
+        #                      write-host "Adding $($i.name) to needs configured"
+        #                     $todo_configure += @{name = $i.name }
+        #                 }
+        #                 Default { write-host "Unknown state $($dtstatus.state) for $($i.name)" }
+        #             }
+        #         }
+        #}
+    }
+    #install extension
+    #$kuduApiUrl = "$kuduUrl/api/siteextensions/$dt_azure_extension"
+    #Invoke-RestMethod -Method 'Get' -Uri $kuduApiUrl -Headers $header
+    #$install_results | sort-object -Property id | format-table -Property id
+    #status
+
+    #$kuduApiUrl = "$kuduApiBaseUrl/api/siteextensions";
+    #$response = Invoke-RestMethod -Method 'Put' -Uri $kuduApiUrl -Headers $header;
+
+    #Do base installs
+    write-host "$($todo_baseinstall.Count) base installs needed"
+    foreach ($i in $todo_baseinstall)
+    {
+        write-host "Installing shell on $($i.name)"
+        $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
+        $kuduDTUrl = "$kuduUrl/$dt_azure_baseURL/api/status"
+        $kuduApiUrl = "$kuduUrl/api/siteextensions/$dt_azure_extension"
+        $result = Invoke-RestMethod -Method 'Put' -Uri $kuduApiUrl -Headers $header
+        if ($result.provisioningStatus -eq "Succeeded")
+        {
+            #Add this webapp to install list
+            write-host "Successful on $($i.name)"
+        }
+        else
+        {
+            #ADd this webapp to fail list
+            write-host "FAILURE: $($i.name) full result: $result"
+        }
+    }
+    #Configure new installations
+    write-host "$($todo_configure.Count) configurations needed"
+    foreach ($i in $todo_configure)
+    {
+        write-host $($i.name)
+        $header = @{
+            Authorization = "Basic $($i.creds)"; Accept = "Application/JSON"
+        }
+        $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
+        $kuduSettingsUrl = "$kuduUrl/$dt_azure_baseURL/api/settings"
+
+        $body = @{environmentId = $tenantId; apiToken = $token } | ConvertTo-Json
+        $body
+        $result = Invoke-RestMethod -Method 'Put' -Body $body -Uri $kuduSettingsUrl -Headers $header
+    }
+
+    #Failed Installs
+    write-host "$($fail_list.Count) failed"
+}
+
 function Update-Menu
 {
     #reset things
     $script:cmd_options = @()
     $script:cmd_counter = 0
     #subscription selection option
-    $current_subscription = az account show --query '{id:id,name:name}' | Convertfrom-Json
+    $current_subscription = az account show --query '{ id:id, name:name }' | Convertfrom-Json
     Add-MenuOption -cmd "ChangeSubscription" -cmd_type "script" -text "Change subscription [currently: $($current_subscription.name)]"
     Add-MenuOption -cmd "GenerateWebapp" -cmd_type "script" -text "Generate a new web app"
     #List existing webapps
-    Add-MenuOption -cmd "az webapp list -g $resource_group --query '[].{name:defaultHostName}' -o table" -cmd_type "azcli" -text "List current webapps"
+    Add-MenuOption -cmd "ProcessWebapps" -cmd_type "script" -text "Get info on webapps"
 
 }
 function Add-MenuOption()
@@ -115,21 +255,34 @@ function MenuLoop
 function blah
 {
     $Unique_id = -join ((65..90) | get-Random -Count 10 | ForEach-Object { [char]$_ })
-    $create_webapp_command = "az webapp create -n $Unique_id -g $resource_group -p $webapp_plan --runtime $runtime --startup-file $startup_file --query '[].{id:id}'"
+    $create_webapp_command = "az webapp create -n $Unique_id -g $resource_group -p $webapp_plan --runtime $runtime --startup-file $startup_file --query '[]. { id:id }'"
     write-host -foregroundcolor green $create_webapp_command
     $results = invoke-expression $create_webapp_command | Convertfrom-Json
     write-host "Tailing log for $Unique_id" | Out-Host
     az webapp log tail -n $Unique_id -g $resource_group
-    #Foreach ($i in $(az webapp list -g $resource_group --query '[].{name:name}' |Convertfrom-Json)){
+    #Foreach ($i in $(az webapp list -g $resource_group --query '[]. { name:name }' |Convertfrom-Json)){
     #    write-host "az webapp log show -n $($i.name) -g $resource_group"
     #}
 }
 #endregion
 
 #region ---Main---
+#Configure Variables
 
-MenuLoop
+if (-not($url)) { $url = $iUrl }
+If ($url -eq "") { write-host "No URL was specified."; exit }
+if (-not($token)) { $token = $iToken }
+if ($token -eq "") { write-host "No token found"; exit }
+if ($url.substring($url.length - 1, 1) -eq "/") { $url = $url.substring(0, $url.length - 1) }
+$tenantId = $url.split(".")[0]
+$tenantId = $tenantId.split("//")
+if ($tenantId.Length -eq 2) { $tenantId = $tenantId[1] }
+if ($tenantId.Length -ne 8) { write-host "Your tenant ID ($tenantId) isn't the correct length of 8 characters."; exit }
 
+#MenuLoop
+
+ProcessWebapps
+#Generatewebapp
 #endregion
 
 
