@@ -19,3 +19,4 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 qg.ps1
+launch.json
