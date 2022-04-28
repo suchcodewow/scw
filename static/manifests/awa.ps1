@@ -57,6 +57,7 @@ function ProcessWebapps
     $todo_configure = @()
     $todo_upgrade = @()
     $fail_list = @()
+    $done_list = @()
     $all_webapps = az webapp list -g $resource_group --query '[].{name:name}' | ConvertFrom-Json
 
     foreach ($i in $all_webapps)
@@ -83,14 +84,26 @@ function ProcessWebapps
         if ($error)
         {
             write-host "There was an error: $error"
+            #If got a 404, install agent here
         }
         else
         {
+            $dt_status
             Switch ($dt_status.state)
             {
                 NotInstalled
                 {
                     $todo_configure += @{name = $i.name; creds = $creds }
+                }
+                Installed
+                {
+                    if ($dt_status.isUpgradeAvailable)
+                    { 
+                        write-host "Can be upgraded" 
+                        $todo_upgrade += @{name = $i.name }
+                    }
+                    else { write-host "up to date" }
+                    $done_list += @{name = $i.name }
                 }
                 Default
                 {
@@ -99,47 +112,8 @@ function ProcessWebapps
                 }
             }
         }
-        #}
-        #catch
-        #{
-        #    if ($_.Exception.Response.StatusCode.value__ -eq 404)
-        #    { 
-        #        #Add this host to the base install list
-        #        $todo_baseinstall += @{name = $i.name }
-        #
-        #            }
-        #            else
-        #            {
-        #                write-host "Unknown status code $($_.Exception.Response.StatusCode.value__) for $($i.name)"
-        #                $fail_list = @{name = $i.name; reason = "HTTPCODE" } 
-        #            }
-        #       }
-        #       finally
-        #       {
-        #          write-host "Error value is $Error"
-        #          if (-not($Error))
-        #          {
-        #              write-host "No error so evaluating $dt_status"
-        #              switch ($dt_status.state)
-        #              {
-        #                  NotInstalled
-        #                  {
-        #                      write-host "Adding $($i.name) to needs configured"
-        #                     $todo_configure += @{name = $i.name }
-        #                 }
-        #                 Default { write-host "Unknown state $($dtstatus.state) for $($i.name)" }
-        #             }
-        #         }
-        #}
+ 
     }
-    #install extension
-    #$kuduApiUrl = "$kuduUrl/api/siteextensions/$dt_azure_extension"
-    #Invoke-RestMethod -Method 'Get' -Uri $kuduApiUrl -Headers $header
-    #$install_results | sort-object -Property id | format-table -Property id
-    #status
-
-    #$kuduApiUrl = "$kuduApiBaseUrl/api/siteextensions";
-    #$response = Invoke-RestMethod -Method 'Put' -Uri $kuduApiUrl -Headers $header;
 
     #Do base installs
     write-host "$($todo_baseinstall.Count) base installs needed"
@@ -178,6 +152,8 @@ function ProcessWebapps
 
     #Failed Installs
     write-host "$($fail_list.Count) failed"
+    #Done Installs
+    write-host "$($done_list.Count) are up to date"
 }
 function Update-Menu
 {
