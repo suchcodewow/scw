@@ -80,7 +80,23 @@ const config = {
               },
             ],
           },
-
+          {
+            type: "dropdown",
+            label: "Scripts",
+            position: "left",
+            items: [
+              {
+                type: "doc",
+                docId: "scripts/index",
+                label: "Welcome",
+              },
+              {
+                type: "doc",
+                docId: "scripts/webapp",
+                label: "Azure Web Apps",
+              },
+            ],
+          },
           {
             href: "https://github.com/suchcodewow/scw",
             label: "GitHub",

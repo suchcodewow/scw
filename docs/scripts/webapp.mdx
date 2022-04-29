@@ -1,0 +1,86 @@
+---
+title: Dynatrace Webapp Extension Installer
+---
+
+## Goal
+
+Deploy the Dynatrace extension effortlessly to your Azure webapps without making pipeline changes or deployment adjustments.
+
+This script will:
+
+- run a preflight check on the options entered to ensure they are valid.
+- collect necessary webapp data for the resource group or webapp you specify.
+- query the webapp(s) for current state of the Dynatrace extension.
+- provide you with a 'todo' list for your confirmation(i.e. which webapps need installs/config/updates).
+- **stop** here by default. If implementation mode is enabled it will continue.
+- install the Dynatrace extension on the webapp(s).
+- configure the extension with your tenant information.
+- confirm successful implementation.
+
+## Prerequisites
+
+### Script download
+
+Download the powershell script:
+
+```bash
+curl -L http://suchcodewow.io/manifests/awa.ps1 > dtextinst.ps1
+```
+
+### From Dynatrace you'll need:
+
+1. Your dynatrace tenant URL.
+1. A dynatrace PAAS token.
+
+### From Azure you'll need:
+
+1. the resource group containing your webapps.
+1. (Optional) the name of the specific webapp where you want to deploy the extension.
+1. the webapp service plan name.
+
+You'll need a **Powershell** [cloud shell](http://portal.azure.com/#cloudshell) -or- a powershell session with the [azcli tools](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli) installed.
+
+## Usage
+
+The script supports `-parameters` or you can save settings in the **settings** block of the script (directly under the **Param** block).
+
+| Parameter                    | Script Setting   | Required?                   | Details                                                                                      |
+| ---------------------------- | ---------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
+| -url                         | $iUrl=           | **yes**                     | Your dynatrace tenant i.e. https://xxx.live.dynatrace.com/                                   |
+| -token                       | $iToken=         | **yes**                     | a [Paas token](https://www.dynatrace.com/support/help/get-started/access-tokens)             |
+| -group                       | $iGroup=         | **yes**                     | The Azure resource group with your webapps                                                   |
+| -webapp                      | $webapp=         |                             | (Optional) Specify a single webapp in your resource group to install the Dynatrace extension |
+| -plan                        | $iPlan=          | _only if generating an app_ | Only needed when generating blank apps for testing- not usually needed                       |
+| -mode [install/recycle/stop] | _Parameter only_ |                             | Switches from 'what-if' to implementation mode. See below for more detail                    |
+
+:::info "What-if" mode is the default
+By default, the script is read-only. It will evaluate your webapps and display a table of _todo's_ based on its findings. It's highly recommendeded to run the script read-only until you confirm what the script will do.
+:::
+
+### Implementation mode
+
+Using the `-mode` parameter enables the script to make changes. Use in conjunction with one flag below.
+
+- `-mode install` will install and configure the extension only.
+- `-mode recycle` same as install but will recycle the webapp when configuration complete.
+- `-mode stop` stops the webapp prior to install/configure. Starts the webapp when configuration complete.
+
+:::tip Stop mode
+The most reliable way for the extension to install correctly is using the `stop` flag. In complex/scaled environments the webapp will sometimes lock files preventing extension installation and removal. In most cases install & config takes only a few minutes minimizing the amount of the time the webapp is down.
+:::
+
+### Examples
+
+To see a todo list of what would happen in the 'webapp-group-3' resource group, run something like:
+
+```bash
+./dtextinst.ps1 -group webapp-group-3 -url https://12345678.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
+```
+
+You should see a list of webapps and their current Dynatrace extension status.
+
+Scoping to the single webapp 'BackendService2' would be something like:
+
+```bash
+./dtextinst.ps1 -group webapp-group-3 -webapp BackendService2 -url https://12345678.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
+```
