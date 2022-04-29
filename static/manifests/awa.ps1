@@ -1,22 +1,24 @@
 Param(
     [Parameter(Mandatory = $false)] [string] $url,
-    [Parameter(Mandatory = $false)] [string] $token
+    [Parameter(Mandatory = $false)] [string] $token,
+    [Parameter(Mandatory = $false)] [string] $group,
+    [Parameter(Mandatory = $false)] [string] $webapp,
+    [Parameter(Mandatory = $false)] [string] $mode
 )
-#region ---Settings
-# [Core Setting] Show commands (chatty, but informative)
-$show_commands = $true
-# [Core Setting] Your Dynatrace tenant URL (Ignore after ;)
-$iUrl = "" ; 
-# [Core Setting] Your Dynatrace PAAS token
-$iToken = ""
-# [Core Setting] The resource group scope for this script
-$resource_group = "scw-group-shawn.pearson"
+#region ---Settings 
+# [Core Settings]
+$logLevel = 2 # 0 = results only, 1 = status, 2 = info, 3 = az commands
+$iUrl = "" # Your Dynatrace tenant URL (in place of -url cmd line option)
+$iToken = "" # Your Dynatrace PAAS token (in place of -token cmd line option)
+$iGroup = "" # The resource group scope for this script (in place of -group cmd line option)
+$iWebapp = "" # Specific web app within resource group (optional)
+$apiTimeout = 30 # How many 3 second loops to wait until abandoning install
 # [Azure Web App Settings]
 $webapp_plan = "shawn-projects"
-$runtime = "TOMCAT:10.0-java11"
-$startup_file = """curl -o /tmp/installer.sh -s '$($URL)/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token=$($token)&arch=x86' && sh /tmp/installer.sh /home && LD_PRELOAD='/home/dynatrace/oneagent/agent/lib64/liboneagentproc.so'"""
-$dt_azure_extension = "Dynatrace"
-$dt_azure_baseURL = "dynatrace"
+#$runtime = "TOMCAT:10.0-java11"
+#$startup_file = """curl -o /tmp/installer.sh -s '$($URL)/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token=$($token)&arch=x86' && sh /tmp/installer.sh /home && LD_PRELOAD='/home/dynatrace/oneagent/agent/lib64/liboneagentproc.so'"""
+$dtAzExt = "Dynatrace" # Leave as-is
+
 #endregion
 
 #region ---Functions---
@@ -40,120 +42,232 @@ function ChangeSubscription()
 }
 function Generatewebapp()
 {
+    write-host -foregroundcolor green "Creating random webapp..." -NoNewline
     $Unique_id = -join ((65..90) | get-Random -Count 10 | ForEach-Object { [char]$_ })
-    az webapp create -g $resource_group -p $webapp_plan -n $Unique_id -o none
+    az webapp create -g $azGroup -p $webapp_plan -n $Unique_id -o none
+    write-host "$Unique_id created"
 }
 
 function Show-cmd($str)
 {
     #Function to execute any command while showing exact command to user if settings is on
-    write-host "`r`n$($str.comments)..." | Out-Host
-    if ($show_commands) { write-host -ForegroundColor Green "$($str.cmd)`r`n" | Out-Host }
-    Invoke-Expression $str.cmd
+    if ($logLevel -ge 3)
+    {
+        write-host "$($str.comments)> " -NoNewline
+        write-host -foregroundcolor green "$($str.cmd)"
+    }
+    return Invoke-Expression $str.cmd
 }
 function ProcessWebapps
 {
-    $todo_baseinstall = @()
-    $todo_configure = @()
-    $todo_upgrade = @()
-    $fail_list = @()
-    $done_list = @()
-    $all_webapps = az webapp list -g $resource_group --query '[].{name:name}' | ConvertFrom-Json
-
-    foreach ($i in $all_webapps)
+    if ($logLevel -ge 1) { write-host -foregroundColor Green "Loading Web Apps..." -NoNewline }
+    $targetWebapps = [System.Collections.ArrayList]@()
+    $azWebapps = az webapp list -g $azGroup --query '[].{name:name}' | ConvertFrom-Json
+    # Build list of webapps & URL's
+    foreach ($i in $azWebapps)
     {
-        $credentials_command = @{cmd = "az webapp deployment list-publishing-credentials -g $resource_group -n $($i.name) --query '{name:publishingUserName, pass:publishingPassword}' | ConvertFrom-Json"; comments = "Getting credentials" }
-        $login_info = show-cmd($credentials_command)
-        $creds = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("$($login_info.name):$($login_info.pass)")))
+
+        $credsCommand = @{cmd = "az webapp deployment list-publishing-credentials -g $azGroup -n $($i.name) --query '{name:publishingUserName, pass:publishingPassword}' | ConvertFrom-Json"; comments = "Getting credentials" }
+        $loginInfo = show-cmd($credsCommand)
+        $creds = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("$($loginInfo.name):$($loginInfo.pass)")))
         $header = @{
-            Authorization = "Basic $creds"
+            Authorization = "Basic $creds"; "Content-Type" = "Application/JSON"
         }
-        #Base webapp connect info
+        #kudu URL's
         $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
-        $kuduDTUrl = "$kuduUrl/$dt_azure_baseURL/api/status"
-        $kuduApiUrl = "$kuduUrl/api/siteextensions/$dt_azure_extension"
-        #$kuduApiUrl = "$kuduUrl/api/extensionfeed";
-        #Get all extensions
-        #$results = Invoke-RestMethod -Method 'Get' -Uri $kuduApiUrl -Headers $header
-        # 1. Check DT extension status
-        #Invoke-RestMethod -Method 'Get' -Uri $kuduDTUrl -Headers $header
-        #try
-        #{
-        $error.Clear()
-        $dt_status = Invoke-RestMethod -Method 'Get' -Uri $kuduDTUrl -Headers $header -ErrorAction Continue
-        if ($error)
+        [void]$targetWebapps.add((@{
+                    name = $i.name; todo = "query"; notes = ""; header = $header; state = "unchanged"
+                    kuduApiUrl = "$kuduUrl/api/siteextensions";
+                    kuduDtInstallUrl = "$kuduUrl/api/siteextensions/$dtAzExt";
+                    kuduDtStatusUrl = "$kuduUrl/$dtAzExt/api/status";
+                    kuduDtSettingsUrl = "$kuduUrl/$dtAzExt/api/settings"
+                }))
+    }
+    if ($logLevel -ge 1) { write-host -foregroundColor Green "$($targetWebapps.Count) loaded. Getting current states..." -NoNewline }
+    #Query each webapp for current status
+    foreach ($i in $($targetWebapps))
+    {
+        $allExts = Invoke-RestMethod -Method 'Get' -Uri $i.kuduApiUrl -Headers $i.header
+        $dtExtUrl = ($allExts | Where-Object id -Match "Dynatrace")
+        if (-not($dtExtUrl))
         {
-            write-host "There was an error: $error"
-            #If got a 404, install agent here
+            # Dynatrace extension not present
+            $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "install"; $_.notes = "extension not found" }
         }
         else
         {
-            $dt_status
-            Switch ($dt_status.state)
+            # Query status of DT extension
+            $dtStatus = Invoke-RestMethod -Method 'Get' -Uri $i.kuduDtStatusUrl -Headers $i.header
+            Switch ($dtStatus.state)
             {
                 NotInstalled
-                {
-                    $todo_configure += @{name = $i.name; creds = $creds }
-                }
+                { $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "configure"; $_.notes = "Extension present; needs config" } }
                 Installed
                 {
-                    if ($dt_status.isUpgradeAvailable)
-                    { 
-                        write-host "Can be upgraded" 
-                        $todo_upgrade += @{name = $i.name }
-                    }
-                    else { write-host "up to date" }
-                    $done_list += @{name = $i.name }
+                    if ($dtStatus.isUpgradeAvailable)
+                    { $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "upgrade"; $_.notes = $dtStatus.version } }
+                    else
+                    { $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "up-to-date"; $_.notes = $dtStatus.version } }
+                    
                 }
+                Failed
+                { $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "install"; $_.notes = $($dtStatus.message) } }
                 Default
+                { $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "FAILED"; $_.notes = "installation status unknown: $($dtStatus.state)" } }
+            }
+        }
+    }
+    if ($logLevel -ge 1) { write-host -foregroundColor Green "Success" }
+    $targetWebapps | ForEach-Object { [PSCustomObject]$_ } | format-table -AutoSize -Property name, todo, notes, state | Out-Host
+    if ($mode)
+    {
+        if ($mode -eq "stop")
+        {
+            foreach ($i in $($targetWebapps) | Where-Object todo -In ("install", "configure"))
+            {
+                if ($logLevel -ge 2) { write-host -foregroundColor green "Stopping webapp: $($i.name)..." -NoNewline }
+                $shutdownCommand = @{cmd = "az webapp stop -n $($i.name) -g $resource_group"; comments = "Shutting down $($i.name)" }
+                show-cmd($shutdownCommand)
+                if ($logLevel -ge 2) { write-host -foregroundColor green "Success" }
+                $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.state = "down" }
+            }
+        }
+        #Install Extension
+        foreach ($i in $($targetWebapps) | Where-Object todo -Match "install")
+        {
+            if ($logLevel -ge 2) { write-host -foregroundColor green "Starting install on $($i.name)..." -NoNewline }
+            $result = Invoke-RestMethod -Method 'Put' -Uri $i.kuduDtInstallUrl -Headers $i.header
+            if ($result.provisioningState -eq "Succeeded")
+            {
+                if ($logLevel -ge 2) { write-host -foregroundColor green "Provisioned...Waiting at most $apiTime loops for deployment..." -NoNewline }
+                #Hang tight until settings page is ready
+                $counter = 0
+                Do
                 {
-                    #Shouldn't get here.
-                    write-host "Couldn't identify a solution"
+                    Start-Sleep 3
+                    $Error.clear()
+                    try
+                    {
+                        $result = Invoke-RestMethod -Method 'Get' -Uri $i.kuduDtSettingsUrl -Headers $i.header 
+                    }
+                    catch
+                    {
+                        # Loop catches errors
+                    }
+                    $counter++
+                    if ($logLevel -ge 2) { write-host -foregroundColor green "$counter " -NoNewline }
+                    if ($counter -ge $apiTimeout)
+                    {
+                        #We've reached the max number of attempts and need to move on
+                        $Error.clear()
+                        $abortInstall = $true
+                    }
+                } until (-not($Error))
+                #Add to configure list or mark as failed
+                if ($abortInstall)
+                {
+                    if ($logLevel -ge 2) { write-host -foregroundColor red "Aborting" }
+                    $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "FAILED"; $_.notes = "Installation timeout ($apiTimeout) reached" }
+                }
+                else
+                {
+                    if ($logLevel -ge 2) { write-host -foregroundColor green "Success" }
+                        
+                    $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "configure"; $_.notes = "" }
+                }
+            }
+            else
+            {
+                #Add this webapp to fail list
+                $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "FAIL"; $_.notes = "provisioning state: $($result)" }
+                if ($logLevel -ge 2) { write-host -foregroundColor red "Installation failed: $($result)" }
+            }
+        }
+        #Configure
+        foreach ($i in $($targetWebapps) | Where-Object todo -Match "configure")
+        {
+            if ($logLevel -ge 2) { write-host -foregroundColor green "Configuring $($i.name)..." -NoNewline }
+            $body = @{environmentId = $tenantId; apiToken = $token } | ConvertTo-Json
+            #Configure [possible todo? handle errors during this method?]
+            $result = Invoke-RestMethod -Method 'Put' -Body $body -Uri $i.kuduDtSettingsUrl -Headers $i.header
+            #Hang tight while configuration/setup occurs
+            $installResult = "Installing"
+            $counter = 0
+            Do 
+            {
+                Start-Sleep 3
+                $installLoop = Invoke-RestMethod -Method 'Get' -Uri $i.kuduDtStatusUrl -Headers $i.header
+                $installResult = $installLoop.state
+                if ($logLevel -ge 2) { write-host -foregroundColor green "$installResult, " -NoNewline }
+                $counter++
+                if ($counter -ge $apiTimeout)
+                {
+                    $abortConfigure = $true
+                    break
+                }
+            } until ($installResult -eq "Installed")
+            if ($abortConfigure)
+            {
+                if ($logLevel -ge 2) { write-host -foregroundColor red "Aborting" }
+                $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "FAIL"; $_.notes = "Reached max tries ($apiTimeout).  Last configuration status was $installResult" }
+            }
+            else
+            {
+                if ($logLevel -ge 2) { write-host -foregroundColor green "Success" }
+                $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.todo = "up-to-date"; $_.state = "restart required"; $_.notes = "$($installLoop.version)" }
+            }
+                
+
+        }
+        # Recycle/start by flag
+        foreach ($i in $($targetWebapps) | Where-Object state -Match "restart required")
+        {
+            Switch ($mode)
+            {
+                stop
+                {
+                    # Start webapps
+                    $startupCommand = @{cmd = "az webapp start -g $resource_group -n $($i.name)"; comments = "starting webapp $($i.name)" }
+                    if ($logLevel -ge 2) { write-host -foregroundColor green "Starting webapp $($i.name)..." -NoNewline }
+                    show-cmd($startupCommand)
+                    if ($logLevel -ge 2) { write-host -foregroundColor green "Success" }
+                    $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.state = "Startup Successful" }
+
+                }
+                recycle
+                {
+                    # Recycle webapps
+                    $recycleCommand = @{cmd = "az webapp restart -g $resource_group -n $($i.name)"; comments = "starting webapp $($i.name)" }
+                    if ($logLevel -ge 2) { write-host -foregroundColor green "Recycling webapp $($i.name)..." -NoNewline }
+                    show-cmd($recycleCommand)
+                    if ($logLevel -ge 2) { write-host -foregroundColor green "Success" }
+                    $targetWebapps | Where-Object name -Match $i.name | ForEach-Object { $_.state = "Recycle Successful" }
+                }
+                default
+                {
+                    #no flag so leave apps running with 'restart required' notice
                 }
             }
         }
- 
-    }
+    } 
+    
+    #Output Results
+    $targetWebapps | ForEach-Object { [PSCustomObject]$_ } | format-table -AutoSize -Property name, todo, notes, state | Out-Host
 
-    #Do base installs
-    write-host "$($todo_baseinstall.Count) base installs needed"
-    foreach ($i in $todo_baseinstall)
+    if (-not($mode))
     {
-        write-host "Installing shell on $($i.name)"
-        $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
-        $kuduDTUrl = "$kuduUrl/$dt_azure_baseURL/api/status"
-        $kuduApiUrl = "$kuduUrl/api/siteextensions/$dt_azure_extension"
-        $result = Invoke-RestMethod -Method 'Put' -Uri $kuduApiUrl -Headers $header
-        if ($result.provisioningStatus -eq "Succeeded")
-        {
-            #Add this webapp to install list
-            write-host "Successful on $($i.name)"
-        }
-        else
-        {
-            #ADd this webapp to fail list
-            write-host "FAILURE: $($i.name) full result: $result"
-        }
+        write-host -ForegroundColor yellow "Running in 'what if' mode.  Use ' -mode' flag with of these options to make changes: install recycle stop"
     }
-    #Configure new installations
-    write-host "$($todo_configure.Count) configurations needed"
-    foreach ($i in $todo_configure)
+}
+function DeleteWebapps
+{
+    write-host "Deleting webapps"
+    $azWebapps = az webapp list -g $azGroup --query '[].{name:name,id:id}' | ConvertFrom-Json
+    foreach ($i in $azWebapps)
     {
-        $header = @{
-            Authorization = "Basic $($i.creds)"; "Content-Type" = "Application/JSON"
-        }
-        $kuduUrl = "https://$($i.name).scm.azurewebsites.net"
-        $kuduSettingsUrl = "$kuduUrl/$dt_azure_baseURL/api/settings"
-
-        $body = @{environmentId = $tenantId; apiToken = $token } | ConvertTo-Json
-        $result = Invoke-RestMethod -Method 'Put' -Body $body -Uri $kuduSettingsUrl -Headers $header
-        $result
+        az webapp delete --id $i.id
+        write-host "Killed webapp: $($i.name)"
     }
-
-    #Failed Installs
-    write-host "$($fail_list.Count) failed"
-    #Done Installs
-    write-host "$($done_list.Count) are up to date"
 }
 function Update-Menu
 {
@@ -228,14 +342,34 @@ function MenuLoop
 }
 #endregion
 
-#Configure Variables
-
+# ---Preflight check
+# Are we logged into Azure?
+$signedIn = az ad signed-in-user show 2>null
+if (-not $signedIn) { write-host -ForegroundColor green "No valid login detected.  Please run 'az login' and retry."; exit }
+# Do we have needed input?
 if (-not($url)) { $url = $iUrl }; If ($url -eq "") { write-host "No URL was specified."; exit }
 if (-not($token)) { $token = $iToken }; if ($token -eq "") { write-host "No token found"; exit }
 if ($url.substring($url.length - 1, 1) -eq "/") { $url = $url.substring(0, $url.length - 1) }
 $tenantId = $url.split(".")[0]; $tenantId = $tenantId.split("//"); if ($tenantId.Length -eq 2) { $tenantId = $tenantId[1] }
 if ($tenantId.Length -ne 8) { write-host "Your tenant ID ($tenantId) isn't the correct length of 8 characters."; exit }
+if (-not($group)) { $group = $iGroup }; if ($group -eq "") { write-host "No Azure resource group specified"; exit }
+# Set flags based on command line input
+if ($mode -notin ("install", "stop", "recycle", $null))
+{
+    write-host -foregroundcolor red "mode: '$mode' invalid.  Leave blank for read-only mode.  Execution options are: install recycle stop"
+    exit
+    
+}
+else
+{
+    #mode is valid; continue
+}
 
+
+
+
+Clear-Host
 #MenuLoop
-
-ProcessWebapps
+#DeleteWebapps
+GenerateWebapp
+#ProcessWebapps
