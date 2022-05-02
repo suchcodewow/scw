@@ -380,6 +380,8 @@ else
 {
     #mode is valid; continue
 }
+
+
 Clear-Host
 #MenuLoop
 #DeleteWebapps
