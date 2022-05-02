@@ -4,39 +4,44 @@ title: Dynatrace Webapp Extension Installer
 
 ## Goal
 
-Deploy the Dynatrace extension effortlessly to your Azure webapps without making pipeline changes or deployment adjustments.
+Deploy the Dynatrace extension effortlessly to your Azure webapps without pipeline changes or deployment adjustments.
 
-This script will:
+The installer will:
 
 - run a preflight check on the options entered to ensure they are valid.
-- collect necessary webapp data for the resource group or webapp you specify.
 - query the webapp(s) for current state of the Dynatrace extension.
-- provide you with a 'todo' list for your confirmation(i.e. which webapps need installs/config/updates).
-- **stop** here by default. If implementation mode is enabled it will continue.
+- provide you with a 'todo' list based on current state.
+
+By default, it will stop here. If an implementation mode is enabled it will continue:
+
+- (Optionally) stop the webapp(s).
 - install the Dynatrace extension on the webapp(s).
 - configure the extension with your tenant information.
-- confirm successful implementation.
+- Restart/recycle & confirm successful implementation.
+- provide you with a report.
 
 ## Prerequisites
 
 ### Script download
 
-Download the powershell script:
+Download directly in a azure cloud shell:
 
 ```bash
-curl -L http://suchcodewow.io/manifests/awa.ps1 > dtextinst.ps1
+curl -L http://suchcodewow.io/manifests/dtextinst.ps1 > dtextinst.ps1
 ```
+
+Or [download here](https://suchcodewow.io/manifests/dtextinst.ps1).
 
 ### From Dynatrace you'll need:
 
-1. Your dynatrace tenant URL.
-1. A dynatrace PAAS token.
+1. Your dynatrace tenant URL (the URL where you access Dynatrace i.e. https://xyz.live.dynatrace.com/)
+1. A dynatrace [PAAS token](https://www.dynatrace.com/support/help/get-started/access-tokens).
 
 ### From Azure you'll need:
 
-1. the resource group containing your webapps.
-1. (Optional) the name of the specific webapp where you want to deploy the extension.
-1. the webapp service plan name.
+1. the [resource group](https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/manage-resource-groups-portal) containing your webapps.
+1. (Optional) a specific webapp to target in the resource group.
+1. the webapp [service plan](https://docs.microsoft.com/en-us/azure/app-service/overview-hosting-plans) name.
 
 You'll need a **Powershell** [cloud shell](http://portal.azure.com/#cloudshell) -or- a powershell session with the [azcli tools](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli) installed.
 
