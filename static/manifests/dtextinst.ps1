@@ -386,7 +386,7 @@ Clear-Host
 # Uncomment options below for testing to create/remove webapps
 # DANGER: do not use until you confirm resource group target contains test data ONLY!
 #DeleteWebapps
-#GenerateWebapp
+GenerateWebapp
 
 #Main production function
-ProcessWebapps
+#ProcessWebapps
