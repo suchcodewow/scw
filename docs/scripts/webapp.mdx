@@ -76,16 +76,20 @@ The most reliable way for the extension to install correctly is using the `stop`
 
 ### Examples
 
-To see a todo list of what would happen in the 'webapp-group-3' resource group, run something like:
+To see a todo list of what would happen in the 'app-group-3' resource group, run something like:
 
 ```bash
-./dtextinst.ps1 -group webapp-group-3 -url https://12345678.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
+./dtextinst.ps1 -group app-group-3 -url https://xyz.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
 ```
 
-You should see a list of webapps and their current Dynatrace extension status.
-
-Scoping to the single webapp 'BackendService2' would be something like:
+Scoping to the single webapp 'Service2' would be something like:
 
 ```bash
-./dtextinst.ps1 -group webapp-group-3 -webapp BackendService2 -url https://12345678.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
+./dtextinst.ps1 -group app-group-3 -webapp Service2 -url https://xyz.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
+```
+
+To deploy the extension to app-group-3 by stopping the webapps prior to installation use:
+
+```bash
+./dtextinst.ps1 -group app-group-3 -webapp Service2 -mode stop -url https://xyz.live.dynatrace.com -token dt0c1.AlfeFigjkbE1VC33Csa
 ```
