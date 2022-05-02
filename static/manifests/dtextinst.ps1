@@ -8,7 +8,7 @@ Param(
 )
 #region ---Settings 
 # [Core Settings]
-$logLevel = 3 # 0 = results only, 1 = status, 2 = info, 3 = az commands
+$logLevel = 3 # 0 = results only, 1 = status, 2 = prev + info, 3 = prev + az commands
 $iUrl = "" # Your Dynatrace tenant URL (in place of -url cmd line option)
 $iToken = "" # Your Dynatrace PAAS token (in place of -token cmd line option)
 $apiTimeout = 30 # How many 3 second loops to wait until abandoning install
@@ -66,15 +66,16 @@ function ProcessWebapps
 {
     if ($logLevel -ge 1) { write-host -foregroundColor Green "Loading Web Apps..." -NoNewline }
     $targetWebapps = [System.Collections.ArrayList]@()
-    if ($webapp) { $azWebapps = @{name = $webapp } } else
+    if ($webapp) { $azWebapps = @{name = $webapp } }
+    else
     {
-        $azWebapps = az webapp list -g $azGroup --query '[].{name:name}' | ConvertFrom-Json
+        $azWebapps = az webapp list -g $group --query '[].{name:name}' | ConvertFrom-Json
     }
     # Build list of webapps & URL's
     foreach ($i in $azWebapps)
     {
 
-        $credsCommand = @{cmd = "az webapp deployment list-publishing-credentials -g $azGroup -n $($i.name) --query '{name:publishingUserName, pass:publishingPassword}' | ConvertFrom-Json"; comments = "Getting credentials" }
+        $credsCommand = @{cmd = "az webapp deployment list-publishing-credentials -g $group -n $($i.name) --query '{name:publishingUserName, pass:publishingPassword}' | ConvertFrom-Json"; comments = "Getting credentials" }
         $loginInfo = show-cmd($credsCommand)
         if (-not($loginInfo)) { break }
         $creds = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("$($loginInfo.name):$($loginInfo.pass)")))
@@ -275,7 +276,7 @@ function ProcessWebapps
 function DeleteWebapps
 {
     write-host "Deleting webapps"
-    $azWebapps = az webapp list -g $azGroup --query '[].{name:name,id:id}' | ConvertFrom-Json
+    $azWebapps = az webapp list -g $group --query '[].{name:name,id:id}' | ConvertFrom-Json
     foreach ($i in $azWebapps)
     {
         az webapp delete --id $i.id
@@ -381,9 +382,11 @@ else
     #mode is valid; continue
 }
 
-
 Clear-Host
-#MenuLoop
+# Uncomment options below for testing to create/remove webapps
+# DANGER: do not use until you confirm resource group target contains test data ONLY!
 #DeleteWebapps
 #GenerateWebapp
+
+#Main production function
 ProcessWebapps
