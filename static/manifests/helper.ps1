@@ -114,8 +114,9 @@ if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
 {
     while (-not($host_result))
     {
-        $pw = read-host "Enter a password for your host.  It must be 12 characters long and have: lower, upper, special character"
-        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --admin-password $pw"; comments = "Creating your host" }
+        #$pw = read-host "Enter a password for your host.  It must be 12 characters long and have: lower, upper, special character"
+        #$create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --admin-password $pw"; comments = "Creating your host" }
+        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser"; comments = "Creating your host" }
         $host_result = Show-cmd($create_host_command) | Convertfrom-json
         Write-Output $host_result.publicIpAddress > myip
     }
@@ -131,13 +132,15 @@ $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
 {
     $counter++
     # $az_list = az vm list-ip-addresses --id $($i.id)  --query '[].{publicIP:virtualMachine.network.publicIpAddresses[0].ipAddress}' | ConvertFrom-Json
-    New-object PSCustomObject -Property @{Option = $counter; Name = "login to host"; Command_Line = "ssh $($i.user)@$($i.publicIP)" 
+    New-object PSCustomObject -Property @{Option = $counter; Name = "login to $($i.name)"; Command_Line = "ssh $($i.user)@$($i.publicIP)" 
     }
     $counter++
     new-object PSCustomObject -Property @{Option = $counter; Name = "reset password"; Command_Line = "az vm user update -u $($i.user) -p [new password] -n $target_host -g $target_group -o none" 
     }
     $counter++
     new-object PSCustomObject -Property @{Option = $counter; Name = "open port 80"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none" }
+    $counter++
+    new-object PSCustomObject -Property @{Option = $counter; Name = "Reploy (reset) host"; Command_Line = "az vm redeploy -g $target_group -n $target_host -o none" }
 }
 #endregion
 
