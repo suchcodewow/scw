@@ -46,8 +46,13 @@ function Show-cmd($str)
 #endregion
 
 # Startup
-write-host -ForegroundColor Green "Lines in this color show commands exactly as they are executed."
 
+
+# Are we logged into Azure?
+$signedIn = az ad signed-in-user show 2>null
+if (-not ($signedIn)) { write-host -foregroundcolor red "`r`nNo valid azure credential found.  Please login with 'az login' then retry."; exit }
+
+write-host -ForegroundColor Green "Lines in this color show commands exactly as they are executed."
 #region ---subscription selection---
 if ($subscription_mode)
 {
@@ -139,8 +144,6 @@ $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
     }
     $counter++
     new-object PSCustomObject -Property @{Option = $counter; Name = "open port 80"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none" }
-    $counter++
-    new-object PSCustomObject -Property @{Option = $counter; Name = "Reploy (reset) host"; Command_Line = "az vm redeploy -g $target_group -n $target_host -o none" }
 }
 #endregion
 
