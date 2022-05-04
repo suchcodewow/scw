@@ -40,8 +40,8 @@ By default, the helper script shows each command as it runs- helpful if you are 
 ## Create the virtual machine
 
 :::warning Check your subscription!
-Your shell is connected to a subscription. When you create resources (groups/vm's/etc) in Azure they will be created in your current subscription.
-Ensure that you connect to the subscription where you want to build your host.
+Your shell is connected to a [subscription](https://docs.microsoft.com/en-us/microsoft-365/enterprise/subscriptions-licenses-accounts-and-tenants-for-microsoft-cloud-offerings?view=o365-worldwide). When you create something in Azure it is added to that subscription.
+Ensure you choose the subscription where you want to build your host.
 
 :::
 
@@ -65,13 +65,15 @@ About the host creation step:
 - We're using the long term support (LTS) version of Ubuntu linux for the **image**.
 - The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpu & 8gb mem) to run kubernetes.
 - **public-ip-sku** assigns a public IP address so we can access our machine remotely.
-- Azure generates an ssh key for the host and automatically adds it to your cloud shell. This way you can login without a password.
+- We're generating an ssh key (or using your existing one) instead of a password to login.
 
 :::
 
-Once the script presents you with additional options, it's safe to press < enter > and quit. You can run the helper script again at any time.
+Once the script menu appears, press < enter > and quit. You can run the helper script again at any time.
 
-Copy the **myip** file into your host to reference later typing `yes` if asked to store fingerprint & entering the host password you just created.
+Copy the **myip** file into your host.
+
+> choose `yes` if asked to store your host's fingerprint.
 
 :::tip
 The default user is **azureuser**. No need to change it below! You didn't miss anything.
@@ -84,10 +86,10 @@ scp myip azureuser@$(cat myip):/home/azureuser/myip
 <details>
   <summary>Waiter, there seems to be a cat in my scp?</summary>SCP is the secure
   copy command. We're using it to copy the myip file to your host to use later.
-  The cat command displays the contents of said file and the $() part means "run
-  whatever command is in here". In the end, scp gets the azure user name and the
-  IP of the host. The part after ':' is the folder and filename where scp saves
-  the file.
+  The cat command outputs the file contents (just the ip address in this case)
+  and the $() part means "run whatever command is in here". In the end, scp gets
+  the azure user name and the IP of the host. The part after ':' is the folder
+  and filename on your host where scp saves the file.
 </details>
 
 ## :checkered_flag: Checkpoint
