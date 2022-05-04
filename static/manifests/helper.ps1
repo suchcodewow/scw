@@ -46,8 +46,13 @@ function Show-cmd($str)
 #endregion
 
 # Startup
-write-host -ForegroundColor Green "Lines in this color show commands exactly as they are executed."
 
+
+# Are we logged into Azure?
+$signedIn = az ad signed-in-user show 2>null
+if (-not ($signedIn)) { write-host -foregroundcolor red "`r`nNo valid azure credential found.  Please login with 'az login' then retry."; exit }
+
+write-host -ForegroundColor Green "Lines in this color show commands exactly as they are executed."
 #region ---subscription selection---
 if ($subscription_mode)
 {
@@ -116,7 +121,7 @@ if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
     {
         #$pw = read-host "Enter a password for your host.  It must be 12 characters long and have: lower, upper, special character"
         #$create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --admin-password $pw"; comments = "Creating your host" }
-        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser"; comments = "Creating your host" }
+        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --generate-ssh-keys"; comments = "Creating your host" }
         $host_result = Show-cmd($create_host_command) | Convertfrom-json
         Write-Output $host_result.publicIpAddress > myip
     }
@@ -139,8 +144,6 @@ $counter = 0; $vm_choices = @(); $vm_choices = Foreach ($i in $vm_list)
     }
     $counter++
     new-object PSCustomObject -Property @{Option = $counter; Name = "open port 80"; Command_Line = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none" }
-    $counter++
-    new-object PSCustomObject -Property @{Option = $counter; Name = "Reploy (reset) host"; Command_Line = "az vm redeploy -g $target_group -n $target_host -o none" }
 }
 #endregion
 

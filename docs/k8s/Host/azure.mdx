@@ -39,17 +39,9 @@ By default, the helper script shows each command as it runs- helpful if you are 
 
 ## Create the virtual machine
 
-:::warning Two things...
-**Check your subscription!**  
+:::warning Check your subscription!
 Your shell is connected to a subscription. When you create resources (groups/vm's/etc) in Azure they will be created in your current subscription.
 Ensure that you connect to the subscription where you want to build your host.
-
-**Azure passwords**  
-You'll need to think up a fairly saucy password for your host. As of this writing:
-
-- Passwords must be 12 characters long.
-- Have 3 out of 4: lower case, upper case, digit, special character
-- Avoid using the dollar sign ($)
 
 :::
 
@@ -73,6 +65,7 @@ About the host creation step:
 - We're using the long term support (LTS) version of Ubuntu linux for the **image**.
 - The **- - size Standard_B2ms** is a good combination of price and a large enough host (2cpu & 8gb mem) to run kubernetes.
 - **public-ip-sku** assigns a public IP address so we can access our machine remotely.
+- Azure generates an ssh key for the host and automatically adds it to your cloud shell. This way you can login without a password.
 
 :::
 
