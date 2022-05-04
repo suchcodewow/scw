@@ -39,7 +39,7 @@ We'll hang tight right here while you get it ready. Super excited to have you jo
 
 :::
 
-Find the section starting with **Optional: resource settings for OneAgent container** and remove the # signs so it looks like:
+Find the section starting with **Optional: resource settings for OneAgent container**. Change the requests/limits to match and remove the # signs so it looks like:
 
 ```bash
       # Optional: resource settings for OneAgent container. Consumption of the OneAgent heavily depends
@@ -61,7 +61,7 @@ YAML config files are extremely sensitive to spacing/tabs/margins. As of this wr
 If you are using vscode [check out this extension to assist with YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
 :::
 
-Follow a similar process for the section starting with **Optional: resource settings for ActiveGate container**. Change the memory limits from `1G` to `500M`. Remove the # signs so it looks like:
+Follow a similar process for the section starting with **Optional: resource settings for ActiveGate container**. Change the requests/limits to match. Remove the # signs so it looks like:
 
 ```bash
     # Optional: resource settings for ActiveGate container. Consumption of the ActiveGate heavily depends
@@ -72,10 +72,10 @@ Follow a similar process for the section starting with **Optional: resource sett
     resources:
       requests:
         cpu: 150m
-        memory: 250M
+        memory: 250Mi
       limits:
         cpu: 300m
-        memory: 500M
+        memory: 512Mi
 
 ```
 
