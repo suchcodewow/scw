@@ -14,10 +14,16 @@ If you're following this section from previous tutorials you should be all set.
 
 ## Install Kubernetes
 
-Login to your host and install the base k3s package.
+Login to your host and install [docker](https://docs.docker.com/get-started/overview/#what-can-i-use-docker-for).
 
 ```bash
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -
+curl https://releases.rancher.com/install-docker/19.03.sh | sh
+```
+
+Install the base kubernetes k3s package.
+
+```bash
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -s -  --docker
 ```
 
 - **curl** downloads the k3s installer.
@@ -25,7 +31,7 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -
 - **INSTALL_K3S_EXEC...** sets an environment variable instructing the install to skip k3s' default ingress controller traefik.
 - **sh -** runs the result of the previous step in a shell (in this case, the k3s install).
 
-## Copy config file to default spot & install kubectl
+## Copy config file to default location & install kubectl
 
 Create a folder and move the kubernetes config file to a default location to help further standardize this kubernetes install.
 
