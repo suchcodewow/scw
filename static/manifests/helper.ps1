@@ -121,7 +121,7 @@ if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
     {
         #$pw = read-host "Enter a password for your host.  It must be 12 characters long and have: lower, upper, special character"
         #$create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --admin-password $pw"; comments = "Creating your host" }
-        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser"; comments = "Creating your host" }
+        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --generate-ssh-keys"; comments = "Creating your host" }
         $host_result = Show-cmd($create_host_command) | Convertfrom-json
         Write-Output $host_result.publicIpAddress > myip
     }
