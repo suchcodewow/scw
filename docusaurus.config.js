@@ -7,7 +7,7 @@ const config = {
   tagline: "and tutorial accessories",
   url: "https://suchcodewow.io",
   baseUrl: "/",
-  onBrokenLinks: "throw",
+  onBrokenLinks: "ignore",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.ico",
   organizationName: "suchcodewow", // Usually your GitHub org/user name.
