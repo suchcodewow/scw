@@ -1,0 +1,138 @@
+---
+sidebar_position: 4
+pagination_prev:
+pagination_next:
+title: 3- Dynatrace
+---
+
+The steps below summarize installation of the Dynatrace Operator. The only change from default is to set limits on cpu/memory to keep resource consumption low in cloud platforms.
+
+For the latest documentation, [click here](https://www.dynatrace.com/support/help/setup-and-configuration/setup-on-container-platforms/kubernetes/set-up-k8s-monitoring).
+
+## Create tokens and download files
+
+- In your Dynatrace tenant, click _Deploy Dynatrace_ from the left navigation and then _start installation_.
+
+- Select _Kubernetes_.
+
+- Enter a descriptive name in **Name**.
+
+- Click _create token_ on the **Operator Token** line.
+
+- Turn _Skip SSL certificate check_ **on**.
+
+- Click **Download dynakube.yaml**.
+
+## Modify dynakube.yaml
+
+Open **dynakube.yaml** in a text editor.
+
+:::tip But I love Notepad!
+There's nothing wrong with notepad for these tutorials. But if it is front and center in your mind when hear 'text editor', check out VScode when you have time.  
+It's a free, open-source, and built to work with all kinds of files (not just code as the name implies).
+
+If you want to try it out now, [click here to download](https://code.visualstudio.com/download).  
+We'll hang tight right here while you get it ready. Super excited to have you join in.
+![one of us](/img/oneofus.png)
+
+:::
+
+Find the section starting with **Optional: resource settings for OneAgent container**. Change the requests/limits to match and remove the # signs so it looks like:
+
+```bash
+      # Optional: resource settings for OneAgent container. Consumption of the OneAgent heavily depends
+      # on the workload to monitor; please adjust values accordingly.
+      #
+      oneAgentResources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 300m
+          memory: 1.5Gi
+
+```
+
+:::warning YAML gets grumpy easily
+YAML config files are extremely sensitive to spacing/tabs/margins. As of this writing, you'll need to remove the # sign and ONE (1) space so that **oneAgentResources:** lines up with the comments above. If you accidentally delete too much, **always** use spaces when adding more.....uh..... space. #ElegantWording
+
+If you are using vscode [check out this extension to assist with YAML](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
+:::
+
+Follow a similar process for the section starting with **Optional: resource settings for ActiveGate container**. Change the requests/limits to match. Remove the # signs so it looks like:
+
+```bash
+    # Optional: resource settings for ActiveGate container. Consumption of the ActiveGate heavily depends
+    # on the workload to monitor; please adjust values accordingly.
+    #
+    # Suggested starting point for resources below:
+    #
+    resources:
+      requests:
+        cpu: 150m
+        memory: 250Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+
+```
+
+- (Optional) Save the file.
+
+- Copy the entire contents of this file (usually with _ctrl+a_ then _ctrl+c_).
+
+In your linux terminal, create and edit dynakube.yaml with:
+
+```bash
+nano dynakube.yaml
+```
+
+- Paste the contents of the file into this nano window. Then, press _ctrl+x_ and _y_ to save and quit.
+
+## Deploy the Dynatrace manifests
+
+- Back in the Dynatrace tenant, click the **copy** button next to the commands and paste into your linux terminal.
+
+:::tip
+Make sure to press < enter > once to send all commands. Because there are multiple lines, the shell will start executing the first command immediately but leave the last one hanging.
+:::
+
+## :checkered_flag: Checkpoint
+
+Confirm the Dynatrace operator successfully started with:
+
+```bash
+kubectl get pods -n dynatrace
+```
+
+Hang tight until you have 4 **ready** pods. The webook and operator spin up quickly. The oneAgent and active gate need a few minutes.
+
+```bash
+NAME                                 READY   STATUS    RESTARTS   AGE
+dynatrace-webhook-5679588856-vwxsn   1/1     Running   0          4m48s
+dynatrace-operator-b54bf4694-mwfnf   1/1     Running   0          4m48s
+scw-4-19-22-activegate-0             1/1     Running   0          3m43s
+scw-4-19-22-oneagent-mk9lt           1/1     Running   0          3m42s
+```
+
+:::tip Troubleshooting
+If one of the pods fails to start try reviewing the logs as a first troubleshooting step with:
+
+```bash
+kubectl logs [podname] -n dynatrace
+```
+
+:::
+
+Once 4 pods are ready, return to your Dyantrace tenant.
+
+- Select **Deployment Status** in the left dark menu bar.  
+  You should see a new host running in your environment on the **OneAgents** page.
+- Select **ActiveGates** in the grey menu bar.  
+  You should see a new active gate.
+
+If you see both running, congratulations :tada: ! You've successfully connected Dynatrace to your Kubernetes cluster.
+
+## Next Steps
+
+Move to the next step on the left sidebar for more.

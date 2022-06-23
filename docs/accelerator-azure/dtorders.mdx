@@ -1,0 +1,133 @@
+---
+sidebar_position: 5
+pagination_prev:
+pagination_next:
+title: 4- DTOrders
+---
+
+This deployment will create an application in the **dtorders** namespace and automatically generate synthetic traffic for you.
+
+<details>
+  <summary>What's a deployment?</summary>A deployment is a set of instructions,
+  usually in a YAML file like below, that provide a blueprint for what
+  components we want to add to our cluster. If one of the components of that
+  deployment is removed, kubernetes will automatically recreate them.
+</details>
+
+The deployment creates the DTORDERS namespace.
+
+A pod, service, and ingress are created for:
+
+- a simple frontend UI
+- a catalog service
+- a customer table
+- an orders table
+
+There are also two other pods:
+
+- a browser traffic generator creating "real" user sessions
+- a load traffic generator creating hits to API's in the application
+
+:::info Prerequisites
+
+1. Login to your host.
+2. Confirm you've recorded your public IP address with:
+
+```bash
+cat myip
+```
+
+if you don't see your IP address, return to the previous Host Setup page and retry the step to create/copy it.
+
+:::
+
+## Quickstart
+
+Download the dtorders application manifest.
+
+```bash
+curl https://suchcodewow.io/manifests/dtorders/dtorders-all.yaml -L -o dtorders-all.yaml
+```
+
+Replace `dev.local` in this yaml file with your public IP address.
+
+```bash
+sed "s/dev.local/$(cat myip)/g" dtorders-all.yaml > dtorders-all-hasIP.yaml
+```
+
+<details><summary>What is sed?</summary>
+sed is a utility that replaces one string of text with another.  Here we're telling it to search for **dev.local** (a placeholder) in **dtorders-all.yaml** and use the contents of the *myip* file as the replacement.  The **/g** tells sed to replace every instance.  The part starting with **>** means to send the result of all those replacements to the target filename.
+
+</details>
+
+Apply the updated yaml file.
+
+```bash
+kubectl apply -f dtorders-all-hasIP.yaml
+```
+
+You can see the pods that make up the application with:
+
+```bash
+kubectl get pods -n dtorders
+```
+
+The deployment uses the IP address you provided to create URL's to the various components of your application. You can see the links with:
+
+```bash
+kubectl get ingress -n dtorders
+```
+
+The **HOSTS** column shows the URL's of your services. You can copy and paste any of them into your browser.
+
+The various components:
+
+- **frontend** shows the main UI of the application.
+- **customer** is the API for the customer list. Add `/customer` to the end of the URL to retrieve the current customers.
+- **catalog** is the API for the various items for sale. Add `/catalog` to the end of the URL to see the current items.
+- **order** lists the orders that have been submitted from the front end. You can manually add orders here as well.
+
+:::info What is nip.io?
+Real applications have names like 'booksforyou.com' and configure several networking components to route users to many different hosts to serve requests. It adds cost and complexity well beyond the scope of these tutorials.
+
+For this tutorial series, we're using nip.io to elegantly provides the same functionality without cost. Anything before **.nip.io** is sent to the IP address. This means we can access any number of services on our single kubernetes cluster. Without nip.io, we'd be limited to hosting a single web service on our cluster's IP address.
+
+For example, **dtorders-frontend.192.168.1.100.nip.io** and **dtorders-customer.192.168.1.100.nip.io** both go to **192.168.100** but nginx sees the entire URL coming in and can route the request to the appropriate service.
+![science](/img/science.png)
+:::
+
+## :checkered_flag: Checkpoint
+
+Find the URL for the application frontend above. Copy and paste the URL into your browser. You should see an application page similar to below.
+
+![dtorders frontend](/img/dtorders-frontend.png)
+
+In your Dynatrace tenant, go to **services**. You should see catalog, customer, order, and frontend services with significant request rates.
+
+![dtorders frontend](/img/dtorders_services.png)
+
+Under **Frontend** applications, _My Web Application_ should also have traffic and "real user" sessions. (Session replay can be enabled to capture replays.)
+
+If you can connect to the frontend of your application and Dynatrace observability is in place, congratulations :tada: ! You've deployed the dtorders application. In Dynatrace, you'll see traffic begin to flow across services and at the application level.
+
+## Removing DTOrders
+
+There are a couple of ways you can remove DTOrders if you want to recover space in your cluster.
+
+### Option 1: YAML
+
+You can use the same YAML file used to deploy the application to remove it.
+
+```bash
+kubectl delete -f dtorders-all-hasIP.yaml
+```
+
+This will "surgically" remove exactly the elements added during the original deployment.
+
+### Option 2: namespace
+
+Deleting the namespace for DTORDERS will delete the namespace and everything in it.
+
+```bash
+kubectl delete ns dtorders
+```

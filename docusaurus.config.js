@@ -82,7 +82,7 @@ const config = {
           },
           {
             type: "dropdown",
-            label: "Scripts",
+            label: "Helpers",
             position: "left",
             items: [
               {

@@ -1,0 +1,144 @@
+---
+sidebar_position: 3
+pagination_prev:
+pagination_next:
+title: 2- Install k3s
+---
+
+These steps build a kubernetes cluster using k3s.  
+k3s is an extremely light-weight but capable kubernetes distribution.
+
+:::info Prerequisites
+Ensure you can login to your ubuntu host & that you have administrative ability.  
+If you're following this section from previous tutorials you should be all set.
+:::
+
+## Install Kubernetes
+
+Login to your host and install [docker](https://docs.docker.com/get-started/overview/#what-can-i-use-docker-for).
+
+```bash
+curl https://releases.rancher.com/install-docker/19.03.sh | sh
+```
+
+Install the base kubernetes k3s package.
+
+```bash
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--no-deploy traefik" sh -s -  --docker
+```
+
+- **curl** downloads the k3s installer.
+- **|** is the pipe command chaining multiple commands together.
+- **INSTALL_K3S_EXEC...** sets an environment variable instructing the install to skip k3s' default ingress controller traefik.
+- **sh -** runs the result of the previous step in a shell (in this case, the k3s install).
+
+## Copy config file to default location & install kubectl
+
+Create a folder and move the kubernetes config file to a default location to help further standardize this kubernetes install.
+
+<details>
+  <summary>What is the kubernetes config file?</summary>
+  <ul>
+    <li>
+      Kubernetes distributions create a config file that describe the cluster
+      and how to access it.
+    </li>
+    <li>
+      These next few steps move the k3s config file to the default spot where
+      kubectl will look & secure the file to avoid errors later.
+    </li>
+  </ul>
+</details>
+
+```bash
+mkdir -m700 ~/.kube
+```
+
+- **mkdir** is the linux **make directory** command.
+- **-m700** limits the permissions to just our user (preventing security warnings later)
+- **~/.kube** is the standard folder location for the config file.
+
+Export the config file to the folder you created.
+
+```bash
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+```
+
+Ensure you are the file's owner (prevents security warnings/issues later).
+
+```bash
+sudo chown -R $USER ~/.kube
+```
+
+## Install kubectl
+
+k3s comes with a slightly modified kubectl command. There's nothing wrong with it-
+but to make sure kubernetes works in a standard way across all tutorials, we'll install and use the official kubectl.
+
+Download kubectl.
+
+```bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+```
+
+<details>
+  <summary>What is kubectl?</summary>
+  <ul>
+    <li>
+      Kubernetes's interface is an [API](https://en.wikipedia.org/wiki/API). We
+      need a way to interact with it.
+    </li>
+    <li>
+      kubectl is a well organized/documented command line tool to achieve this.
+      Running `kubectl` will show you the myriad of options available.
+    </li>
+  </ul>
+</details>
+
+:::info
+
+The weird bonus curl command in the middle simply gets the most current version number for downloading in the main curl command. #InceptionButWithCurl
+
+:::
+
+Install.
+
+```bash
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+```
+
+## :checkered_flag: Checkpoint
+
+To check that everything works, run the following.
+
+```bash
+kubectl get nodes
+```
+
+If you see a response indicating a `READY` status, congratulations :tada:! You have kubernetes.
+
+![node_ready](/img/node_ready.png)
+
+## Final config for k3s
+
+We skipped the k3s ingress controller during install. We'll install nginx with the command below.
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/cloud/deploy.yaml
+```
+
+<details>
+  <summary>New Ingress, who dis?</summary>
+
+By default, Kubernetes sets up a virtual network between the containers. This lets application components communicate with each other and (generally) the internet.
+
+We need an [ingress controller](https://www.nginx.com/resources/glossary/kubernetes-ingress-controller)
+to manage cluster access from the outside. It's like adding a gate
+to a walled city with guards directing traffic. It allows access to approved
+locations and prevents unauthorized requests.
+
+</details>
+
+## Next steps
+
+With kubernetes running, move to next step on the left sidebar.
