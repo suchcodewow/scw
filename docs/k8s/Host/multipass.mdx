@@ -1,10 +1,111 @@
 ---
 pagination_prev:
 pagination_next:
+title: Multipass
 ---
 
-## Public IP address
+Multipass is an application that allows you to virtually host an ubuntu linux server on your computer.
+
+## Download and Install **Multipass** using the defaults
+
+[Download on MAC](https://multipass.run/download/macos) or [Download on PC](https://multipass.run/download/windows)
+
+## Launch a new ubuntu server
+
+When the installation is complete, open a terminal window and run:
 
 ```bash
-$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o=custom-columns=EXTERNAL-IP:.status.loadBalancer.ingress[0].ip --no-headers)
+multipass launch -c 4 -m 4G -d 64GB -n DTkube
 ```
+
+:::info
+This creates an ubuntu server that can use 4 cores, 4 GB of memory, and is named DTkube.  
+The `-d 64GB` command allocates maximum hard disk size. Multipass will only use space consumed by the ubuntu server's files & you won't actually use up 64GB of space on your computer.
+:::
+
+## Get the IP address of your new server
+
+```bash
+multipass info DTkube
+```
+
+> Name: DTkube  
+> State: Running  
+> IPv4: **192.168.x.x** (this)
+
+:::tip
+You can run `multipass list` to show all servers if you have several.
+:::
+
+## Add this IP address to your hosts file
+
+Open your hosts file and add _rancher.localdev_ with the IP. (Replace x's with actual IP from previous step)
+
+Hosts file example:
+
+> 192.168.1.1 server1  
+> 192.168.1.2 server2  
+> **192.168.x.x rancher.localdev**
+
+## Log in to the server
+
+Connect to your new ubuntu server.
+
+```bash
+multipass shell DTkube
+```
+
+> Multipass automatically creates an account named _ubuntu_ for you and logs in with this account automatically. You won't need a password when using _sudo_.  
+> **sudo** is a way to preface commands in linux that elevates your permission to root (administrator) level temporarily.
+
+## (Recommended) Update your server
+
+```bash
+sudo apt-get update -y
+sudo apt upgrade -y
+```
+
+## Managing Multipass
+
+### Start/Stop
+
+In the nearly unthinkable situation of pausing this tutorial, you can simply shut down this lab's virtual machine with:
+
+```bash
+multipass stop DTkube
+```
+
+This will release all used resources on your computer aside from the nominal disk space used. Restart with:
+
+```bash
+multipass start Dtkube
+```
+
+### Remove Multipass server
+
+To completely remove the Multipass server, shut down then delete the instance:
+
+```bash
+multipass stop DTkube
+multipass delete DTkube
+```
+
+```bash
+multipass purge
+```
+
+### Uninstall Multipass
+
+If you are ready to
+
+- In windows, use Add/Remove Programs.
+- On Mac, you can use:
+
+```bash
+sudo chmod 755 "/Library/Application Support/com.canonical.multipass/uninstall.sh"
+sudo "/Library/Application Support/com.canonical.multipass/uninstall.sh"
+```
+
+## Next Steps
+
+Check out the next numbered item on the left sidebar for more.
