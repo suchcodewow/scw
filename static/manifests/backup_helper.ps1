@@ -84,7 +84,7 @@ if ($subscription_mode)
 }
 #endregion
 
-$NewSub = az account show --query '{name:name,email:user.name,id:id}' | ConvertFrom-Json; $SubName = $NewSub.name; $SubId = $NewSub.id; $UserName = (($NewSub.email).split("@")[0]).replace(".","_")
+$NewSub = az account show --query '{name:name,email:user.name,id:id}' | ConvertFrom-Json; $SubName = $NewSub.name; $SubId = $NewSub.id; $UserName = ($NewSub.email).split("@")[0]
 write-host "Loading command options for: $SubName" | Out-Host
 
 #region ---Create resource group if needed---
@@ -113,39 +113,23 @@ $cmd_choices += New-object PSCustomObject -Property @{Option = "del"; Name = "En
 #endregion
 
 #region ---Create VM if needed---
-# $target_host = "scw-host-$UserName"
-# $Check_host_command = @{cmd = "az vm list -g $target_group --query ""[?name=='$target_host']"""; comments = "Check if host exists" }
-# if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
-# {
-#     while (-not($host_result))
-#     {
-#         #$pw = read-host "Enter a password for your host.  It must be 12 characters long and have: lower, upper, special character"
-#         #$create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --admin-password $pw"; comments = "Creating your host" }
-#         $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --generate-ssh-keys"; comments = "Creating your host" }
-#         $host_result = Show-cmd($create_host_command) | Convertfrom-json
-#         Write-Output $host_result.publicIpAddress > myip
-#     }
-#     # open port 80 to the host
-#     $open_port_command = @{cmd = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none"; comments = "Open port 80" }
-#     Show-cmd($open_port_command)
-# }
-#endregion
-
-#region ---Create AKS cluster  if needed---
-$target_cluster = "scw-AKS-$UserName"
-$Check_cluster_command = @{cmd = "az aks show -n $target_cluster -g $target_group --query id 2>nul"; comments = "Check if cluster already exists"}
-$cluster_creds_command = @{cmd="az aks get-credentials --admin -g $target_group -n $target_cluster";comments="Get cluster credentials"}
- 
-if (-not(Show-cmd($Check_cluster_command)))
-{$create_cluster_command = @{cmd="az aks create -g $target_group -n $target_cluster --node-count 2 --generate-ssh-keys"; comments = "Creating AKS cluster"}
-Show-cmd($create_cluster_command)
-Show-cmd($cluster_creds_command)
-}
-else
+$target_host = "scw-host-$UserName"
+$Check_host_command = @{cmd = "az vm list -g $target_group --query ""[?name=='$target_host']"""; comments = "Check if host exists" }
+if (-not(Show-cmd($Check_host_command) | Convertfrom-Json))
 {
-    Show-cmd($cluster_creds_command)
+    while (-not($host_result))
+    {
+        #$pw = read-host "Enter a password for your host.  It must be 12 characters long and have: lower, upper, special character"
+        #$create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --admin-password $pw"; comments = "Creating your host" }
+        $create_host_command = @{cmd = "az vm create --resource-group $target_group --name $target_host --image UbuntuLTS --size Standard_B2ms --public-ip-sku Standard --admin-username azureuser --generate-ssh-keys"; comments = "Creating your host" }
+        $host_result = Show-cmd($create_host_command) | Convertfrom-json
+        Write-Output $host_result.publicIpAddress > myip
+    }
+    # open port 80 to the host
+    $open_port_command = @{cmd = "az vm open-port -g $target_group -n $target_host --port 80 --priority 100 -o none"; comments = "Open port 80" }
+    Show-cmd($open_port_command)
 }
-
+#endregion
 
 #region ---Menu: VM Options---
 $vm_list = az vm list --query '[].{id:id,name:name,user:osProfile.adminUsername,publicIP:publicIps}' -g $target_group -d | ConvertFrom-Json

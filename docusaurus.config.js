@@ -78,6 +78,11 @@ const config = {
                 docId: "accelerator-azure/index",
                 label: "Accelerator: Azure",
               },
+              {
+                type: "doc",
+                docId: "aws/index",
+                label: "AWS",
+              },
             ],
           },
           {
