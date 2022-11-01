@@ -1,3 +1,5 @@
+#Installer for webapps across a  resource group
+
 Param(
     [Parameter(Mandatory = $false)] [string] $url,
     [Parameter(Mandatory = $false)] [string] $token,

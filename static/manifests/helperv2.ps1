@@ -1,0 +1,1 @@
+$PSVersionTable | select-object PSVersion
