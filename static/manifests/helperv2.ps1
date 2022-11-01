@@ -17,7 +17,7 @@ function addProvider($provider) {
 
 # Do we have access to Azure?
 
-if (get-command 'az' -ea SilentlyContinue) { $azureSignedIn = az ad signed-in-user show 2>null } 
+if (get-command 'az' -ea SilentlyContinue) { $azureSignedIn = az ad signed-in-user show 2>$null } 
 if ($azureSignedIn) {
     #Azure connected, get current subscription
     $currentAccount = az account show --query 'id' | Convertfrom-Json
@@ -30,7 +30,7 @@ if ($azureSignedIn) {
 }
 
 #Do we have access to AWS?
-if (get-command 'aws' -ea SilentlyContinue) { $awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]' 2>null }
+if (get-command 'aws' -ea SilentlyContinue) { $awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]' 2>$null }
 if ($awsSignedIn) {
     $provider = New-object PSCustomObject -Property @{Provider = "AWS"; Name = $awsSignedIn; default = $true }
     addProvider($provider)
