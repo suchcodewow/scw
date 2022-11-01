@@ -56,7 +56,7 @@ write-host -ForegroundColor Green "Lines in this color show commands exactly as 
 #region ---subscription selection---
 if ($subscription_mode)
 {
-    $current_id = az account show --query 'id' -o tsv
+    $current_id = az account show --query '{name:name, id:id}' | Convertfrom-Json
     $all_accounts = az account list --query '[].{name:name, id:id}' --only-show-errors | ConvertFrom-Json
     $counter = 0; $account_choices = Foreach ($i in $all_accounts)
     {
