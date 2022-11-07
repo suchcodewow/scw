@@ -1,11 +1,12 @@
 #region ---Variables
 
 #Settings to Modify
-$outputLevel = 1 # [0/1/2] message level to send to screen: debug/info/errors, info/errors, errors
+$outputLevel = 0 # [0/1/2] message level to send to screen: debug/info/errors, info/errors, errors
 $retainLog = $false # [$true/false] keep written log between executions
 $useAWS = $true # [$true/false] use AWS
 $useAzure = $true # [$true/$false] use Azure
 $useGcloud = $true # [$true/$false] use Gcloud
+
 
 # [DO NOT MODIFY BELOW] Internal variables/setup
 $script:selectedCLI = $false
@@ -31,9 +32,9 @@ function Write-Log {
     )
     $Params = @{}
     Switch ($type) {
-        0 { $Params['ForegroundColor'] = "DarkGray"; $start = [char]26 }
-        1 { $Params['ForegroundColor'] = "DarkGreen"; $start = "($([char]16) )" }
-        2 { $Params['ForegroundColor'] = "DarkRed"; $start = "(XX)" }
+        0 { $Params['ForegroundColor'] = "DarkBlue"; $start = "[.]" }
+        1 { $Params['ForegroundColor'] = "DarkGreen"; $start = "[>]" }
+        2 { $Params['ForegroundColor'] = "DarkRed"; $start = "[X]" }
         default { $Params['ForegroundColor'] = "Gray"; $start = "" }
     }
     if ($currentLogEntry) { $screenOutput = $content } else { $screenOutput = "   $start $content" }
@@ -52,22 +53,42 @@ function Write-Log {
         write-host @Params $screenOutput
     }
 }
+function Add-Choice() {
+    param(
+        [string] $k, # key identifying this choice, unique only
+        [string] $d, # description of item
+        [string] $c, # current selection of item, if applicable
+        [string] $f, # function name to call if changing item
+        [object] $p # parameters needed in the function
+    )
+    # If this key exists, delete it and anything that followed
+    $keyOption = $choices | Where-Object { $_.key -eq $k } | select-object -Property Option -first 1
+    if ($keyOption) {
+        Write-Log -content "key: '$k' found at option: '$($keyOption.Option)'. Deleting Option " -append
+        $choices | ForEach-Object { if ($_.Option -ge $keyOption.Option) { $choices.Remove($_); Write-Log -content "$($_.Option), " -type 0 -append } }
+        Write-Log -content "done"
+    }
+    $choice = New-Object PSCustomObject -Property @{
+        key            = $k
+        description    = $d
+        current        = $c
+        callFunction   = $f
+        callProperties = $p
+        Option         = $choices.count + 1
 
-function Add-Choice($choice) {
-    #Adds a choice to the menu
-    $choice | Add-Member -MemberType NoteProperty -Name Option -value $($choices.count + 1)
+    }
     [void]$choices.add($choice)
 }
 
 function Add-Provider($provider) {
+    #TODO match Add-Choice Params
     #---Add an option selector to item then add to provider list
     $provider | Add-Member -MemberType NoteProperty -Name Option -value $($providerList.count + 1)
     [void]$providerList.add($provider)
 }
 function Get-Choice($cmd_choices) {
     # Present list of options and get selection
-    
-    write-output $choices | sort-object -property Option | format-table -Property Option, Description, Current | Out-Host
+    write-output $choices | sort-object -property Option | format-table -Property Option, Description, Current, callFunction, callProperties | Out-Host
     # $cmd_choices | sort-object -property Option | format-table -Property Option, Name, Command_Line | Out-Host
     $cmd_selected = read-host -prompt "Which option to execute? [<enter> to quit]"
     if (-not($cmd_selected)) {
@@ -92,7 +113,7 @@ function Get-Providers() {
             $allAccounts = az account list --query '[].{name:name, id:id}' --only-show-errors | ConvertFrom-Json
             foreach ($i in $allAccounts) {
                 if ($i.id -eq $currentAccount) { $defaultOption = $true } else { $defaultOption = $false }
-                Add-Provider(New-object PSCustomObject -Property @{Provider = "Azure"; Name = $i.name; Identifier = $i.id; default = $defaultOption })
+                Add-Provider(New-object PSCustomObject -Property @{Provider = "Azure"; Name = "subscription: $($i.name)"; Identifier = $i.id; default = $defaultOption })
             }
         }
     }
@@ -104,25 +125,61 @@ function Get-Providers() {
         }
         else { Write-Log -content "AWS... " -type 2 -append }
         if ($awsSignedIn) {
-            Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = $awsSignedIn; default = $true })
+            Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
         }
     }
     # Check for GCLOUD projects
     if ($useGcloud) {
-        if (get-command 'gcloud' -ea SilentlyContinue) { Write-Log -content "Gcloud... " -type 1 -append; $gcloudSignedIn = gcloud config get-value project  2>$null }
+        if (get-command 'gcloud' -ea SilentlyContinue) { Write-Log -content "Gcloud... " -type 1 -append; $gcloudSignedIn = gcloud config get-value project -quiet 2>$null }
         else { Write-Log -content "Gcloud... " -type 2 -append }
         if ($gcloudSignedIn) {
             $currentProject = gcloud config get-value project
             $allProjects = gcloud projects list --format=json | Convertfrom-Json
             foreach ($i in $allProjects) {
                 if ($i.name -eq $currentProject) { $defaultOption = $true } else { $defaultOption = $false }
-                Add-Provider(New-object PSCustomObject -Property @{Provider = "GCP"; Name = $i.name; Identifier = $i.projectNumber; default = $defaultOption })
+                Add-Provider(New-object PSCustomObject -Property @{Provider = "GCP"; Name = "project: $($i.name)"; Identifier = $i.projectNumber; default = $defaultOption })
             }
         }
+    
     }
     # Done getting options
     Write-Log -content "Done!" -type 1
 }
+function Set-Provider() {
+    param(
+        [object] $preset # optional preset to bypass selection
+    )
+    $providerSelected = $preset
+    while (-not $providerSelected) {
+        write-output $providerList | sort-object -property Option | format-table -property Option, Provider, Name | Out-Host
+        $newProvider = read-host -prompt "Which environment to use? <enter> to cancel"
+        if (-not($newProvider)) {
+            return
+        }
+        $providerSelected = $providerList | Where-Object { $_.Option -eq $newProvider } | Select-Object  -first 1
+        if (-not $providerSelected) {
+            write-host -ForegroundColor red "`r`nY U no pick valid option?" 
+        }
+    }
+    $functionProperties = @{provider = $providerSelected.Provider; id = $providerSelected.identifier }
+    # Reset choices
+    # Add option to change destination again
+    Add-Choice -k "target" -d "change script target" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
+    # build options for specified provider
+    switch ($providerSelected.Provider) {
+        "Azure" { Add-AzureSteps }
+        "AWS" { Add-AWSSteps }
+        "Gcloud" { Add-GloudSteps }
+    }
+}
+function Add-AzureSteps() {
+    # Create a resource group
+    
+    # Deploy AKS
+
+}
+function Add-AWSSteps() {}
+function Add-GloudSteps() {}
 #endregion
 
 #region ---Main
@@ -132,20 +189,21 @@ if ($providerList.count -eq 0) { write-output "`nCouldn't find a valid target cl
 #If there's one default, set it as the current option
 $providerDefault = $providerList | Where-Object default -eq $true
 if ($providerDefault.count -eq 1) {
-    # One default option, select it and move on (most likely for workshop running a cloud shell)
-    Add-Choice(New-object PSCustomObject -Property @{Key = "target"; Description = "Change Script Target"; Current = " $($providerDefault[0].Provider) -> $($providerDefault[0].Name)" })
+    # Select the default
+    #Add-Choice -k "target" -d "change script target" -c "$($providerDefault[0].Provider) $($providerDefault[0].Name)" -f "Set-Provider"
+    Set-Provider -preset $providerDefault
 }
 else {
-    # Somebody's popular in cloud land. (user running script locally & logged into multiple clouds)  Need to prompt for correct cloud environment
+    # Select from 2+ default providers
+    Set-Provider
 }
 
 # Main Menu loop
-while ($true) {
+while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
     if ($cmd) {
-        # Invoke-Choice($cmd)
+        Invoke-Expression $cmd.callFunction
     }
     else { write-host -ForegroundColor red "`r`nY U no pick existing option?" }
 }
 #endregion
-#Option, Key, Description, Current, Function, Properties
