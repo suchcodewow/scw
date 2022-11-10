@@ -6,9 +6,9 @@ $outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu d
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
 #Cloud Options
-$useAWS = $false # [$true/false] use AWS
+$useAWS = $true # [$true/false] use AWS
 $useAzure = $true # [$true/$false] use Azure
-$useGCP = $false # [$true/$false] use GCP
+$useGCP = $true # [$true/$false] use GCP
 
 # [DO NOT MODIFY BELOW] Internal variables/setup
 [System.Collections.ArrayList]$providerList = @()
