@@ -173,15 +173,16 @@ function Get-Providers() {
     }
     # GCP
     if ($useGCP) {
-        if (get-command 'gcloud' -ea SilentlyContinue) { Send-Update -content "GCP... " -type 1 -append; $GCPSignedIn = gcloud config get-value project -quiet 2>$null }
+        if (get-command 'gcloud' -ea SilentlyContinue) { Send-Update -content "GCP... " -type 1 -append; $GCPSignedIn = gcloud auth list --format json | Convertfrom-Json }
         else { Send-Update -content "GCP... " -type 2 -append }
         if ($GCPSignedIn) {
             $currentProject = gcloud config get-value project
             $allProjects = gcloud projects list --format=json | Convertfrom-Json
             foreach ($i in $allProjects) {
+                Send-Update -content "found: $i" -type 0 -append
                 $Params = @{}
                 if ($i.name -eq $currentProject) { $Params['d'] = $true } 
-                Add-Provider @Params -p "GCP" -n "project: $($i.name)" -i $i.projectNumber 
+                Add-Provider @Params -p "GCP" -n "project: $($i.name)" -i $i.projectNumber -u (($GCPSignedIn.account).split("@")[0]).replace(".", "")
             }
         }
     
