@@ -1,3 +1,0 @@
-ERROR: (ResourceNotFound) The Resource 'Microsoft.ContainerService/managedClusters/scw-AKS-shawnpearson' under resource group 'scw-group-shawnpearson' was not found. For more details please go to https://aka.ms/ARMResourceNotFoundFix
-Code: ResourceNotFound
-Message: The Resource 'Microsoft.ContainerService/managedClusters/scw-AKS-shawnpearson' under resource group 'scw-group-shawnpearson' was not found. For more details please go to https://aka.ms/ARMResourceNotFoundFix
