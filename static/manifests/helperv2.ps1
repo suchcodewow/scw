@@ -35,11 +35,11 @@ function Send-Update {
     param(
         [string] $content, # Message content to log/write to screen
         [int] $type, # [0/1/2] log levels respectively: debug/info/errors, info/errors, errors
-        [string] $cmd, # Include a command to run and return result
+        [string] $run, # Run a command and return result
         [switch] $append # [$true/false] skip the newline (next entry will be on same line)
     )
     $Params = @{}
-    if ($cmd) {
+    if ($run) {
         $Params['ForegroundColor'] = "Magenta"; $start = "[>]"
     }
     else {
@@ -51,7 +51,7 @@ function Send-Update {
         }
     }
     # Format the command to show on screen if user wants to see it
-    if ($cmd -and $showCommands) { $showcmd = " [ $cmd ] " }
+    if ($run -and $showCommands) { $showcmd = " [ $run ] " }
     if ($currentLogEntry) { $screenOutput = "$content$showcmd" } else { $screenOutput = "   $start $content$showcmd" }
     if ($append) { $Params['NoNewLine'] = $true; $script:currentLogEntry = "$script:currentLogEntry$content"; }
     if (-not $append) {
@@ -66,7 +66,7 @@ function Send-Update {
     if ($type -ge $outputLevel) {
         write-host @Params $screenOutput
     }
-    if ($cmd) { return invoke-Expression $cmd }
+    if ($run) { return invoke-Expression $run }
 }
 function Add-Choice() {
     #example: Add-Choice -k 'key' -d 'description' -c 'current' -f 'function' -p 'parameters'
@@ -143,11 +143,11 @@ function Get-Providers() {
     Send-Update -content "Gathering provider options: " -type 1 -append
     $providerList.Clear()
     if ($useAzure) {
+        Send-Update -content "Azure:" -type 1 -append
         if (get-command 'az' -ea SilentlyContinue) {
-            Send-Update -content "Azure... " -type 1 -append
             $azureSignedIn = az ad signed-in-user show 2>$null 
         }
-        else { Send-Update -content "Azure... " -type 2 -append }
+        else { Send-Update -content "NA " -type 2 -append }
         if ($azureSignedIn) {
             #Azure connected, get current subscription
             $currentAccount = az account show --query '{name:name,email:user.name,id:id}' | Convertfrom-Json
@@ -158,33 +158,42 @@ function Get-Providers() {
                 Add-Provider @Params -p "Azure" -n "subscription: $($i.name)" -i $i.id -u (($currentAccount.email).split("@")[0]).replace(".", "")
             }
         }
+        Send-Update -content "$($allAccounts.count) " -append -type 1
     }
     # AWS
     if ($useAWS) {
+        Send-Update -content "AWS:" -type 1 -append
         if (get-command 'aws' -ea SilentlyContinue) {
-            Send-Update -content "AWS... " -type 1 -append
             $awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]' 2>$null 
         }
-        else { Send-Update -content "AWS... " -type 2 -append }
+        else { Send-Update -content "NA " -type 2 -append }
         if ($awsSignedIn) {
             # Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
             Add-Provider -p "AWS" -n "region: $($awsSignedIn)" -i $awsSignedIn -d
+            Send-Update -c "1 " -append -type 1
+        }
+        else {
+            # Total for AWS is just 1 or 0 for now so use this toggle
+            Send-Update -c "0 " -append -type 1
         }
     }
     # GCP
     if ($useGCP) {
-        if (get-command 'gcloud' -ea SilentlyContinue) { Send-Update -content "GCP... " -type 1 -append; $GCPSignedIn = gcloud auth list --format json | Convertfrom-Json }
-        else { Send-Update -content "GCP... " -type 2 -append }
+        Send-Update -content "GCP:" -type 1 -append
+        if (get-command 'gcloud' -ea SilentlyContinue) {
+            $GCPSignedIn = gcloud auth list --format json | Convertfrom-Json 
+        }
+        else { Send-Update -content "NA " -type 2 -append }
         if ($GCPSignedIn) {
-            $currentProject = gcloud config get-value project
+            $currentProject = gcloud config get-value project 2>$null
             $allProjects = gcloud projects list --format=json | Convertfrom-Json
             foreach ($i in $allProjects) {
-                Send-Update -content "found: $i" -type 0 -append
                 $Params = @{}
                 if ($i.name -eq $currentProject) { $Params['d'] = $true } 
                 Add-Provider @Params -p "GCP" -n "project: $($i.name)" -i $i.projectNumber -u (($GCPSignedIn.account).split("@")[0]).replace(".", "")
             }
         }
+        Send-Update -content "$($allProjects.count) " -append -type 1
     
     }
     # Done getting options
@@ -227,7 +236,7 @@ function Set-Provider() {
     switch ($providerSelected.Provider) {
         "Azure" {
             # Set the Azure subscription
-            az account set --subscription $providerSelected.identifier
+            Send-Update -content "Azure: Set Subscription" -run "az account set --subscription $providerSelected.identifier"
             Add-AzureSteps 
         }
         "AWS" { Add-AWSSteps }
@@ -235,7 +244,7 @@ function Set-Provider() {
     }
 }
 function Add-AzureResourceGroup($targetGroup) {
-    $azureLocations = Send-Update -content "Azure: Available resource group locations?" -cmd "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $azureLocations = Send-Update -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; id = $i.id; name = $i.name }
@@ -247,11 +256,11 @@ function Add-AzureResourceGroup($targetGroup) {
         $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
         if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    Send-Update -content "Azure: Create resource group" -cmd "az group create --name $targetGroup --location $locationId -o none"
+    Send-Update -content "Azure: Create resource group" -run "az group create --name $targetGroup --location $locationId -o none"
     Add-AzureSteps
 }
 function Remove-AzureResourceGroup($targetGroup) {
-    Send-Update -content "Azure: Remove resource group" -cmd "az group delete -n $targetGroup"
+    Send-Update -content "Azure: Remove resource group" -run "az group delete -n $targetGroup"
     Add-AzureSteps
 }
 function Add-AKSCluster() {
@@ -259,7 +268,7 @@ function Add-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -content "Azure: Create AKS Cluster" -cmd "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_B2s' --generate-ssh-keys"
+    Send-Update -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_B2s' --generate-ssh-keys"
     Get-AKSCluster -g $g -c $c
     Add-AzureSteps
 } 
@@ -268,7 +277,7 @@ function Remove-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -content "Azure: Remove AKS Cluster" -cmd "az aks delete -g $g -n $c"
+    Send-Update -content "Azure: Remove AKS Cluster" -run "az aks delete -g $g -n $c"
     Add-AzureSteps
 }
 function Get-AKSCluster() {
@@ -276,14 +285,14 @@ function Get-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -content "Azure: Get AKS Crendentials" -cmd "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
+    Send-Update -content "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
 }
 function Add-AzureSteps() {
     # Get Azure specific properties from current choice
     $azureProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     #Resource Group Check
     $targetGroup = "scw-group-$($azureProperties.userid)"; $SubId = $azureProperties.id
-    $groupExists = Send-Update -content "Azure: Resource group exists?" -cmd "az group exists -g $targetGroup --subscription $SubId" -append
+    $groupExists = Send-Update -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup --subscription $SubId" -append
     if ($groupExists -eq "true") {
         Send-Update -content "yes" -type 0
         Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
@@ -295,7 +304,7 @@ function Add-AzureSteps() {
     }
     #AKS Cluster Check
     $targetCluster = "scw-AKS-$($azureProperties.userid)"
-    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -cmd "az aks show -n $targetCluster -g $targetGroup --query id 2>nul" -append
+    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id 2>nul" -append
     if ($aksExists) {
         send-Update -content "yes" -type 0
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
