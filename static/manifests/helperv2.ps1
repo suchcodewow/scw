@@ -225,7 +225,11 @@ function Set-Provider() {
     Add-Choice -k "TARGET" -d "change script target" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
     # build options for specified provider
     switch ($providerSelected.Provider) {
-        "Azure" { Add-AzureSteps }
+        "Azure" {
+            # Set the Azure subscription
+            az account set --subscription $providerSelected.identifier
+            Add-AzureSteps 
+        }
         "AWS" { Add-AWSSteps }
         "GCP" { Add-GloudSteps }
     }
