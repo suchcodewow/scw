@@ -11,25 +11,7 @@ $useAzure = $true # [$true/$false] use Azure
 $useGCP = $true # [$true/$false] use GCP
 
 # [DO NOT MODIFY BELOW] Internal variables/setup
-[System.Collections.ArrayList]$providerList = @()
-[System.Collections.ArrayList]$choices = @()
-$script:currentLogEntry = $null
-$repo = "https://www.suchcodewow.io/manifests"
-$ProgressPreference = "SilentlyContinue"
-if ($MyInvocation.MyCommand.Name) {
-    $logFile = "$(Split-Path $MyInvocation.MyCommand.Name  -LeafBase).log"
-    if ((test-path $logFile) -and -not $retainLog) {
-        Remove-Item $logFile
-    }
-    $configFile = "$(Split-Path $MyInvocation.MyCommand.Name  -LeafBase).log"
-}
-if ($outputLevel -eq 0) {
-    $choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties") 
-}
-else {
-    $choiceColumns = @("Option", "description", "current")
-}
-write-host
+
 #endregion
 
 #region ---Functions 
@@ -71,22 +53,46 @@ function Send-Update {
     }
     if ($run) { return invoke-Expression $run }
 }
-function Get-Prefs {
-    # Load preferences/settings.  Access with $config variable anywhere
-    # Set with Set-Prefs function
-    $script:configFile = "$(Split-Path $MyInvocation.MyCommand.Name  -LeafBase).conf"
-    if (Test-Path $configFile) {
-        Send-Update -c "Reading config: $configFile" -t 0
-        $script:config = Get-Content $configFile -Raw | ConvertFrom-Json -AsHashtable
+function Get-Prefs($scriptPath) {
+    # Set Script level variables and housekeeping stuffs
+    [System.Collections.ArrayList]$script:providerList = @()
+    [System.Collections.ArrayList]$script:choices = @()
+    $script:currentLogEntry = $null
+    $script:repo = "https://www.suchcodewow.io/manifests"
+    $script:ProgressPreference = "SilentlyContinue"
+    if ($scriptPath) {
+        $script:logFile = "$($scriptPath).log"
+        Send-Update -c "Log: $logFile"
+        if ((test-path $logFile) -and -not $retainLog) {
+            Remove-Item $logFile
+        }
+        $script:configFile = "$($scriptPath).conf"
+        Send-Update -c "Config: $configFile"
+    }
+    if ($outputLevel -eq 0) {
+        $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties") 
     }
     else {
-        $script:config = @{}
-        $config["schemaVersion"] = "1.2"
-        if ($MyInvocation.MyCommand.Name) {
-            $config | ConvertTo-Json | Out-File $configFile
-            Send-Update -c "CREATED config: $configFile" -t 0
-        }
+        $script:choiceColumns = @("Option", "description", "current")
     }
+    # Load preferences/settings.  Access with $config variable anywhere
+    # Set with Set-Prefs function
+    if ($scriptPath) {
+        $script:configFile = "$scriptPath.conf"
+        if (Test-Path $configFile) {
+            Send-Update -c "Reading config" -t 0
+            $script:config = Get-Content $configFile -Raw | ConvertFrom-Json -AsHashtable
+        }
+        else {
+            $script:config = @{}
+            $config["schemaVersion"] = "1.2"
+            if ($MyInvocation.MyCommand.Name) {
+                $config | ConvertTo-Json | Out-File $configFile
+                Send-Update -c "CREATED config: $configFile" -t 0
+            }
+        }
+    } 
+    write-host
 
 }
 function Set-Prefs {
@@ -94,7 +100,9 @@ function Set-Prefs {
         $k, # key
         $v # value
     )
-    $config[$k] = $v
+    if ($v) { $config[$k] = $v }
+    else { $config.remove($k) }
+    
     if ($MyInvocation.MyCommand.Name) {
         SEnd-Update -c "Updating config file" -t 0
         $config | ConvertTo-Json | Out-File $configFile
@@ -439,7 +447,7 @@ function Set-DTConfig() {
     }
 }
 #region ---Main
-Get-Prefs
+Get-Prefs($Myinvocation.MyCommand.Source)
 #Get-Providers
 Add-CommonSteps
 # Main Menu loop
