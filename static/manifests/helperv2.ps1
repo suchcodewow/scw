@@ -189,7 +189,7 @@ function Get-Providers() {
             $allProjects = gcloud projects list --format=json | Convertfrom-Json
             foreach ($i in $allProjects) {
                 $Params = @{}
-                if ($i.name -eq $currentProject) { $Params['d'] = $true } 
+                if ($i.PROJECT_NUMBER -eq $currentProject) { $Params['d'] = $true } 
                 Add-Provider @Params -p "GCP" -n "project: $($i.name)" -i $i.projectNumber -u (($GCPSignedIn.account).split("@")[0]).replace(".", "")
             }
         }
@@ -199,7 +199,7 @@ function Get-Providers() {
     # Done getting options
     Send-Update -content "Done!" -type 1
     #Take action based on # of providers
-    if ($providerList.count -eq 0) { write-output "`nCouldn't find a valid target cloud environment. `nLogin to Azure, AWS, or GCP and retry.`n"; exit }
+    if ($providerList.count -eq 0) { write-output "`nCouldn't find a valid target cloud environment. `nLogin to Azure (az login), AWS, or GCP (gcloud auth login) and retry.`n"; exit }
     #If there's one default, set it as the current option
     $providerDefault = $providerList | Where-Object default -eq $true
     if ($providerDefault.count -eq 1) {
@@ -236,11 +236,15 @@ function Set-Provider() {
     switch ($providerSelected.Provider) {
         "Azure" {
             # Set the Azure subscription
-            Send-Update -content "Azure: Set Subscription" -run "az account set --subscription $providerSelected.identifier"
+            Send-Update -content "Azure: Set Subscription" -run "az account set --subscription $($providerSelected.identifier)"
             Add-AzureSteps 
         }
         "AWS" { Add-AWSSteps }
-        "GCP" { Add-GloudSteps }
+        "GCP" { 
+            # set the GCP Project
+            Send-Update -content "GCP: Set Project" -run "gcloud config set project $($providerSelected.identifier)"
+            Add-GloudSteps 
+        }
     }
 }
 function Add-AzureResourceGroup($targetGroup) {
