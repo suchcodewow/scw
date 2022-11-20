@@ -21,6 +21,7 @@ if ($MyInvocation.MyCommand.Name) {
     if ((test-path $logFile) -and -not $retainLog) {
         Remove-Item $logFile
     }
+    $configFile = "$(Split-Path $MyInvocation.MyCommand.Name  -LeafBase).log"
 }
 if ($outputLevel -eq 0) {
     $choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties") 
@@ -69,6 +70,38 @@ function Send-Update {
         write-host @Params $screenOutput
     }
     if ($run) { return invoke-Expression $run }
+}
+function Get-Prefs {
+    # Load preferences/settings.  Access with $config variable anywhere
+    # Set with Set-Prefs function
+    $script:configFile = "$(Split-Path $MyInvocation.MyCommand.Name  -LeafBase).conf"
+    if (Test-Path $configFile) {
+        Send-Update -c "Reading config: $configFile" -t 0
+        $script:config = Get-Content $configFile -Raw | ConvertFrom-Json -AsHashtable
+    }
+    else {
+        $script:config = @{}
+        $config["schemaVersion"] = "1.2"
+        if ($MyInvocation.MyCommand.Name) {
+            $config | ConvertTo-Json | Out-File $configFile
+            Send-Update -c "CREATED config: $configFile" -t 0
+        }
+    }
+
+}
+function Set-Prefs {
+    param(
+        $k, # key
+        $v # value
+    )
+    $config[$k] = $v
+    if ($MyInvocation.MyCommand.Name) {
+        SEnd-Update -c "Updating config file" -t 0
+        $config | ConvertTo-Json | Out-File $configFile
+    }
+    else {
+        Send-Update -c "No command name, skipping write" -type 0
+    }
 }
 function Add-Choice() {
     #example: Add-Choice -k 'key' -d 'description' -c 'current' -f 'function' -p 'parameters'
@@ -406,6 +439,7 @@ function Set-DTConfig() {
     }
 }
 #region ---Main
+Get-Prefs
 #Get-Providers
 Add-CommonSteps
 # Main Menu loop

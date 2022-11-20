@@ -20,6 +20,6 @@ qg.ps1
 launch.json
 
 # Project Specific stuffs
-api.ps1
+test.ps1
 /*.yaml
 *.conf
