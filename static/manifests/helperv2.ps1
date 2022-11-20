@@ -189,7 +189,7 @@ function Get-Providers() {
             $allProjects = gcloud projects list --format=json | Convertfrom-Json
             foreach ($i in $allProjects) {
                 $Params = @{}
-                if ($i.PROJECT_NUMBER -eq $currentProject) { $Params['d'] = $true } 
+                if ($i.projectNumber -eq $currentProject) { $Params['d'] = $true } 
                 Add-Provider @Params -p "GCP" -n "project: $($i.name)" -i $i.projectNumber -u (($GCPSignedIn.account).split("@")[0]).replace(".", "")
             }
         }
@@ -203,8 +203,7 @@ function Get-Providers() {
     #If there's one default, set it as the current option
     $providerDefault = $providerList | Where-Object default -eq $true
     if ($providerDefault.count -eq 1) {
-        # Select the default
-        #Add-Choice -k "target" -d "change script target" -c "$($providerDefault[0].Provider) $($providerDefault[0].Name)" -f "Set-Provider"
+        # One provider- preload it
         Set-Provider -preset $providerDefault
     }
     else {
