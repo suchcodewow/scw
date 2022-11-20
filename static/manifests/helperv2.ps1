@@ -14,6 +14,8 @@ $useGCP = $true # [$true/$false] use GCP
 [System.Collections.ArrayList]$providerList = @()
 [System.Collections.ArrayList]$choices = @()
 $script:currentLogEntry = $null
+$repo = "https://www.suchcodewow.io/manifests"
+$ProgressPreference = "SilentlyContinue"
 if ($MyInvocation.MyCommand.Name) {
     $logFile = "$(Split-Path $MyInvocation.MyCommand.Name  -LeafBase).log"
     if ((test-path $logFile) -and -not $retainLog) {
@@ -321,10 +323,27 @@ function Add-AzureSteps() {
 }
 function Add-AWSSteps() {}
 function Add-GloudSteps() {}
+function Add-CommonSteps() {
+    #Optional steps to download additional files, install Dynatrace/apps
+    if (test-path dbic.yaml) {
+        $downloadtype = "Download App Yaml"
+    }
+    else {
+        $downloadtype = "NEW: Download App Yaml"
+    
+    }
+    Add-Choice -k "DLYML" -d $downloadtype -f Get-Yaml
+}
+function Get-Yaml() {
+    Invoke-WebRequest -Uri "$repo/dbic.yaml" -OutFile dbic.yaml | Out-Host
+    Send-Update -c "Downloaded file" -type 1
+    Add-CommonSteps
+}
 #endregion
 
 #region ---Main
-Get-Providers
+#Get-Providers
+Add-CommonSteps
 # Main Menu loop
 while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
