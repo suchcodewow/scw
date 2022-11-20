@@ -1,20 +1,14 @@
-#VSCODE: ctrl/cmd+k+2 folds all functions
-#region ---Variables
-
-#Visibility Options
+# User settable options 
+# -VSCODE: ctrl/cmd+k+2 folds all functions
+# -Visibility Options
 $outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
-#Cloud Options
+# -Cloud Options
 $useAWS = $true # [$true/false] use AWS
 $useAzure = $true # [$true/$false] use Azure
 $useGCP = $true # [$true/$false] use GCP
 
-# [DO NOT MODIFY BELOW] Internal variables/setup
-
-#endregion
-
-#region ---Functions 
 function Send-Update {
     # Handle output to screen & log, execute commands to cloud systems and return results
     param(
@@ -88,7 +82,7 @@ function Get-Prefs($scriptPath) {
             $config["schemaVersion"] = "1.2"
             if ($MyInvocation.MyCommand.Name) {
                 $config | ConvertTo-Json | Out-File $configFile
-                Send-Update -c "CREATED config: $configFile" -t 0
+                Send-Update -c "CREATED config" -t 0
             }
         }
     } 
@@ -100,11 +94,23 @@ function Set-Prefs {
         $k, # key
         $v # value
     )
-    if ($v) { $config[$k] = $v }
-    else { $config.remove($k) }
-    
+    if ($v) {
+        Send-Update -c "Updating config key: $k"
+        $config[$k] = $v 
+    }
+    else {
+        if ($k -and $config.containsKey($k)
+        ) {
+            Send-Update -c "Deleting config key: $k"
+            $config.remove($k)
+        }
+        else {
+            Send-Update -c "Key didn't exist: $k"
+        }
+         
+    }
     if ($MyInvocation.MyCommand.Name) {
-        SEnd-Update -c "Updating config file" -t 0
+        Send-Update -c "Setting config key: $k" -t 0
         $config | ConvertTo-Json | Out-File $configFile
     }
     else {
@@ -365,58 +371,83 @@ function Add-AzureSteps() {
 function Add-AWSSteps() {}
 function Add-GloudSteps() {}
 function Add-CommonSteps() {
-    #Optional steps to download additional files, install Dynatrace/apps
+    # Option to download any needed support files
     if (test-path dbic.yaml) {
         $downloadtype = "Download App Yaml"
     }
     else {
-        $downloadtype = "NEW: Download App Yaml"
+        $downloadtype = "TODO: Download App Yaml"
     
     }
     Add-Choice -k "DLYML" -d $downloadtype -f Get-Yaml
+    # Option to setup Dynatrace in the cluster
+    if ($config.k8stoken) {
+        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "tenant: $($config.tenantID)"
+    }
+    else {
+        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "<not done>"
+    }
 }
 function Get-Yaml() {
     Invoke-WebRequest -Uri "$repo/dbic.yaml" -OutFile dbic.yaml | Out-Host
     Send-Update -c "Downloaded file" -type 1
     Add-CommonSteps
 }
-#endregion
-
 function Set-DTConfig() {
     While (-not $k8sToken) {
+        # Get Tenant ID
         While (-not $cleantenantID) {
+            # if ($config.tenantID) {
+            #     $tenantID = read-Host -Prompt "Dynatrace Tenant ID [$($config.tenantID)]: "
+            #     if (-not $tenantID) {
+            #         $tenantID = $config.tenantID
+            #     }
+            # }
+            # else {
             $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel: "
             if (-not $tenantID) {
+                Set-Prefs -k tenantID
+                Set-Prefs -k writeToken
+                Set-Prefs -k k8stoken
+                Add-CommonSteps
                 return
+                # }
             }
             if ($Matches) { Clear-Variable Matches }
             $tenantID -match '\w{8}' | Out-Null
             if ($Matches) {
                 $cleanTenantID = $Matches[0]
-            
+                
             }
             else {
                 write-host "Tenant ID should be at least 8 alphanumeric characters."
             }
         }
-        write-host "Check Matches: $($Matches[0])"
+        # Get Token
         While (-not $cleanToken) {
-            $token = read-Host -Prompt "Token with 'Write API tokens' permission <enter> to cancel: "
+            # if ($config.writeToken) {
+            #     $token = read-Host -Prompt "Token with 'Write API token' permission <enter> to use saved token: "
+            #     if (-not $token) {
+            #         $token = $config.writeToken
+            #     }
+            # }
+            # else {
+            $token = read-Host -Prompt "Token with 'Write API token' permission <enter> to cancel: "
             if (-not $token) {
                 return
+                # }
             }
             if ($Matches) { Clear-Variable Matches }
             $token -match '^dt0c01.{80}' | Out-Null
             if ($Matches) {
                 $cleanToken = $Matches[0]
-            
+                Set-Prefs -k writeToken -v $cleanToken
             }
             else {
                 write-host "Tokens start with 'dt0c01' and are at least 80 characters."
             }
     
         }
-    
         $headers = @{
             accept         = "application/json; charset=utf-8"
             "Content-Type" = "application/json; charset=utf-8"
@@ -428,8 +459,6 @@ function Set-DTConfig() {
     
         }
         $body = $data | ConvertTo-Json
-    
-    
         Try {
             $response = Invoke-RestMethod -Method Post -Uri "https://$cleanTenantID.live.dynatrace.com/api/v2/apiTokens" -Headers $headers -Body $body
         }
@@ -438,18 +467,26 @@ function Set-DTConfig() {
         }
         if ($response.token) {
             $k8stoken = $response.token
+            Set-Prefs -k tenantID -v $cleanTenantID
+            Set-Prefs -k writeToken -v $token
+            Set-Prefs -k k8stoken -v $k8stoken
         }
         else {
             write-host "Failed to connect to $cleanTenantID"
             Clear-Variable cleanTenantID
             Clear-Variable cleanToken
+            Set-Prefs -k tenantID
+            Set-Prefs -k writeToken
+            Set-Prefs -k k8stoken
         }
     }
 }
+
 #region ---Main
 Get-Prefs($Myinvocation.MyCommand.Source)
 #Get-Providers
 Add-CommonSteps
+
 # Main Menu loop
 while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
