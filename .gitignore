@@ -22,3 +22,4 @@ launch.json
 # Project Specific stuffs
 api.ps1
 /*.yaml
+*.conf

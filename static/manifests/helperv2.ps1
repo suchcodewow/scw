@@ -341,6 +341,70 @@ function Get-Yaml() {
 }
 #endregion
 
+function Set-DTConfig() {
+    While (-not $k8sToken) {
+        While (-not $cleantenantID) {
+            $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel: "
+            if (-not $tenantID) {
+                return
+            }
+            if ($Matches) { Clear-Variable Matches }
+            $tenantID -match '\w{8}' | Out-Null
+            if ($Matches) {
+                $cleanTenantID = $Matches[0]
+            
+            }
+            else {
+                write-host "Tenant ID should be at least 8 alphanumeric characters."
+            }
+        }
+        write-host "Check Matches: $($Matches[0])"
+        While (-not $cleanToken) {
+            $token = read-Host -Prompt "Token with 'Write API tokens' permission <enter> to cancel: "
+            if (-not $token) {
+                return
+            }
+            if ($Matches) { Clear-Variable Matches }
+            $token -match '^dt0c01.{80}' | Out-Null
+            if ($Matches) {
+                $cleanToken = $Matches[0]
+            
+            }
+            else {
+                write-host "Tokens start with 'dt0c01' and are at least 80 characters."
+            }
+    
+        }
+    
+        $headers = @{
+            accept         = "application/json; charset=utf-8"
+            "Content-Type" = "application/json; charset=utf-8"
+            Authorization  = "Api-Token $token"
+        }
+        $data = @{
+            scopes = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload")
+            name   = "Steve The Token"
+    
+        }
+        $body = $data | ConvertTo-Json
+    
+    
+        Try {
+            $response = Invoke-RestMethod -Method Post -Uri "https://$cleanTenantID.live.dynatrace.com/api/v2/apiTokens" -Headers $headers -Body $body
+        }
+        Catch {
+            # The noise, ma'am.  Suppress the noise.
+        }
+        if ($response.token) {
+            $k8stoken = $response.token
+        }
+        else {
+            write-host "Failed to connect to $cleanTenantID"
+            Clear-Variable cleanTenantID
+            Clear-Variable cleanToken
+        }
+    }
+}
 #region ---Main
 #Get-Providers
 Add-CommonSteps
