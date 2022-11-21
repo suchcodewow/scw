@@ -156,27 +156,28 @@ function Add-Choice() {
     }
     [void]$choices.add($choice)
 }
-function Add-Provider() {
-    param(
-        [string] $p, # provider
-        [string] $n, # name of item
-        [string] $i, # item unique identifier
-        [switch] $d, # [$true/$false] default option
-        [string] $u # unique user identifier (for creating groups/clusters)
-    )
-    #TODO match Add-Choice Params
-    #---Add an option selector to item then add to provider list
-    $provider = New-Object PSCustomObject -Property @{
-        provider   = $p
-        name       = $n
-        identifier = $i
-        default    = $d
-        userid     = $u
-        option     = $providerLIst.count + 1
-    }
-    [void]$providerList.add($provider)
-}
 function Get-Choice() {
+    function Add-Provider() {
+        param(
+            [string] $p, # provider
+            [string] $n, # name of item
+            [string] $i, # item unique identifier
+            [switch] $d, # [$true/$false] default option
+            [string] $u # unique user identifier (for creating groups/clusters)
+        )
+        #TODO match Add-Choice Params
+        #---Add an option selector to item then add to provider list
+        $provider = New-Object PSCustomObject -Property @{
+            provider   = $p
+            name       = $n
+            identifier = $i
+            default    = $d
+            userid     = $u
+            option     = $providerLIst.count + 1
+        }
+        [void]$providerList.add($provider)
+    }
+
     # Present list of options and get selection
 
     write-output $choices | sort-object -property Option | format-table  $choiceColumns | Out-Host
@@ -373,13 +374,13 @@ function Add-GloudSteps() {}
 function Add-CommonSteps() {
     # Option to download any needed support files
     if (test-path dbic.yaml) {
-        $downloadtype = "Download App Yaml"
+        $downloadType = "downloaded"
     }
     else {
-        $downloadtype = "TODO: Download App Yaml"
+        $downloadType = "<not done>"
     
     }
-    Add-Choice -k "DLYML" -d $downloadtype -f Get-Yaml
+    Add-Choice -k "DLYML" -d "Download App Yaml" -f Get-Yaml -c $downloadType
     # Option to setup Dynatrace in the cluster
     if ($config.k8stoken) {
         Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "tenant: $($config.tenantID)"
@@ -397,13 +398,6 @@ function Set-DTConfig() {
     While (-not $k8sToken) {
         # Get Tenant ID
         While (-not $cleantenantID) {
-            # if ($config.tenantID) {
-            #     $tenantID = read-Host -Prompt "Dynatrace Tenant ID [$($config.tenantID)]: "
-            #     if (-not $tenantID) {
-            #         $tenantID = $config.tenantID
-            #     }
-            # }
-            # else {
             $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel: "
             if (-not $tenantID) {
                 Set-Prefs -k tenantID
@@ -411,7 +405,6 @@ function Set-DTConfig() {
                 Set-Prefs -k k8stoken
                 Add-CommonSteps
                 return
-                # }
             }
             if ($Matches) { Clear-Variable Matches }
             $tenantID -match '\w{8}' | Out-Null
@@ -425,17 +418,9 @@ function Set-DTConfig() {
         }
         # Get Token
         While (-not $cleanToken) {
-            # if ($config.writeToken) {
-            #     $token = read-Host -Prompt "Token with 'Write API token' permission <enter> to use saved token: "
-            #     if (-not $token) {
-            #         $token = $config.writeToken
-            #     }
-            # }
-            # else {
             $token = read-Host -Prompt "Token with 'Write API token' permission <enter> to cancel: "
             if (-not $token) {
                 return
-                # }
             }
             if ($Matches) { Clear-Variable Matches }
             $token -match '^dt0c01.{80}' | Out-Null
@@ -456,7 +441,6 @@ function Set-DTConfig() {
         $data = @{
             scopes = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload")
             name   = "Steve The Token"
-    
         }
         $body = $data | ConvertTo-Json
         Try {
@@ -480,13 +464,13 @@ function Set-DTConfig() {
             Set-Prefs -k k8stoken
         }
     }
+    Add-CommonSteps
 }
 
 #region ---Main
 Get-Prefs($Myinvocation.MyCommand.Source)
 #Get-Providers
 Add-CommonSteps
-
 # Main Menu loop
 while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
