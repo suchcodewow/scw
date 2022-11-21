@@ -157,26 +157,7 @@ function Add-Choice() {
     [void]$choices.add($choice)
 }
 function Get-Choice() {
-    function Add-Provider() {
-        param(
-            [string] $p, # provider
-            [string] $n, # name of item
-            [string] $i, # item unique identifier
-            [switch] $d, # [$true/$false] default option
-            [string] $u # unique user identifier (for creating groups/clusters)
-        )
-        #TODO match Add-Choice Params
-        #---Add an option selector to item then add to provider list
-        $provider = New-Object PSCustomObject -Property @{
-            provider   = $p
-            name       = $n
-            identifier = $i
-            default    = $d
-            userid     = $u
-            option     = $providerLIst.count + 1
-        }
-        [void]$providerList.add($provider)
-    }
+
 
     # Present list of options and get selection
 
@@ -187,6 +168,26 @@ function Get-Choice() {
         exit
     }
     return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object  -first 1 
+}
+function Add-Provider() {
+    param(
+        [string] $p, # provider
+        [string] $n, # name of item
+        [string] $i, # item unique identifier
+        [switch] $d, # [$true/$false] default option
+        [string] $u # unique user identifier (for creating groups/clusters)
+    )
+    #TODO match Add-Choice Params
+    #---Add an option selector to item then add to provider list
+    $provider = New-Object PSCustomObject -Property @{
+        provider   = $p
+        name       = $n
+        identifier = $i
+        default    = $d
+        userid     = $u
+        option     = $providerLIst.count + 1
+    }
+    [void]$providerList.add($provider)
 }
 function Get-Providers() {
     # AZURE
@@ -469,7 +470,7 @@ function Set-DTConfig() {
 
 #region ---Main
 Get-Prefs($Myinvocation.MyCommand.Source)
-#Get-Providers
+Get-Providers
 Add-CommonSteps
 # Main Menu loop
 while ($choices.count -gt 0) {
