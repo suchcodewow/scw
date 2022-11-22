@@ -1,14 +1,14 @@
-# User settable options 
-# -VSCODE: ctrl/cmd+k+2 folds all functions
-# -Visibility Options
+# VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions
+# User configurable options 
 $outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
-# -Cloud Options
-$useAWS = $true # [$true/false] use AWS
+# Cloud Options
+$useAWS = $false # [$true/false] use AWS
 $useAzure = $true # [$true/$false] use Azure
-$useGCP = $true # [$true/$false] use GCP
+$useGCP = $false # [$true/$false] use GCP
 
+# Utility
 function Send-Update {
     # Handle output to screen & log, execute commands to cloud systems and return results
     param(
@@ -169,6 +169,31 @@ function Get-Choice() {
     }
     return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object  -first 1 
 }
+function Get-Yaml() {
+    Invoke-WebRequest -Uri "$repo/dbic.yaml" -OutFile dbic.yaml | Out-Host
+    Send-Update -c "Downloaded file" -type 1
+    Add-CommonSteps
+}
+function Add-CommonSteps() {
+    # Option to download any needed support files
+    if (test-path dbic.yaml) {
+        $downloadType = "downloaded"
+    }
+    else {
+        $downloadType = "<not done>"
+    
+    }
+    Add-Choice -k "DLYML" -d "Download App Yaml" -f Get-Yaml -c $downloadType
+    # Option to setup Dynatrace in the cluster
+    if ($config.k8stoken) {
+        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "tenant: $($config.tenantID)"
+    }
+    else {
+        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "<not done>"
+    }
+}
+
+# Providers
 function Add-Provider() {
     param(
         [string] $p, # provider
@@ -297,6 +322,37 @@ function Set-Provider() {
         }
     }
 }
+
+# Azure
+function Add-AzureSteps() {
+    # Get Azure specific properties from current choice
+    $azureProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    #Resource Group Check
+    $targetGroup = "scw-group-$($azureProperties.userid)"; $SubId = $azureProperties.id
+    $groupExists = Send-Update -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup --subscription $SubId" -append
+    if ($groupExists -eq "true") {
+        Send-Update -content "yes" -type 0
+        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
+    }
+    else {
+        Send-Update -content "no" -type 0
+        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup $targetGroup"
+        return
+    }
+    #AKS Cluster Check
+    $targetCluster = "scw-AKS-$($azureProperties.userid)"
+    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id 2>nul" -append
+    if ($aksExists) {
+        send-Update -content "yes" -type 0
+        Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
+        Add-Choice -k "AZCRED" -d "Load Cluster Credentials" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
+    }
+    else {
+        send-Update -content "no" -type 0
+        Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
+    }
+
+}
 function Add-AzureResourceGroup($targetGroup) {
     $azureLocations = Send-Update -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
@@ -341,60 +397,14 @@ function Get-AKSCluster() {
     )
     Send-Update -content "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
 }
-function Add-AzureSteps() {
-    # Get Azure specific properties from current choice
-    $azureProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
-    #Resource Group Check
-    $targetGroup = "scw-group-$($azureProperties.userid)"; $SubId = $azureProperties.id
-    $groupExists = Send-Update -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup --subscription $SubId" -append
-    if ($groupExists -eq "true") {
-        Send-Update -content "yes" -type 0
-        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
-    }
-    else {
-        Send-Update -content "no" -type 0
-        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup $targetGroup"
-        return
-    }
-    #AKS Cluster Check
-    $targetCluster = "scw-AKS-$($azureProperties.userid)"
-    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id 2>nul" -append
-    if ($aksExists) {
-        send-Update -content "yes" -type 0
-        Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
-        Add-Choice -k "AZCRED" -d "Load Cluster Credentials" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
-    }
-    else {
-        send-Update -content "no" -type 0
-        Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
-    }
 
-}
+# AWS
 function Add-AWSSteps() {}
+
+# GCP
 function Add-GloudSteps() {}
-function Add-CommonSteps() {
-    # Option to download any needed support files
-    if (test-path dbic.yaml) {
-        $downloadType = "downloaded"
-    }
-    else {
-        $downloadType = "<not done>"
-    
-    }
-    Add-Choice -k "DLYML" -d "Download App Yaml" -f Get-Yaml -c $downloadType
-    # Option to setup Dynatrace in the cluster
-    if ($config.k8stoken) {
-        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "tenant: $($config.tenantID)"
-    }
-    else {
-        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "<not done>"
-    }
-}
-function Get-Yaml() {
-    Invoke-WebRequest -Uri "$repo/dbic.yaml" -OutFile dbic.yaml | Out-Host
-    Send-Update -c "Downloaded file" -type 1
-    Add-CommonSteps
-}
+
+# Dynatrace / Apps
 function Set-DTConfig() {
     While (-not $k8sToken) {
         # Get Tenant ID
@@ -468,7 +478,7 @@ function Set-DTConfig() {
     Add-CommonSteps
 }
 
-#region ---Main
+# Startup
 Get-Prefs($Myinvocation.MyCommand.Source)
 Get-Providers
 Add-CommonSteps
@@ -480,4 +490,3 @@ while ($choices.count -gt 0) {
     }
     else { write-host -ForegroundColor red "`r`nY U no pick existing option?" }
 }
-#endregion
