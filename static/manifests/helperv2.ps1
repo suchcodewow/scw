@@ -341,7 +341,7 @@ function Add-AzureSteps() {
     }
     #AKS Cluster Check
     $targetCluster = "scw-AKS-$($azureProperties.userid)"
-    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id 2>nul" -append
+    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id 2>$null" -append
     if ($aksExists) {
         send-Update -content "yes" -type 0
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
@@ -351,6 +351,8 @@ function Add-AzureSteps() {
         send-Update -content "no" -type 0
         Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
     }
+    # Also run common steps
+    Add-CommonSteps
 
 }
 function Add-AzureResourceGroup($targetGroup) {
@@ -399,10 +401,16 @@ function Get-AKSCluster() {
 }
 
 # AWS
-function Add-AWSSteps() {}
+function Add-AWSSteps() {
+    # Also run common steps
+    Add-CommonSteps
+}
 
 # GCP
-function Add-GloudSteps() {}
+function Add-GloudSteps() {
+    # Also run common steps
+    Add-CommonSteps
+}
 
 # Dynatrace / Apps
 function Set-DTConfig() {
@@ -481,7 +489,7 @@ function Set-DTConfig() {
 # Startup
 Get-Prefs($Myinvocation.MyCommand.Source)
 Get-Providers
-Add-CommonSteps
+
 # Main Menu loop
 while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
