@@ -52,7 +52,8 @@ function Get-Prefs($scriptPath) {
     [System.Collections.ArrayList]$script:providerList = @()
     [System.Collections.ArrayList]$script:choices = @()
     $script:currentLogEntry = $null
-    $script:repo = "https://www.suchcodewow.io/manifests"
+    # Any yaml listed here will be pulled during yaml command
+    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml" )
     $script:ProgressPreference = "SilentlyContinue"
     if ($scriptPath) {
         $script:logFile = "$($scriptPath).log"
@@ -170,8 +171,11 @@ function Get-Choice() {
     return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object  -first 1 
 }
 function Get-Yaml() {
-    Invoke-WebRequest -Uri "$repo/dbic.yaml" -OutFile dbic.yaml | Out-Host
-    Send-Update -c "Downloaded file" -type 1
+    foreach ($yaml in $yamlList) {
+        [uri]$uri = $yaml
+        Invoke-WebRequest -Uri $uri.OriginalString -OutFile $uri.Segments[-1] | Out-Host
+    }
+    Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
 }
 function Add-CommonSteps() {
@@ -193,7 +197,7 @@ function Add-CommonSteps() {
     }
 }
 
-# Providers
+# Handle Provider Options
 function Add-Provider() {
     param(
         [string] $p, # provider
