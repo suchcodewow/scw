@@ -384,7 +384,7 @@ function Add-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_B2s' --generate-ssh-keys"
+    Send-Update -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D2s_v4' --generate-ssh-keys"
     Get-AKSCluster -g $g -c $c
     Add-AzureSteps
 } 
