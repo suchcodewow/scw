@@ -52,7 +52,7 @@ function Get-Prefs($scriptPath) {
     [System.Collections.ArrayList]$script:providerList = @()
     [System.Collections.ArrayList]$script:choices = @()
     $script:currentLogEntry = $null
-    # Any yaml listed here will be pulled during yaml command
+    # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml" )
     $script:ProgressPreference = "SilentlyContinue"
     if ($scriptPath) {
@@ -121,37 +121,25 @@ function Set-Prefs {
 function Add-Choice() {
     #example: Add-Choice -k 'key' -d 'description' -c 'current' -f 'function' -p 'parameters'
     param(
-        [string] $k, # key identifying this choice, unique only
-        [string] $d, # description of item
-        [string] $c, # current selection of item, if applicable
-        [string] $f, # function name to call if changing item
-        [object] $p # parameters needed in the function
+        [string] $key, # key identifying this choice, unique only
+        [string] $description, # description of item
+        [string] $current, # current selection of item, if applicable
+        [string] $function, # function name to call if changing item
+        [object] $parameters # parameters needed in the function
     )
     # If this key exists, delete it and anything that followed
-    $keyOption = $choices | Where-Object { $_.key -eq $k } | select-object -expandProperty Option -first 1
+    $keyOption = $choices | Where-Object { $_.key -eq $key } | select-object -expandProperty Option -first 1
     if ($keyOption) {
         $staleOptions = $choices | Where-Object { $_.Option -ge $keyOption }
         $staleOptions | foreach-object { Send-Update -content "Removing $($_.Option) $($_.key)" -type 0; $choices.remove($_) }
-    
-        #     Send-Update -content "key: '$k' found at option: '$keyOption'. Deleting Option " -type 0 -append
-        #     $choices | ForEach-Object { 
-        #         if ($_.Option -ge $keyOption) {
-        #             $choices.Remove($_);
-        #             Send-Update -content "[$($_.key), choices: $($choices.count)] " -type 0 -append 
-        #         }
-        #         else {
-        #             Send-Update "[Skip $($_.key), choices: $($choices.count)] " -type 0 -append
-        #         } 
-        #     }
-        #     Send-Update -content "done" -type 0
     }
     $choice = New-Object PSCustomObject -Property @{
         Option         = $choices.count + 1
-        key            = $k
-        description    = $d
-        current        = $c
-        callFunction   = $f
-        callProperties = $p
+        key            = $key
+        description    = $description
+        current        = $current
+        callFunction   = $function
+        callProperties = $parameters
         
 
     }
@@ -168,35 +156,126 @@ function Get-Choice() {
         write-host "buh bye!`r`n" | Out-Host
         exit
     }
+    if ($cmd_selected -eq 0) { Get-Quote }
     return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object  -first 1 
 }
-function Get-Yaml() {
+function Get-Quote {
+    $list = @("That, I DID know.", "I was having twelve percent of a moment.", "OMG, that was really violent!", "Hang on. I got you, Kid.")
+    Get-Random -InputObject $list
+}
+function Get-Apps() {
     foreach ($yaml in $yamlList) {
         [uri]$uri = $yaml
+        $yamlName = $uri.Segments[-1]
+        $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
         Invoke-WebRequest -Uri $uri.OriginalString -OutFile $uri.Segments[-1] | Out-Host
     }
     Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
 }
+function Get-AppUrls {
+    #example: Get-AppUrls -n [namespace]
+    param(
+        [string] $namespace #namespace to search for ingress
+    )
+    #Pull services from the requested namespace
+    $services = (kubectl get svc -n $namespace -ojson | Convertfrom-Json).items
+    #Get any external ingress for this app
+    foreach ($service in $services) {
+        if ($service.status.loadBalancer.ingress.count -gt 0) {
+            if (-not $returnList) { $returnList = "URLS:" }
+            $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
+        }
+    }
+    #Return list
+    return $returnList
+
+}
 function Add-CommonSteps() {
-    # Option to download any needed support files
-    if (test-path dbic.yaml) {
-        $downloadType = "downloaded"
-    }
-    else {
-        $downloadType = "<not done>"
-    
-    }
-    Add-Choice -k "DLYML" -d "Download App Yaml" -f Get-Yaml -c $downloadType
     # Option to setup Dynatrace in the cluster
     if ($config.k8stoken) {
-        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "tenant: $($config.tenantID)"
+        $dtCurrent = "tenant: $($config.tenantID)"
     }
     else {
-        Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c "<not done>"
+        $dtCurrent = "<not done>"
+    }
+    Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c $dtCurrent
+    # Option to download any needed support files
+    [System.Collections.ArrayList]$yamlReady = @()
+    foreach ($yaml in $yamlList) {
+        [uri]$uri = $yaml
+        $yamlName = $uri.Segments[-1]
+        $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
+        if (test-path $yamlName) {
+            $newYaml = New-Object PSCustomObject -Property @{
+                Option    = $yamlReady.count + 1
+                name      = $yamlName
+                namespace = $yamlNameSpace
+            }
+            [void]$yamlReady.add($newYaml)
+        }
+    }
+    if ($yamlReady.count -eq 0) {
+        $downloadType = "<not done>"
+    }
+    else {
+        $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
+    }
+    Add-Choice -k "DLAPPS" -d "Download App Yaml" -f Get-Apps -c $downloadType
+    # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
+    $existingNamespaces = (kubectl get ns -o json | Convertfrom-Json).items.metadata.name
+    foreach ($app in $yamlReady) {
+        # check if this app is deployed using main part of filename as namespace
+        $ns = $app.namespace
+        if ($existingNamespaces.contains($ns)) {
+            
+            # Namespace exists- add status option
+            Add-Choice -k "STATUS$ns" -d "$ns : Show Pods" -c $(Get-AppUrls -n $ns ) -f "Get-Pods -n $ns"
+            # add remove option
+            Add-Choice -k "DEL$ns" -d "$ns : Remove (Delete Namespace)" -f "Remove-NameSpace -n $ns"
+        }
+        else {
+            # Yaml is available but not yet applied.  Add option to apply it
+            Add-Choice -k "INST$ns" -d "$ns : Deploy to Cluster" -f "Add-App -y $($app.name) -n $ns"        
+        }
     }
 }
+function Add-App {
+    param (
+        [string] $yaml, #yaml to apply
+        [string] $namespace #namespace to confirm
+    )
+    Send-Update -c "Adding deployment" -t 1 -r "kubectl apply -f $yaml"
+    Send-Update -c "Waiting 10s for namespace [$namespace] to activate" -a -t 1
+    $counter = 0
+    While ($namespaceState -ne "Active") {
+        if ($counter -ge 10) {
+            Send-Update -t 2 -c " Failed to create namespace!"
+            break
+        }
+        $counter++
+        Send-Update -c " $counter" -t 1 -a
+        Start-Sleep -s 1
+        #Query for namespace viability
+        $namespaceState = (kubectl get ns $namespace -ojson 2>$null | Convertfrom-Json).status.phase
 
+    }
+    Send-Update -c "Activated!" -t 1
+    Add-CommonSteps
+}
+function Get-Pods {
+    param(
+        [string] $namespace #namespace to return pods
+    )
+    Send-Update -t 1 -c "Showing pod status" -r "kubectl get pods -n $namespace"
+}
+function Remove-NameSpace {
+    param(
+        [string] $namespace
+    )
+    Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
+    Add-CommonSteps
+}
 # Handle Provider Options
 function Add-Provider() {
     param(
@@ -310,7 +389,7 @@ function Set-Provider() {
     $functionProperties = @{provider = $providerSelected.Provider; id = $providerSelected.identifier; userid = $providerSelected.userid }
     # Reset choices
     # Add option to change destination again
-    Add-Choice -k "TARGET" -d "change script target" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
+    Add-Choice -k "TARGET" -d "Change Target" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
     # build options for specified provider
     switch ($providerSelected.Provider) {
         "Azure" {
@@ -350,13 +429,14 @@ function Add-AzureSteps() {
         send-Update -content "yes" -type 0
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
         Add-Choice -k "AZCRED" -d "Load Cluster Credentials" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
+        #We have a cluster so add common things to do with it
+        Add-CommonSteps
     }
     else {
         send-Update -content "no" -type 0
         Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
     }
-    # Also run common steps
-    Add-CommonSteps
+    
 
 }
 function Add-AzureResourceGroup($targetGroup) {
@@ -372,11 +452,11 @@ function Add-AzureResourceGroup($targetGroup) {
         $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
         if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    Send-Update -content "Azure: Create resource group" -run "az group create --name $targetGroup --location $locationId -o none"
+    Send-Update -content "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
     Add-AzureSteps
 }
 function Remove-AzureResourceGroup($targetGroup) {
-    Send-Update -content "Azure: Remove resource group" -run "az group delete -n $targetGroup"
+    Send-Update -content "Azure: Remove Resource Group" -run "az group delete -n $targetGroup"
     Add-AzureSteps
 }
 function Add-AKSCluster() {
