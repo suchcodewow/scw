@@ -8,7 +8,7 @@ $useAWS = $false # [$true/false] use AWS
 $useAzure = $true # [$true/$false] use Azure
 $useGCP = $false # [$true/$false] use GCP
 
-# Utility
+# Core Script Functions
 function Send-Update {
     # Handle output to screen & log, execute commands to cloud systems and return results
     param(
@@ -70,7 +70,7 @@ function Get-Prefs($scriptPath) {
     else {
         $script:choiceColumns = @("Option", "description", "current")
     }
-    # Load preferences/settings.  Access with $config variable anywhere
+    # Load preferences/settings.  Access with $config variable anywhere.  Set-Prefs automatically updates $config variable and saves to file
     # Set with Set-Prefs function
     if ($scriptPath) {
         $script:configFile = "$scriptPath.conf"
@@ -153,6 +153,7 @@ function Get-Choice() {
     write-output $choices | sort-object -property Option | format-table  $choiceColumns | Out-Host
     $cmd_selected = read-host -prompt "Which option to execute? [<enter> to quit]"
     if (-not($cmd_selected)) {
+
         write-host "buh bye!`r`n" | Out-Host
         exit
     }
@@ -160,9 +161,12 @@ function Get-Choice() {
     return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object  -first 1 
 }
 function Get-Quote {
-    $list = @("That, I DID know.", "I was having twelve percent of a moment.", "OMG, that was really violent!", "Hang on. I got you, Kid.")
-    Get-Random -InputObject $list
+    $list = @("That, I DID know.", "I was having twelve percent of a moment.", "OMG, that was really violent!", "Hang on. I got you, Kid.", "And sometimes, I take out the trash.")
+    write-host
+    Get-Random -InputObject $list | Out-Host
 }
+
+# Utility Functions
 function Get-Apps() {
     foreach ($yaml in $yamlList) {
         [uri]$uri = $yaml
@@ -192,14 +196,24 @@ function Get-AppUrls {
 
 }
 function Add-CommonSteps() {
-    # Option to setup Dynatrace in the cluster
-    if ($config.k8stoken) {
-        $dtCurrent = "tenant: $($config.tenantID)"
+    # Get namespaces so we know what's installed or not
+    $existingNamespaces = (kubectl get ns -o json | Convertfrom-Json).items.metadata.name
+    # Determine appropriate Dynatrace option
+    if ($existingNamespaces.contains("dynatrace")) {
+        #1 Dynatrace installed.  Add status and removal options
+        Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+        Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "tenant: $($config.tenantID)"
+    }
+    elseif (test-path dynakube.yaml) {
+        #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
+        $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
+        # Dynakube file found. Provide install option
+        Add-Choice -k "DTCFG" -d "dynatrace: Deploy Platform" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
     }
     else {
-        $dtCurrent = "<not done>"
+        #3 Nothing done for dynatrace yet.  Add option to download YAML
+        Add-Choice -k "DTCFG" -d "Preload Dynatrace YAML"  -f Set-DTConfig
     }
-    Add-Choice -k "DTCFG" -d "Dynatrace Config" -f Set-DTConfig -c $dtCurrent
     # Option to download any needed support files
     [System.Collections.ArrayList]$yamlReady = @()
     foreach ($yaml in $yamlList) {
@@ -221,22 +235,21 @@ function Add-CommonSteps() {
     else {
         $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
     }
-    Add-Choice -k "DLAPPS" -d "Download App Yaml" -f Get-Apps -c $downloadType
+    Add-Choice -k "DLAPPS" -d "Download Sample Apps Yaml" -f Get-Apps -c $downloadType
     # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
-    $existingNamespaces = (kubectl get ns -o json | Convertfrom-Json).items.metadata.name
+    
     foreach ($app in $yamlReady) {
         # check if this app is deployed using main part of filename as namespace
         $ns = $app.namespace
         if ($existingNamespaces.contains($ns)) {
-            
             # Namespace exists- add status option
-            Add-Choice -k "STATUS$ns" -d "$ns : Show Pods" -c $(Get-AppUrls -n $ns ) -f "Get-Pods -n $ns"
+            Add-Choice -k "STATUS$ns" -d "$ns : Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
             # add remove option
-            Add-Choice -k "DEL$ns" -d "$ns : Remove (Delete Namespace)" -f "Remove-NameSpace -n $ns"
+            Add-Choice -k "DEL$ns" -d "$ns : Remove" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
         }
         else {
             # Yaml is available but not yet applied.  Add option to apply it
-            Add-Choice -k "INST$ns" -d "$ns : Deploy to Cluster" -f "Add-App -y $($app.name) -n $ns"        
+            Add-Choice -k "INST$ns" -d "$ns : Deploy App" -f "Add-App -y $($app.name) -n $ns"        
         }
     }
 }
@@ -268,6 +281,15 @@ function Get-Pods {
         [string] $namespace #namespace to return pods
     )
     Send-Update -t 1 -c "Showing pod status" -r "kubectl get pods -n $namespace"
+    Add-CommonSteps
+}
+function Get-PodReadyCount {
+    param(
+        [string] $namespace # namespace to count pods
+    )
+    $totalPods = (kubectl get pods -n $namespace  -ojson | Convertfrom-Json).items.count
+    $runningPods = (kubectl get pods -n $namespace --field-selector status.phase=Running -ojson | Convertfrom-Json).items.count
+    return "$runningPods/$totalPods pods READY"
 }
 function Remove-NameSpace {
     param(
@@ -276,7 +298,8 @@ function Remove-NameSpace {
     Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
     Add-CommonSteps
 }
-# Handle Provider Options
+
+# Provider Functions
 function Add-Provider() {
     param(
         [string] $p, # provider
@@ -406,7 +429,7 @@ function Set-Provider() {
     }
 }
 
-# Azure
+# Azure Functions
 function Add-AzureSteps() {
     # Get Azure specific properties from current choice
     $azureProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
@@ -428,7 +451,7 @@ function Add-AzureSteps() {
     if ($aksExists) {
         send-Update -content "yes" -type 0
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
-        Add-Choice -k "AZCRED" -d "Load Cluster Credentials" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
+        Add-Choice -k "AZCRED" -d "Refresh k8s credential" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
         #We have a cluster so add common things to do with it
         Add-CommonSteps
     }
@@ -484,19 +507,19 @@ function Get-AKSCluster() {
     Send-Update -content "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
 }
 
-# AWS
+# AWS Functions
 function Add-AWSSteps() {
     # Also run common steps
     Add-CommonSteps
 }
 
-# GCP
+# GCP Functions
 function Add-GloudSteps() {
     # Also run common steps
     Add-CommonSteps
 }
 
-# Dynatrace / Apps
+# Dynatrace Functions
 function Set-DTConfig() {
     While (-not $k8sToken) {
         # Get Tenant ID
@@ -542,8 +565,9 @@ function Set-DTConfig() {
             Authorization  = "Api-Token $token"
         }
         $data = @{
-            scopes = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload")
-            name   = "Steve The Token"
+            scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload")
+            name                = "SCW Token"
+            personalAccessToken = $false
         }
         $body = $data | ConvertTo-Json
         Try {
@@ -551,12 +575,15 @@ function Set-DTConfig() {
         }
         Catch {
             # The noise, ma'am.  Suppress the noise.
+            write-host "Error Code: " $_.Exception.Response.StatusCode.value__
+            Write-Host "Description:" $_.Exception.Response.StatusDescription
         }
         if ($response.token) {
             $k8stoken = $response.token
             Set-Prefs -k tenantID -v $cleanTenantID
             Set-Prefs -k writeToken -v $token
             Set-Prefs -k k8stoken -v $k8stoken
+            Add-DynakubeYaml -t $k8stoken -u "https://$cleanTenantID.live.dynatrace.com/api" -c "k8s$($choices.callProperties.userid)"
         }
         else {
             write-host "Failed to connect to $cleanTenantID"
@@ -567,6 +594,80 @@ function Set-DTConfig() {
             Set-Prefs -k k8stoken
         }
     }
+    Add-CommonSteps
+}
+function Add-DynakubeYaml {
+    param (
+        [string] $token, # Dynatrace API token
+        [string] $url, # URL To Dynatrace tenant
+        [string] $clusterName # Name of cluster in Dynatrace
+    )
+    $dynaKubeContent = 
+    @"
+apiVersion: v1
+data:
+  apiToken: $token
+kind: Secret
+metadata:
+  name: $clusterName
+  namespace: dynatrace
+type: Opaque
+---
+apiVersion: dynatrace.com/v1beta1
+kind: DynaKube
+metadata:
+  name: $clusterName
+  namespace: dynatrace
+  annotations:
+    feature.dynatrace.com/automatic-kubernetes-api-monitoring: "true"
+spec:
+  apiUrl: $url
+  skipCertCheck: false
+  oneAgent:
+    classicFullStack:
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+      env:
+        - name: ONEAGENT_ENABLE_VOLUME_STORAGE
+          value: "false"
+  activeGate:
+    capabilities:
+      - routing
+      - kubernetes-monitoring
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1.5Gi
+"@
+    $dynaKubeContent | out-File -FilePath dynakube.yaml
+}
+function Add-Dynatrace {
+    Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl create ns dynatrace"
+    Send-Update -c "Waiting 10s for activation" -a -t 1
+    $counter = 0
+    While ($namespaceState -ne "Active") {
+        if ($counter -ge 10) {
+            Send-Update -t 2 -c " Failed to create namespace!"
+            break
+        }
+        $counter++
+        Send-Update -c " $counter" -t 1 -a
+        Start-Sleep -s 1
+        #Query for namespace viability
+        $namespaceState = (kubectl get ns dynatrace -ojson 2>$null | Convertfrom-Json).status.phase
+
+    }
+    Send-Update -c " Activated!" -t 1
+    Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/download/v0.10.0/kubernetes.yaml"
+    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
     Add-CommonSteps
 }
 
