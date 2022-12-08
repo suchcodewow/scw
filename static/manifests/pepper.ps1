@@ -363,21 +363,20 @@ function Get-Providers() {
     if ($useGCP) {
         Send-Update -content "GCP:" -type 1 -append
         if (get-command 'gcloud' -ea SilentlyContinue) {
-            $GCPSignedIn = gcloud auth list --format json | Convertfrom-Json 
+            $accounts = gcloud auth list --format="json" | ConvertFrom-Json 
         }
         else { Send-Update -content "NA " -type 2 -append }
-        if ($GCPSignedIn) {
-            $account = 
-            $currentProject = gcloud config get-value project 2>$null
-            $allProjects = gcloud projects list --format=json | Convertfrom-Json
-            foreach ($i in $allProjects) {
+        if ($accounts.count -gt 0) {
+            #$currentProject = gcloud config get-value project
+            #$allProjects = gcloud projects list --format='json' | COnvertfrom-Json
+            foreach ($i in $accounts) {
                 $Params = @{}
-                if ($i.projectNumber -eq $currentProject) { $Params['d'] = $true } 
-                Add-Provider @Params -p "GCP" -n "project: $($i.name)" -i $i.projectNumber -u (($GCPSignedIn.account).split("@")[0]).replace(".", "")
+                if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
+                Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "")
             }
         }
         Send-Update -content "$($allProjects.count) " -append -type 1
-    
+        exit
     }
     # Done getting options
     Send-Update -content "Done!" -type 1
