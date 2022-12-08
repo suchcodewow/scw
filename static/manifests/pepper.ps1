@@ -4,8 +4,8 @@ $outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu d
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
 # Cloud Options
-$useAWS = $false # [$true/false] use AWS
-$useAzure = $true # [$true/$false] use Azure
+$useAWS = $true # [$true/false] use AWS
+$useAzure = $false # [$true/$false] use Azure
 $useGCP = $false # [$true/$false] use GCP
 
 # Core Script Functions
@@ -580,6 +580,7 @@ function Set-DTConfig() {
             Write-Host "Description:" $_.Exception.Response.StatusDescription
         }
         if ($response.token) {
+            # API Token has to be base64. #PropsDaveThomas<3
             $k8stoken = $response.token
             $base64Token = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($k8stoken))
             Set-Prefs -k tenantID -v $cleanTenantID
@@ -605,7 +606,7 @@ function Add-DynakubeYaml {
         [string] $url, # URL To Dynatrace tenant
         [string] $clusterName # Name of cluster in Dynatrace
     )
-    # API Token has to be base64. #PropsDaveThomas<3
+    
     $dynaKubeContent = 
     @"
 apiVersion: v1
