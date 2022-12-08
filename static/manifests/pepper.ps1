@@ -4,9 +4,9 @@ $outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu d
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
 # Cloud Options
-$useAWS = $true # [$true/false] use AWS
+$useAWS = $false # [$true/false] use AWS
 $useAzure = $false # [$true/$false] use Azure
-$useGCP = $false # [$true/$false] use GCP
+$useGCP = $true # [$true/$false] use GCP
 
 # Core Script Functions
 function Send-Update {
@@ -367,6 +367,7 @@ function Get-Providers() {
         }
         else { Send-Update -content "NA " -type 2 -append }
         if ($GCPSignedIn) {
+            $account = 
             $currentProject = gcloud config get-value project 2>$null
             $allProjects = gcloud projects list --format=json | Convertfrom-Json
             foreach ($i in $allProjects) {
