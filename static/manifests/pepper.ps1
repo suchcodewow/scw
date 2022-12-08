@@ -273,7 +273,7 @@ function Add-App {
         $namespaceState = (kubectl get ns $namespace -ojson 2>$null | Convertfrom-Json).status.phase
 
     }
-    Send-Update -c "Activated!" -t 1
+    Send-Update -c " Activated!" -t 1
     Add-CommonSteps
 }
 function Get-Pods {
@@ -490,6 +490,7 @@ function Add-AKSCluster() {
     Send-Update -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D2s_v4' --generate-ssh-keys"
     Get-AKSCluster -g $g -c $c
     Add-AzureSteps
+    Add-CommonSteps
 } 
 function Remove-AKSCluster() {
     param(
@@ -602,11 +603,13 @@ function Add-DynakubeYaml {
         [string] $url, # URL To Dynatrace tenant
         [string] $clusterName # Name of cluster in Dynatrace
     )
+    # API Token has to be base64. #PropsDaveThomas<3
+    $base64Token = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($token))
     $dynaKubeContent = 
     @"
 apiVersion: v1
 data:
-  apiToken: $token
+  apiToken: $base64Token
 kind: Secret
 metadata:
   name: $clusterName
