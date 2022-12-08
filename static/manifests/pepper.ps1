@@ -420,7 +420,10 @@ function Set-Provider() {
             Send-Update -content "Azure: Set Subscription" -run "az account set --subscription $($providerSelected.identifier)"
             Add-AzureSteps 
         }
-        "AWS" { Add-AWSSteps }
+        "AWS" {
+            Send-Update -content "AWS: Set region"
+            Add-AWSSteps 
+        }
         "GCP" { 
             # set the GCP Project
             Send-Update -content "GCP: Set Project" -run "gcloud config set project $($providerSelected.identifier)"
@@ -670,7 +673,7 @@ function Add-Dynatrace {
         $namespaceState = (kubectl get ns dynatrace -ojson 2>$null | Convertfrom-Json).status.phase
     }
     Send-Update -c " Activated!" -t 1
-    Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/download/v0.10.0/kubernetes.yaml"
+    Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
     Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
     Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
     Add-CommonSteps
