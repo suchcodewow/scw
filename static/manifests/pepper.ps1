@@ -581,10 +581,12 @@ function Set-DTConfig() {
         }
         if ($response.token) {
             $k8stoken = $response.token
+            $base64Token = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($k8stoken))
             Set-Prefs -k tenantID -v $cleanTenantID
             Set-Prefs -k writeToken -v $token
             Set-Prefs -k k8stoken -v $k8stoken
-            Add-DynakubeYaml -t $k8stoken -u "https://$cleanTenantID.live.dynatrace.com/api" -c "k8s$($choices.callProperties.userid)"
+            Set-Prefs -k base64Token -v $base64Token
+            Add-DynakubeYaml -t $base64Token -u "https://$cleanTenantID.live.dynatrace.com/api" -c "k8s$($choices.callProperties.userid)"
         }
         else {
             write-host "Failed to connect to $cleanTenantID"
@@ -604,7 +606,6 @@ function Add-DynakubeYaml {
         [string] $clusterName # Name of cluster in Dynatrace
     )
     # API Token has to be base64. #PropsDaveThomas<3
-    $base64Token = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($token))
     $dynaKubeContent = 
     @"
 apiVersion: v1
@@ -644,10 +645,10 @@ spec:
       - kubernetes-monitoring
     resources:
       requests:
-        cpu: 500m
-        memory: 512Mi
+        cpu: 250m
+        memory: 256Mi
       limits:
-        cpu: 1000m
+        cpu: 500m
         memory: 1.5Gi
 "@
     $dynaKubeContent | out-File -FilePath dynakube.yaml
@@ -666,10 +667,10 @@ function Add-Dynatrace {
         Start-Sleep -s 1
         #Query for namespace viability
         $namespaceState = (kubectl get ns dynatrace -ojson 2>$null | Convertfrom-Json).status.phase
-
     }
     Send-Update -c " Activated!" -t 1
     Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/download/v0.10.0/kubernetes.yaml"
+    Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
     Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
     Add-CommonSteps
 }
