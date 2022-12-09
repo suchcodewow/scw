@@ -5,27 +5,79 @@ pagination_next:
 title: Overview
 ---
 
-## DynaBankInsurCart
+## Dynabankinsuracart.com
 
-A micro-services backend application
+The application is a fully-featured application showcasing shopping cart, banking, and insurance sites. In the application diagram below, you can see the various functions provided and the technology stacks used.
+
+### Features
+
+- modern front end design
+- production-grade services architecture
+- user based load generator
+- pre-populated fields making it easy to try out
 
 ![DynaBankInsurCart](/img/DynaBankInsuraCart.png)
 
-### Helper Script.
+## Deployment assistant
 
-Download the helper script here.
+The application can be easily deployed into a kubernetes environment with Pepper. While not as brilliant as the famous [Pepper Potts](https://en.wikipedia.org/wiki/Pepper_Potts), this installer:
+
+- works seamlessly across Azure, AWS, and GCP
+- creates a kubernetes cluster using best practices for each cloud
+- guides you through full deployment or lets you take over at any point
+- shows each command as it runs so you can repeat any step yourself later
+- can be expanded with any number of kubernetes deployment (yaml) files
+
+### Assistant download
+
+Download
 
 ```bash
-curl https://www.suchcodewow.io/manifests/helperv2.ps1 > ~/helper.ps1
+curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1
 ```
 
-Run the helper.
+Run
 
 ```bash
-~/helper.ps1
+pwsh ~/pepper.ps1
 ```
 
-## Google Specific notes
+### About the assistant
 
-You might need to run `gcloud components update`.
+The assistant is written in powershell. The main reasons for this are:
+
+- It is well supported natively on all 3 cloud platforms & kept up to date.
+- Versus bash, the other built in option, it offers real arraylist support and native json parsing.
+
+It is purposefully written as a single script to allow a quick download via curl instead of cloning a repo. However, the file is fully commented and if using vscode, there are instructions at the top for folding the various functions into neat one-liners making the file simple to navigate.
+
+You can run this assistant either in the cloud shell or a local terminal with the cli tools available for your cloud vendor. Please check out the cloud vendor specific notes below if relevant.
+
+### Assistant configuration
+
+By default, Pepper will look for valid install locations across each cloud environment & provide feedback on steps run.
+
+At the top of the script, there are several output levels you can modify:
+
+```bash
+$outputLevel = 1 # [0/1/2] message level to send to screen
+$showCommands = $true # [$true/$false] show cloud commands as they execute
+$retainLog = $false # [$true/false] keep written log between executions
+```
+
+If you are using the assistant on a local terminal and are currently logged into multiple cloud vendors, you can set specifics vendors to false to skip them:
+
+```bash
+$useAWS = $true # [$true/false] use AWS
+$useAzure = $true # [$true/$false] use Azure
+$useGCP = $true # [$true/$false] use GCP
+```
+
+#### Azure specific notes
+
+#### AWS specific notes
+
+#### GCP Specific notes
+
+You might need to run `gcloud components update` if you run into script issues.
 You might need to authorize google cloud services via popup.

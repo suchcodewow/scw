@@ -375,8 +375,7 @@ function Get-Providers() {
                 Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "")
             }
         }
-        Send-Update -content "$($allProjects.count) " -append -type 1
-        exit
+        Send-Update -content "$($accounts.count) " -append -type 1
     }
     # Done getting options
     Send-Update -content "Done!" -type 1
@@ -426,7 +425,7 @@ function Set-Provider() {
         }
         "GCP" { 
             # set the GCP Project
-            Send-Update -content "GCP: Set Project" -run "gcloud config set project $($providerSelected.identifier)"
+            Send-Update -content "GCP: Set Account" -run "gcloud config set account '$($providerSelected.identifier)'"
             Add-GloudSteps 
         }
     }
