@@ -376,6 +376,7 @@ function Get-Providers() {
             }
         }
         Send-Update -content "$($accounts.count) " -append -type 1
+        
     }
     # Done getting options
     Send-Update -content "Done!" -type 1
@@ -425,7 +426,7 @@ function Set-Provider() {
         }
         "GCP" { 
             # set the GCP Project
-            Send-Update -content "GCP: Set Account" -run "gcloud config set account '$($providerSelected.identifier)'"
+            Send-Update -content "GCP: Set Project" -run "gcloud config set account '$($providerSelected.identifier)' --no-user-output-enabled"
             Add-GloudSteps 
         }
     }
@@ -434,9 +435,9 @@ function Set-Provider() {
 # Azure Functions
 function Add-AzureSteps() {
     # Get Azure specific properties from current choice
-    $azureProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     #Resource Group Check
-    $targetGroup = "scw-group-$($azureProperties.userid)"; $SubId = $azureProperties.id
+    $targetGroup = "scw-group-$($userProperties.userid)"; $SubId = $userProperties.id
     $groupExists = Send-Update -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup --subscription $SubId" -append
     if ($groupExists -eq "true") {
         Send-Update -content "yes" -type 0
@@ -448,7 +449,7 @@ function Add-AzureSteps() {
         return
     }
     #AKS Cluster Check
-    $targetCluster = "scw-AKS-$($azureProperties.userid)"
+    $targetCluster = "scw-AKS-$($userProperties.userid)"
     $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id" -append
     if ($aksExists) {
         send-Update -content "yes" -type 0
@@ -518,8 +519,22 @@ function Add-AWSSteps() {
 
 # GCP Functions
 function Add-GloudSteps() {
+    # Add GCP specific steps
+    $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    $targetProject = "scw-project-$($userProperties.userid)"; $SubId = $userProperties.id
+    $projectExists = Send-Update -content "GCP: Project exists?" -run "gcloud projects list --filter $targetProject --format='json' | Convertfrom-JSon" -append
+    if ($projectExists.count -eq 1
+    ) {
+        Send-Update -content "yes" -type 0
+        Add-Choice -k "GPROJ" -d "Delete Project & all content" -c $targetProject -f "Remove-GCPProject $targetProject"
+    }
+    else {
+        Send-Update -content "no" -type 0
+        Add-Choice -k "GPROJ" -d "Required: Create Project" -f "Add-GCPProject $targetProject"
+        return
+    }
     # Also run common steps
-    Add-CommonSteps
+    #Add-CommonSteps
 }
 
 # Dynatrace Functions
