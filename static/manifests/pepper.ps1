@@ -1,11 +1,11 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions
 # User configurable options 
-$outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
+$outputLevel = 1 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
 # Cloud Options
-$useAWS = $false # [$true/false] use AWS
-$useAzure = $false # [$true/$false] use Azure
+$useAWS = $true # [$true/false] use AWS
+$useAzure = $true # [$true/$false] use Azure
 $useGCP = $true # [$true/$false] use GCP
 
 # Core Script Functions
