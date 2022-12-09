@@ -170,8 +170,8 @@ function Get-Quote {
 function Get-Apps() {
     foreach ($yaml in $yamlList) {
         [uri]$uri = $yaml
-        $yamlName = $uri.Segments[-1]
-        $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
+        #$yamlName = $uri.Segments[-1]
+        #$yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
         Invoke-WebRequest -Uri $uri.OriginalString -OutFile $uri.Segments[-1] | Out-Host
     }
     Send-Update -c "Downloaded $($yamlList.count)" -type 1
@@ -521,7 +521,7 @@ function Add-AWSSteps() {
 function Add-GloudSteps() {
     # Add GCP specific steps
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
-    $targetProject = "scw-project-$($userProperties.userid)"; $SubId = $userProperties.id
+    $targetProject = "scw-project-$($userProperties.userid)"
     $projectExists = Send-Update -content "GCP: Project exists?" -run "gcloud projects list --filter $targetProject --format='json' | Convertfrom-JSon" -append
     if ($projectExists.count -eq 1
     ) {
