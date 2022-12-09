@@ -1,11 +1,11 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions
 # User configurable options 
-$outputLevel = 1 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
+$outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
 $showCommands = $true # [$true/$false] show cloud commands as they execute
 $retainLog = $false # [$true/false] keep written log between executions
 # Cloud Options
-$useAWS = $true # [$true/false] use AWS
-$useAzure = $true # [$true/$false] use Azure
+$useAWS = $false # [$true/false] use AWS
+$useAzure = $false # [$true/$false] use Azure
 $useGCP = $true # [$true/$false] use GCP
 
 # Core Script Functions
@@ -409,7 +409,7 @@ function Set-Provider() {
             write-host -ForegroundColor red "`r`nY U no pick valid option?" 
         }
     }
-    $functionProperties = @{provider = $providerSelected.Provider; id = $providerSelected.identifier; userid = $providerSelected.userid }
+    $functionProperties = @{provider = $providerSelected.Provider; id = $providerSelected.identifier.tolower(); userid = $providerSelected.userid.tolower() }
     # Reset choices
     # Add option to change destination again
     Add-Choice -k "TARGET" -d "Change Target" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
@@ -427,7 +427,7 @@ function Set-Provider() {
         "GCP" { 
             # set the GCP Project
             Send-Update -content "GCP: Set Project" -run "gcloud config set account '$($providerSelected.identifier)' --no-user-output-enabled"
-            Add-GloudSteps 
+            Add-GCPSteps 
         }
     }
 }
@@ -518,24 +518,51 @@ function Add-AWSSteps() {
 }
 
 # GCP Functions
-function Add-GloudSteps() {
+function Add-GCPSteps() {
     # Add GCP specific steps
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
-    $targetProject = "scw-project-$($userProperties.userid)"
-    $projectExists = Send-Update -content "GCP: Project exists?" -run "gcloud projects list --filter $targetProject --format='json' | Convertfrom-JSon" -append
-    if ($projectExists.count -eq 1
-    ) {
+    # get current Project
+    $currentProject = Send-Update -content "GCP: Get Current Project" -t 0 -r "gcloud config get-value project"
+    # if it exists, is it valid for this account?
+    if ($currentProject) {
+        # project exists, check if current account can access it
+        $validProject = Send-Update -c "GCP: Project found, is it valid?" -a -t 0 -r "gcloud projects list --filter $currentProject --format='json' | Convertfrom-Json"
+    }
+    if ($validProject.count -eq 1) {
+        # Exactly one valid project.  Offer option to change it
         Send-Update -content "yes" -type 0
-        Add-Choice -k "GPROJ" -d "Delete Project & all content" -c $targetProject -f "Remove-GCPProject $targetProject"
+        if ($currentProject -ne $validProject.projectid) {
+            Send-Update -c "Switching from Project # to Id" -t 0 -r "gcloud config set project $($validProject.Projectid) 2>$null"
+        }
+        Add-Choice -k "GPROJ" -d "Change Project" -c $($validProject.projectId) -f "Set-GCPProject"
     }
     else {
         Send-Update -content "no" -type 0
-        Add-Choice -k "GPROJ" -d "Required: Create Project" -f "Add-GCPProject $targetProject"
+        Add-Choice -k "GPROJ" -d "Required: Select GCP Project" -f "Set-GCPProject"
         return
     }
     # Also run common steps
     #Add-CommonSteps
 }
+function Set-GCPProject {
+    # set the default project
+    $projectList = gcloud projects list --format='json' --sort-by name | ConvertFrom-Json
+    $counter = 0; $projectChoices = Foreach ($i in $projectList) {
+        $counter++
+        New-object PSCustomObject -Property @{Option = $counter; name = $i.name; projectId = $i.projectId }
+    }
+    $projectChoices | sort-object -property Option | format-table -Property Option, name, projectId | Out-Host
+    while (-not $projectId) {
+        $projectSelected = read-host -prompt "Which region for your resource group? <enter> to cancel"
+        if (-not $projectSelected) { return }
+        $projectId = $projectChoices | Where-Object -FilterScript { $_.Option -eq $projectSelected } | Select-Object -ExpandProperty id -first 1
+        if (-not $projectId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    Send-Update -content "GCP: Select Project" -run "gcloud config set project $projectId"
+    Add-GCPSteps
+
+}
+
 
 # Dynatrace Functions
 function Set-DTConfig() {
