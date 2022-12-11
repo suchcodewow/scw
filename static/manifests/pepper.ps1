@@ -243,7 +243,7 @@ function Add-CommonSteps() {
         $ns = $app.namespace
         if ($existingNamespaces.contains($ns)) {
             # Namespace exists- add status option
-            Add-Choice -k "STATUS$ns" -d "$ns : Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
+            Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
             # add remove option
             Add-Choice -k "DEL$ns" -d "$ns : Remove" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
         }
@@ -270,7 +270,7 @@ function Add-App {
         Send-Update -c " $counter" -t 1 -a
         Start-Sleep -s 1
         #Query for namespace viability
-        $namespaceState = (kubectl get ns $namespace -ojson 2>$null | Convertfrom-Json).status.phase
+        $namespaceState = (kubectl get ns $namespace -ojson | Convertfrom-Json).status.phase
 
     }
     Send-Update -c " Activated!" -t 1
@@ -530,7 +530,7 @@ function Add-GCPSteps() {
         # Exactly one valid project.  Offer option to change it
         Send-Update -content "yes" -type 0
         if ($currentProject -ne $validProject.projectid) {
-            Send-Update -c "Switching from Project # to Id" -t 0 -r "gcloud config set project $($validProject.Projectid) 2>$null"
+            Send-Update -c "Switching from Project # to Id" -t 0 -r "gcloud config set project $($validProject.Projectid) "
         }
         Add-Choice -k "GPROJ" -d "Change Project" -c $($validProject.projectId) -f "Set-GCPProject"
     }
@@ -543,8 +543,8 @@ function Add-GCPSteps() {
     $existingCluster = Send-Update -c "Check for existing cluster" -r "gcloud container clusters list --filter=name=$gkeClusterName --format='json' | Convertfrom-Json"
     if ($existingCluster.count -eq 1) {
         #Cluster already exists
-        Add-Choice -k "GKECRED" -d "Get GKE cluster credentials" -f "Get-GCPCluster" -c $gkeClusterName
         Add-Choice -k "GKE" -d "Delete GKE cluster & all content" -f "Remove-GCPCluster" -c $gkeClusterName
+        Add-Choice -k "GKECRED" -d "Get GKE cluster credentials" -f "Get-GCPCluster" -c $gkeClusterName
         Set-Prefs -k gcpzone -v $existingCluster[0].zone
         Set-Prefs -k gcpclustername -v $gkeClusterName
     }
@@ -601,7 +601,8 @@ function get-GCPCluster {
 }
 function Remove-GCPCluster {
     # Delete the GKE Cluster
-    Send-Update -c "Delete GKE cluster" -t 1 -r "gcloud container clusters delete --zone $($confg.gcpzone) $($config.gclclustername)"
+    Send-Update -c "Deleting GKE cluster can take up to 10 minutes" -t 1
+    Send-Update -c "Delete GKE cluster" -t 1 -r "gcloud container clusters delete --zone $($config.gcpzone) $($config.gcpclustername)"
 }
 
 # Dynatrace Functions
@@ -751,7 +752,7 @@ function Add-Dynatrace {
         Send-Update -c " $counter" -t 1 -a
         Start-Sleep -s 1
         #Query for namespace viability
-        $namespaceState = (kubectl get ns dynatrace -ojson 2>$null | Convertfrom-Json).status.phase
+        $namespaceState = (kubectl get ns dynatrace -ojson | Convertfrom-Json).status.phase
     }
     Send-Update -c " Activated!" -t 1
     Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
