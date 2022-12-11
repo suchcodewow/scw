@@ -1,4 +1,5 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions
+
 # User configurable options 
 $outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
 $showCommands = $true # [$true/$false] show cloud commands as they execute
@@ -597,6 +598,7 @@ function Add-GCPCluster {
 }
 function get-GCPCluster {
     # Load the kubectl credentials
+    $env:USE_GKE_GCLOUD_AUTH_PLUGIN = True
     Send-Update -c "Get cluster creds" -t 1 -r "gcloud container clusters get-credentials  --zone $($config.gcpzone) $($config.gcpclustername)"
 }
 function Remove-GCPCluster {
