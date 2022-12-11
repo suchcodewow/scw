@@ -208,11 +208,11 @@ function Add-CommonSteps() {
         #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
         $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
         # Dynakube file found. Provide install option
-        Add-Choice -k "DTCFG" -d "dynatrace: Deploy Platform" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
+        Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
     }
     else {
         #3 Nothing done for dynatrace yet.  Add option to download YAML
-        Add-Choice -k "DTCFG" -d "Preload Dynatrace YAML"  -f Set-DTConfig
+        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
     }
     # Option to download any needed support files
     [System.Collections.ArrayList]$yamlReady = @()
@@ -462,8 +462,6 @@ function Add-AzureSteps() {
         send-Update -content "no" -type 0
         Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
     }
-    
-
 }
 function Add-AzureResourceGroup($targetGroup) {
     $azureLocations = Send-Update -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
@@ -545,7 +543,10 @@ function Add-GCPSteps() {
     $existingCluster = Send-Update -c "Check for existing cluster" -r "gcloud container clusters list --filter=name=$gkeClusterName --format='json' | Convertfrom-Json"
     if ($existingCluster.count -eq 1) {
         #Cluster already exists
-        Add-Choice -k "GKE" -d "Delete GKE cluster & all content" -f "Remove-GCPCluster"
+        Add-Choice -k "GKECRED" -d "Get GKE cluster credentials" -f "Get-GCPCluster" -c $gkeClusterName
+        Add-Choice -k "GKE" -d "Delete GKE cluster & all content" -f "Remove-GCPCluster" -c $gkeClusterName
+        Set-Prefs -k gcpzone -v $existingCluster[0].zone
+        Set-Prefs -k gcpclustername -v $gkeClusterName
     }
     else {
         Add-Choice -k "GKE" -d "Required: Create GKE k8s cluster" -f "Add-GCPCluster -c $gkeClusterName"
@@ -590,14 +591,17 @@ function Add-GCPCluster {
         if (-not $zone) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
     # Create the GKE cluster using name and zone
-    Send-Update -content "GCP: Create GKE cluster" -run "gcloud container clusters create --zone $zone $clusterName"
+
+    Send-Update -content "GCP: Create GKE cluster" -t 1 -run "gcloud container clusters create --zone $zone $clusterName"
     Add-GCPSteps
 }
 function get-GCPCluster {
-    # Load the kubectl bits
+    # Load the kubectl credentials
+    Send-Update -c "Get cluster creds" -t 1 -r "gcloud container clusters get-credentials  --zone $($config.gcpzone) $($config.gcpclustername)"
 }
 function Remove-GCPCluster {
     # Delete the GKE Cluster
+    Send-Update -c "Delete GKE cluster" -t 1 -r "gcloud container clusters delete --zone $($confg.gcpzone) $($config.gclclustername)"
 }
 
 # Dynatrace Functions
