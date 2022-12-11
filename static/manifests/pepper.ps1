@@ -540,9 +540,19 @@ function Add-GCPSteps() {
         Add-Choice -k "GPROJ" -d "Required: Select GCP Project" -f "Set-GCPProject"
         return
     }
-    # We have a valid project, 
+    # We have a valid project, is there a GCP cluster running?
+    $gkeClusterName = "scw-gke-$($userProperties.userid)"
+    $existingCluster = Send-Update -c "Check for existing cluster" -r "gcloud container clusters list --filter=name=$gkeClusterName --format='json' | Convertfrom-Json"
+    if ($existingCluster.count -eq 1) {
+        #Cluster already exists
+        Add-Choice -k "GKE" -d "Delete GKE cluster & all content" -f "Remove-GCPCluster"
+    }
+    else {
+        Add-Choice -k "GKE" -d "Required: Create GKE k8s cluster" -f "Add-GCPCluster -c $gkeClusterName"
+        return
+    }
     # Also run common steps
-    #Add-CommonSteps
+    Add-CommonSteps
 }
 function Set-GCPProject {
     # set the default project
@@ -561,6 +571,33 @@ function Set-GCPProject {
     Send-Update -content "GCP: Select Project" -run "gcloud config set project $projectId"
     Add-GCPSteps
 
+}
+function Add-GCPCluster {
+    param (
+        [string] $clusterName #Name for the new GKE cluster
+    )
+    # Retrieve zone list
+    $zoneList = gcloud compute zones list --format='json' --sort-by name | ConvertFrom-Json
+    $counter = 0; $zoneChoices = Foreach ($i in $zoneList) {
+        $counter++
+        New-object PSCustomObject -Property @{Option = $counter; name = $i.name }
+    }
+    $zoneChoices | sort-object -property Option | format-table -Property Option, name | Out-Host
+    while (-not $zone) {
+        $zoneSelected = read-host -prompt "Which zone? <enter> to cancel"
+        if (-not $zoneSelected) { return }
+        $zone = $zoneChoices | Where-Object -FilterScript { $_.Option -eq $zoneSelected } | Select-Object -ExpandProperty name -first 1
+        if (-not $zone) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    # Create the GKE cluster using name and zone
+    Send-Update -content "GCP: Create GKE cluster" -run "gcloud container clusters create --zone $zone $clusterName"
+    Add-GCPSteps
+}
+function get-GCPCluster {
+    # Load the kubectl bits
+}
+function Remove-GCPCluster {
+    # Delete the GKE Cluster
 }
 
 # Dynatrace Functions
