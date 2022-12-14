@@ -1,13 +1,21 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions
-
-# User configurable options 
-$outputLevel = 0 # [0/1/2] message level to send to screen: debug & extra menu details/info/errors, info/errors, errors
-$showCommands = $true # [$true/$false] show cloud commands as they execute
-$retainLog = $false # [$true/false] keep written log between executions
-# Cloud Options
-$useAWS = $false # [$true/false] use AWS
-$useAzure = $false # [$true/$false] use Azure
-$useGCP = $true # [$true/$false] use GCP
+param (
+    [switch] $verbose, # default output level is 1 (info/errors), use -v for level 0 (debug/info/errors)
+    [switch] $cloudCommands, # enable to show commands
+    [switch] $logRetention, # enable to retain log between runs
+    [switch] $aws, # use aws
+    [switch] $azure, # use azure
+    [switch] $gcp # use gcp
+)
+# Set options based on parameters
+if ($verbose) { $outputLevel = 0 } else { $outputLevel = 1 }
+if ($cloudCommands) { $showCommands = $true } else { $showCommands = $false }
+if ($logRetention) { $retainLog = $true } else { $retainLog = $false }
+if ($aws) { $useAWS = $true }
+if ($azure -eq $true) { $useAzure = $true }
+if ($gcp) { $useGCP = $true }
+# If no cloud selected, use all
+if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { write-host "setting all"; $useAWS = $true; $useAzure = $true; $useGCP = $true }
 
 # Core Script Functions
 function Send-Update {
@@ -347,12 +355,28 @@ function Get-Providers() {
     if ($useAWS) {
         Send-Update -content "AWS:" -type 1 -append
         if (get-command 'aws' -ea SilentlyContinue) {
-            $awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]' 2>$null 
+            # below doesn't work for non-admin accounts
+            #$awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]' 2>$null
+            # instead, check environment variables for a region
+            $awsRegion = $env:AWS_REGION
         }
         else { Send-Update -content "NA " -type 2 -append }
+        if (-not $awsRegion) {
+            # No region in environment variables, trying pulling from local config
+            $awsRegion = aws configure get region
+        }
+        if ($awsRegion) {
+            # We have a region- get a userid
+            (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@"
+            if ($Matches.count -eq 3) {
+                $awsSignedIn = "$($Matches[1])$($Matches[2])"
+                write-host "AWS account: $awsSignedIn"
+            }
+            #TODO: Handle situation with root/password accounts
+        }
         if ($awsSignedIn) {
             # Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
-            Add-Provider -p "AWS" -n "region: $($awsSignedIn)" -i $awsSignedIn -d
+            Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsSignedIn -u $awsSignedIn
             Send-Update -c "1 " -append -type 1
         }
         else {
@@ -512,8 +536,10 @@ function Get-AKSCluster() {
 
 # AWS Functions
 function Add-AWSSteps() {
-    # Also run common steps
-    Add-CommonSteps
+    $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    $targetCluster = "scw-AWS-$($userProperties.userid)"
+    # Cluster exists and ready- add common steps
+    #Add-CommonSteps
 }
 
 # GCP Functions
