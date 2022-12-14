@@ -1,5 +1,0 @@
-{
-  "yaml.schemas": {
-    "kubernetes://schema/apps/v1%40deployment": "file:///Users/shawnpearson/source/scw/manifests/dtorders/catalog-service.yaml"
-  }
-}

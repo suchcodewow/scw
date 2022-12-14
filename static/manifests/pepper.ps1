@@ -15,7 +15,7 @@ if ($aws) { $useAWS = $true }
 if ($azure -eq $true) { $useAzure = $true }
 if ($gcp) { $useGCP = $true }
 # If no cloud selected, use all
-if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { write-host "setting all"; $useAWS = $true; $useAzure = $true; $useGCP = $true }
+if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { $useAWS = $true; $useAzure = $true; $useGCP = $true }
 
 # Core Script Functions
 function Send-Update {
@@ -367,10 +367,9 @@ function Get-Providers() {
         }
         if ($awsRegion) {
             # We have a region- get a userid
-            (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@"
+            (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
             if ($Matches.count -eq 3) {
                 $awsSignedIn = "$($Matches[1])$($Matches[2])"
-                write-host "AWS account: $awsSignedIn"
             }
             #TODO: Handle situation with root/password accounts
         }
@@ -540,6 +539,16 @@ function Add-AWSSteps() {
     $targetCluster = "scw-AWS-$($userProperties.userid)"
     # Cluster exists and ready- add common steps
     #Add-CommonSteps
+}
+function Add-AWSRole {
+    # Create the ARN role and add the policy
+    $policy = '{""Version"":""2012-10-17"",""Statement"":[{""Effect"":""Allow"",""Principal"":{""Service"":[""eks.amazonaws.com""]},""Action"":""sts:AssumeRole""}]}'
+    $iamrole = Send-Update -c "Create Role" -r "aws iam create-role --role-name scw-eksrole-shawnpearson --assume-role-policy-document '$policy'" -t 1 | Convertfrom-Json
+    if ($iamrole.Role.Arn) { Set-Prefs -k AWSEksArn - v $iamrole.Role.Arn }
+    Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn $($iamrole.Role.Arn) --role-name scw-eksrole-shawnpearson"
+}
+function Remove-AWSRole {
+
 }
 
 # GCP Functions
