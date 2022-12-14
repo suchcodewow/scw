@@ -536,6 +536,7 @@ function Get-AKSCluster() {
 # AWS Functions
 function Add-AWSSteps() {
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    $userid = $userProperties.userid
     $targetCluster = "scw-AWS-$($userProperties.userid)"
     # Cluster exists and ready- add common steps
     #Add-CommonSteps
