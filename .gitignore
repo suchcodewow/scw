@@ -17,7 +17,6 @@
 
 *.log
 qg.ps1
-launch.json
 
 # Project Specific stuffs
 test.ps1
