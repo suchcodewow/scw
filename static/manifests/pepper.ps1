@@ -7,15 +7,6 @@ param (
     [switch] $azure, # use azure
     [switch] $gcp # use gcp
 )
-# Set options based on parameters
-if ($verbose) { $outputLevel = 0 } else { $outputLevel = 1 }
-if ($cloudCommands) { $showCommands = $true } else { $showCommands = $false }
-if ($logRetention) { $retainLog = $true } else { $retainLog = $false }
-if ($aws) { $useAWS = $true }
-if ($azure -eq $true) { $useAzure = $true }
-if ($gcp) { $useGCP = $true }
-# If no cloud selected, use all
-if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { write-host "setting all"; $useAWS = $true; $useAzure = $true; $useGCP = $true }
 
 # Core Script Functions
 function Send-Update {
@@ -57,6 +48,14 @@ function Send-Update {
     if ($run) { return invoke-expression $run 2>$null }
 }
 function Get-Prefs($scriptPath) {
+    if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
+    if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
+    if ($logRetention) { $script:retainLog = $true } else { $script:retainLog = $false }
+    if ($aws) { $script:useAWS = $true }
+    if ($azure -eq $true) { $script:useAzure = $true }
+    if ($gcp) { $script:useGCP = $true }
+    # If no cloud selected, use all
+    if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { write-host "setting all"; $script:useAWS = $true; $script:useAzure = $true; $script:useGCP = $true }
     # Set Script level variables and housekeeping stuffs
     [System.Collections.ArrayList]$script:providerList = @()
     [System.Collections.ArrayList]$script:choices = @()
@@ -370,7 +369,6 @@ function Get-Providers() {
             (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@"
             if ($Matches.count -eq 3) {
                 $awsSignedIn = "$($Matches[1])$($Matches[2])"
-                write-host "AWS account: $awsSignedIn"
             }
             #TODO: Handle situation with root/password accounts
         }
