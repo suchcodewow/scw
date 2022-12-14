@@ -15,7 +15,8 @@ function Send-Update {
         [string] $content, # Message content to log/write to screen
         [int] $type, # [0/1/2] log levels respectively: debug/info/errors, info/errors, errors
         [string] $run, # Run a command and return result
-        [switch] $append # [$true/false] skip the newline (next entry will be on same line)
+        [switch] $append, # [$true/false] skip the newline (next entry will be on same line)
+        [switch] $suppressErrors # use this switch to suppress error output (useful for extraneous warnings) 
     )
     $Params = @{}
     if ($run) {
@@ -45,7 +46,8 @@ function Send-Update {
     if ($type -ge $outputLevel) {
         write-host @Params $screenOutput
     }
-    if ($run) { return invoke-expression $run 2>$null }
+    if ($run -and $suppressErrors) { return invoke-expression $run 2>$null }
+    if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
@@ -355,7 +357,7 @@ function Get-Providers() {
         Send-Update -content "AWS:" -type 1 -append
         if (get-command 'aws' -ea SilentlyContinue) {
             # below doesn't work for non-admin accounts
-            #$awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]' 2>$null
+            #$awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]'
             # instead, check environment variables for a region
             $awsRegion = $env:AWS_REGION
         }
@@ -541,11 +543,16 @@ function Add-AWSSteps() {
     #Add-CommonSteps
 }
 function Add-AWSRole {
+    param (
+        [string] $userid # User unique identifier
+    )
     # Create the ARN role and add the policy
     $policy = '{""Version"":""2012-10-17"",""Statement"":[{""Effect"":""Allow"",""Principal"":{""Service"":[""eks.amazonaws.com""]},""Action"":""sts:AssumeRole""}]}'
     $iamrole = Send-Update -c "Create Role" -r "aws iam create-role --role-name scw-eksrole-shawnpearson --assume-role-policy-document '$policy'" -t 1 | Convertfrom-Json
-    if ($iamrole.Role.Arn) { Set-Prefs -k AWSEksArn - v $iamrole.Role.Arn }
-    Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn $($iamrole.Role.Arn) --role-name scw-eksrole-shawnpearson"
+    if ($iamrole.Role.Arn) {
+        Set-Prefs -k AWSEksArn - v $iamrole.Role.Arn 
+        Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn $($iamrole.Role.Arn) --role-name scw-eksrole-shawnpearson"
+    }
 }
 function Remove-AWSRole {
 
