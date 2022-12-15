@@ -77,6 +77,11 @@ $useGCP = $true # [$true/$false] use GCP
 
 #### AWS specific notes
 
+If your AWS account is not found (espiecally on a terminal with cli tools installed):
+
+- Check configuration with `aws configure list`. Ensure you have a secret, key, and valid region available.
+- Check that pepper can find your account with `aws sys get-caller-identity`. Ideally the ARN should have an email in it. Pepper will extract the alpha characters. If not, it will fall back to whatever is after user/.
+
 #### GCP Specific notes
 
 You might need to run `gcloud components update` if you run into script issues.

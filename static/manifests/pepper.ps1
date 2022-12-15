@@ -1,8 +1,8 @@
-# VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions
+# VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions. Check '.vscode/launch.json' for any current parameters
 param (
     [switch] $verbose, # default output level is 1 (info/errors), use -v for level 0 (debug/info/errors)
     [switch] $cloudCommands, # enable to show commands
-    [switch] $logRetention, # enable to retain log between runs
+    [switch] $logReset, # enable to reset log between runs
     [switch] $aws, # use aws
     [switch] $azure, # use azure
     [switch] $gcp # use gcp
@@ -33,11 +33,11 @@ function Send-Update {
     # Format the command to show on screen if user wants to see it
     if ($run -and $showCommands) { $showcmd = " [ $run ] " }
     if ($currentLogEntry) { $screenOutput = "$content$showcmd" } else { $screenOutput = "   $start $content$showcmd" }
-    if ($append) { $Params['NoNewLine'] = $true; $script:currentLogEntry = "$script:currentLogEntry$content"; }
+    if ($append) { $Params['NoNewLine'] = $true; $script:currentLogEntry = "$script:currentLogEntry $content$showcmd"; }
     if (-not $append) {
         #This is the last item in-line.  Write it out if log exists
         if ($logFile) {
-            "$(get-date -format "yyyy-MM-dd HH:mm:ss"): $currentLogEntry$content" | out-file $logFile -Append
+            "$(get-date -format "yyyy-MM-dd HH:mm:ss"): $currentLogEntry $content$showcmd" | out-file $logFile -Append
         }
         #Reset inline recording
         $script:currentLogEntry = $null
@@ -52,7 +52,7 @@ function Send-Update {
 function Get-Prefs($scriptPath) {
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
     if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
-    if ($logRetention) { $script:retainLog = $true } else { $script:retainLog = $false }
+    if ($logReset) { $script:retainLog = $false } else { $script:retainLog = $true }
     if ($aws) { $script:useAWS = $true }
     if ($azure -eq $true) { $script:useAzure = $true }
     if ($gcp) { $script:useGCP = $true }
@@ -75,10 +75,12 @@ function Get-Prefs($scriptPath) {
         Send-Update -c "Config: $configFile"
     }
     if ($outputLevel -eq 0) {
-        $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties") 
+        $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties")
+        $script:providerColumns = @("option", "provider", "name", "identifier", "userid", "default")
     }
     else {
         $script:choiceColumns = @("Option", "description", "current")
+        $script:providerColumns = @("option", "provider", "name")
     }
     # Load preferences/settings.  Access with $config variable anywhere.  Set-Prefs automatically updates $config variable and saves to file
     # Set with Set-Prefs function
@@ -372,6 +374,9 @@ function Get-Providers() {
             if ($Matches.count -eq 3) {
                 $awsSignedIn = "$($Matches[1])$($Matches[2])"
             }
+            else {
+                $awsSignedIn = (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId.subString(0, 6)
+            }
             #TODO: Handle situation with root/password accounts
         }
         if ($awsSignedIn) {
@@ -424,7 +429,7 @@ function Set-Provider() {
     )
     $providerSelected = $preset
     while (-not $providerSelected) {
-        write-output $providerList | sort-object -property Option | format-table -property Option, Provider, Name | Out-Host
+        write-output $providerList | sort-object -property Option | format-table $providerColumns | Out-Host
         $newProvider = read-host -prompt "Which environment to use? <enter> to cancel"
         if (-not($newProvider)) {
             return
@@ -538,24 +543,98 @@ function Get-AKSCluster() {
 function Add-AWSSteps() {
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     $userid = $userProperties.userid
-    $targetCluster = "scw-AWS-$($userProperties.userid)"
-    # Cluster exists and ready- add common steps
-    #Add-CommonSteps
+    # Counter to determine how many AWS components are ready.  AWS is really annoying.
+    $componentsReady = 0
+    $removeString = " "
+    # Check if AWS role exists
+    $roleName = "scw-awsrole-$userid"
+    $roleExists = Send-Update -s -c "Checking for AWS Component: role" -r "aws iam get-role --role-name $roleName" -a
+    if ($roleExists) {
+        Send-Update -c "exists" -t 1
+        $removeString = "$removeString -r $roleName"
+        $componentsReady++
+    }
+    else {
+        Send-Update -c "not found" -t 1
+    }
+    # Check for VPC
+    $vpcName = "scw-vpc-$userid"
+    $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$vpcName --output json" | Convertfrom-Json
+    if ($vpcExists.Vpcs) {
+        Send-Update -c "exists" -t 1
+        $removeString = "$removeString -v $($vpcExists.VPCS.VpcID)"
+        $componentsReady++
+    }
+    else {
+        Send-Update -c "not found" -t 1
+    }
+    $targetComponents = 4
+    if ($componentsReady -eq $targetComponents) {
+        # Need to confirm total components and if enough, provide remove components option and create cluster option
+        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$counter/$targetComponents deployed" -f "Remove-AWSComponents $removeString"
+    }
+    elseif ($componentsReady -eq 0) {
+        # No components yet.  Add option to create
+        Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents -r $roleName -v $vpcName"
+        return
+    }
+    else {
+        # Some components installed.  Offer removal option
+        Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents $removeString"
+        return
+    }
+    # Passed the Components steps.  Check for existing cluster.
+    $targetCluster = "scw-AWS-$userid"
+    Add-CommonSteps
 }
-function Add-AWSRole {
+function Add-AWSComponents {
     param (
-        [string] $userid # User unique identifier
+        [string] $roleName, # AWS ARN Role
+        [string] $vpcName, # VPC Name
+        [string] $clusterName # Cluster name
     )
     # Create the ARN role and add the policy
-    $policy = '{""Version"":""2012-10-17"",""Statement"":[{""Effect"":""Allow"",""Principal"":{""Service"":[""eks.amazonaws.com""]},""Action"":""sts:AssumeRole""}]}'
-    $iamrole = Send-Update -c "Create Role" -r "aws iam create-role --role-name scw-eksrole-shawnpearson --assume-role-policy-document '$policy'" -t 1 | Convertfrom-Json
+    $policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    $iamrole = Send-Update -c "Create Role" -r "aws iam create-role --role-name $roleName --assume-role-policy-document '$policy'" -t 1 | Convertfrom-Json
     if ($iamrole.Role.Arn) {
-        Set-Prefs -k AWSEksArn - v $iamrole.Role.Arn 
-        Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn $($iamrole.Role.Arn) --role-name scw-eksrole-shawnpearson"
+        Set-Prefs -k "AWSEksArn" - v $iamrole.Role.Arn 
+        Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $roleName"
     }
+    # Create a VPC
+    $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc,Tags='[{Key=Name,Value=$vpcName}]' --output json" | Convertfrom-Json
+    $vpcId = $vpcResult.Vpc.VpcId
+    Set-Prefs -k awsVpcId -v $vpcId
+    # Get Availability Zones
+    $availabilityZones = (aws ec2 describe-availability-zones --region us-east-2 | Convertfrom-Json).AvailabilityZones.zoneName
+    $firstSubnet = Send-Update -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
+    Set-Prefs -k awsSubnet1 -v $firstSubnet.Subnet.SubnetId
+    $secondSubnet = Send-Update -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
+    Set-Prefs -k awsSubnet2 -v $secondSubnet.Subnet.SubnetId
+    Add-AwsSteps
 }
-function Remove-AWSRole {
-
+function Remove-AWSComponents {
+    param (
+        [string] $roleName, # User unique identifier
+        [string] $vpcId # VPC identifier
+    )
+    if ($roleName) {
+        # Get and remove any attached policies
+        $attachedPolicies = Send-Update -c "Get Attached Policies" -r "aws iam list-attached-role-policies --role-name $roleName --output json" | Convertfrom-Json
+        foreach ($policy in $attachedPolicies.AttachedPolicies) {
+            Send-Update -c "Remove Policy" -r "aws iam detach-role-policy --role-name $roleName --policy-arn $($policy.PolicyArn)"
+        }
+        # Finally deleted the role.  OMG AWS.
+        Send-Update -c "Delete Role" -r "aws iam delete-role --role-name $roleName" 
+    }
+    if ($vpcId) {
+        # Get and remove any dependencies
+        $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id,Values=$vpcId --output json" | Convertfrom-Json
+        foreach ($subnet in $depSubnets.Subnets) {
+            Send-Update -c "Delete subnet" -r "aws ec2 delete-subnet --subnet-id $($subnet.SubnetId)"
+        }
+        Send-Update -c "Delete VPC" -r "aws ec2 delete-vpc --vpc-id $vpcId" 
+    }
+    Add-Awssteps
 }
 
 # GCP Functions
