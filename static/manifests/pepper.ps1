@@ -123,7 +123,7 @@ function Set-Prefs {
          
     }
     if ($MyInvocation.MyCommand.Name) {
-        Send-Update -c "Setting config key: $k" -t 0
+        Send-Update -c "Setting config key: $k value: $v" -t 0
         $config | ConvertTo-Json | Out-File $configFile
     }
     else {
@@ -584,7 +584,15 @@ function Add-AWSSteps() {
         return
     }
     # Passed the Components steps.  Check for existing cluster.
-    $targetCluster = "scw-AWS-$userid"
+    $clusterName = "scw-AWS-$userid"
+    $clusterExists = Send-Update -c "Check for EKS Cluster" -r "aws eks list-clusters --output json" | ConvertFrom-Json
+    #TODO: Adjust above to find 1 cluster
+    if ($clusterExists.clusters) {
+        Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster -c $clusterName"
+    }
+    else {
+        Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster -c $clusterName"
+    }
     Add-CommonSteps
 }
 function Add-AWSComponents {
@@ -597,7 +605,7 @@ function Add-AWSComponents {
     $policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
     $iamrole = Send-Update -c "Create Role" -r "aws iam create-role --role-name $roleName --assume-role-policy-document '$policy'" -t 1 | Convertfrom-Json
     if ($iamrole.Role.Arn) {
-        Set-Prefs -k "AWSEksArn" - v $iamrole.Role.Arn 
+        Set-Prefs -k "AWSEksArn" -v "$($iamrole.Role.Arn)"
         Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $roleName"
     }
     # Create a VPC
@@ -611,6 +619,14 @@ function Add-AWSComponents {
     $secondSubnet = Send-Update -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
     Set-Prefs -k awsSubnet2 -v $secondSubnet.Subnet.SubnetId
     Add-AwsSteps
+}
+function Add-AWSCluster {
+    param(
+        [string] $clusterName,
+        [string] $roleArn,
+        [string] $vpcConfig
+    )
+
 }
 function Remove-AWSComponents {
     param (
