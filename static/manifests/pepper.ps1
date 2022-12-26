@@ -626,7 +626,6 @@ function Add-AWSCluster {
         [string] $roleArn,
         [string] $vpcConfig
     )
-
 }
 function Remove-AWSComponents {
     param (
