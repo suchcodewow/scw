@@ -16,7 +16,8 @@ function Send-Update {
         [int] $type, # [0/1/2] log levels respectively: debug/info/errors, info/errors, errors
         [string] $run, # Run a command and return result
         [switch] $append, # [$true/false] skip the newline (next entry will be on same line)
-        [switch] $suppressErrors # use this switch to suppress error output (useful for extraneous warnings) 
+        [switch] $ErrorSuppression, # use this switch to suppress error output (useful for extraneous warnings)
+        [switch] $OutputSuppression # use to suppress normal output
     )
     $Params = @{}
     if ($run) {
@@ -46,7 +47,9 @@ function Send-Update {
     if ($type -ge $outputLevel) {
         write-host @Params $screenOutput
     }
-    if ($run -and $suppressErrors) { return invoke-expression $run 2>$null }
+    if ($run -and $ErrorSuppression -and $OutputSuppression) { return invoke-expression $run 2>$null 1>$null }
+    if ($run -and $ErrorSuppression) { return invoke-expression $run 2>$null }
+    if ($run -and $OutputSuppression) { return invoke-expression $run 1>$null }
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
@@ -545,8 +548,9 @@ function Add-AWSSteps() {
     $userid = $userProperties.userid
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
     $componentsReady = 0
+    $targetComponents = 4
     $removeString = " "
-    # Check if AWS role exists
+    # Component: AWS Role
     $roleName = "scw-awsrole-$userid"
     $roleExists = Send-Update -s -c "Checking for AWS Component: role" -r "aws iam get-role --role-name $roleName" -a
     if ($roleExists) {
@@ -558,7 +562,7 @@ function Add-AWSSteps() {
     else {
         Send-Update -c "not found" -t 1
     }
-    # Check for VPC
+    # Component: VPC
     $vpcName = "scw-vpc-$userid"
     set-Prefs -k AWSvpc -v $vpcName
     $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$vpcName --output json" | Convertfrom-Json
@@ -566,14 +570,30 @@ function Add-AWSSteps() {
         Send-Update -c "exists" -t 1
         $removeString = "$removeString -v $($vpcExists.VPCS.VpcID)"
         $componentsReady++
+        # Component: Subnets
+        $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
+        if ($subnetsExists.Subnets) {
+            $subnetCounter = 0
+            foreach ($subnet in $subnetsExists.Subnets) {
+                if ($subnet.SubnetId) {
+                    $subnetCounter++
+                    set-Prefs -k "Subnet$subnetCounter" -v "$($subnet.SubnetId)"
+                    Send-Update -c "Subnet $subnetCounter found"
+                    $componentsReady++
+                }
+            }
+        }
+        else {
+            Send-Update -c "no subnets" -t 1
+        }
     }
     else {
-        Send-Update -c "not found" -t 1
+        Send-Update -c "no vpc" -t 1
     }
-    $targetComponents = 4
+    # Add choices
     if ($componentsReady -eq $targetComponents) {
         # Need to confirm total components and if enough, provide remove components option and create cluster option
-        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$counter/$targetComponents deployed" -f "Remove-AWSComponents $removeString"
+        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents $removeString"
     }
     elseif ($componentsReady -eq 0) {
         # No components yet.  Add option to create
@@ -591,11 +611,12 @@ function Add-AWSSteps() {
     #TODO: Adjust above to find 1 cluster
     if ($clusterExists.clusters) {
         Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster -c $clusterName"
+        Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $clusterName" -t 0 -o
+        Add-CommonSteps
     }
     else {
         Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster -c $clusterName"
     }
-    Add-CommonSteps
 }
 function Add-AWSComponents {
     param (
