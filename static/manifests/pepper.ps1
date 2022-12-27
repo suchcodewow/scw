@@ -552,6 +552,7 @@ function Add-AWSSteps() {
     if ($roleExists) {
         Send-Update -c "exists" -t 1
         $removeString = "$removeString -r $roleName"
+        Set-Prefs -k AWSvpc -v $roleName
         $componentsReady++
     }
     else {
@@ -559,6 +560,7 @@ function Add-AWSSteps() {
     }
     # Check for VPC
     $vpcName = "scw-vpc-$userid"
+    set-Prefs -k AWSvpc -v $vpcName
     $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$vpcName --output json" | Convertfrom-Json
     if ($vpcExists.Vpcs) {
         Send-Update -c "exists" -t 1
@@ -615,9 +617,9 @@ function Add-AWSComponents {
     # Get Availability Zones
     $availabilityZones = (aws ec2 describe-availability-zones --region us-east-2 | Convertfrom-Json).AvailabilityZones.zoneName
     $firstSubnet = Send-Update -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
-    Set-Prefs -k awsSubnet1 -v $firstSubnet.Subnet.SubnetId
+    Set-Prefs -k awsSubnet1 -v $($firstSubnet.Subnet.SubnetId)
     $secondSubnet = Send-Update -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
-    Set-Prefs -k awsSubnet2 -v $secondSubnet.Subnet.SubnetId
+    Set-Prefs -k awsSubnet2 -v $($secondSubnet.Subnet.SubnetId)
     Add-AwsSteps
 }
 function Add-AWSCluster {
@@ -645,9 +647,16 @@ function Remove-AWSComponents {
         # Get and remove any dependencies
         $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id,Values=$vpcId --output json" | Convertfrom-Json
         foreach ($subnet in $depSubnets.Subnets) {
+            $depNetworks = Send-Update -c "Get Network Interfaces" -r "aws ec2 describe-network-interfaces --filters Name=subnet-id,Values=$($Subnet.SubnetId) --output json" | Convertfrom-Json
+            foreach ($network in $depNetworks.NetworkInterfaces) {
+                if ($($network.Attachment.AttachmentId)) {
+                    Send-Update -c "Detach Network Interface" -r "aws ec2 detach-network-interface --attachment-id $($network.Attachment.AttachmentId)"
+                }
+                Send-Update -c "Remove Network Interface" -r "aws ec2 delete-network-interface --network-interface-id $($network.NetworkInterfaceId) --output json"
+            }
             Send-Update -c "Delete subnet" -r "aws ec2 delete-subnet --subnet-id $($subnet.SubnetId)"
         }
-        Send-Update -c "Delete VPC" -r "aws ec2 delete-vpc --vpc-id $vpcId" 
+        Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $vpcId"
     }
     Add-Awssteps
 }
