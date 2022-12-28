@@ -111,22 +111,22 @@ function Set-Prefs {
         $v # value
     )
     if ($v) {
-        Send-Update -c "Updating config key: $k"
+        Send-Update -c "Updating key: $k -> $v" -t 0
         $config[$k] = $v 
     }
     else {
         if ($k -and $config.containsKey($k)
         ) {
-            Send-Update -c "Deleting config key: $k"
+            Send-Update -c "Deleting config key: $k" -t 0
             $config.remove($k)
         }
         else {
-            Send-Update -c "Key didn't exist: $k"
+            Send-Update -c "Key didn't exist: $k" -t 0
         }
          
     }
     if ($MyInvocation.MyCommand.Name) {
-        Send-Update -c "Setting config key: $k value: $v" -t 0
+        #Send-Update -c "Setting config key: $k value: $v" -t 0
         $config | ConvertTo-Json | Out-File $configFile
     }
     else {
@@ -549,14 +549,13 @@ function Add-AWSSteps() {
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
     $componentsReady = 0
     $targetComponents = 4
-    $removeString = " "
     # Component: AWS Role
     $roleName = "scw-awsrole-$userid"
-    $roleExists = Send-Update -s -c "Checking for AWS Component: role" -r "aws iam get-role --role-name $roleName" -a
+    set-Prefs -k AWSroleName -v $roleName
+    $roleExists = Send-Update -s -c "Checking for AWS Component: role" -r "aws iam get-role --role-name $roleName --output json" -a | COnvertfrom-Json
     if ($roleExists) {
         Send-Update -c "exists" -t 1
-        $removeString = "$removeString -r $roleName"
-        Set-Prefs -k AWSvpc -v $roleName
+        Set-Prefs -k AWSrole -v $($roleExists.Role.Arn)
         $componentsReady++
     }
     else {
@@ -568,16 +567,16 @@ function Add-AWSSteps() {
     $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$vpcName --output json" | Convertfrom-Json
     if ($vpcExists.Vpcs) {
         Send-Update -c "exists" -t 1
-        $removeString = "$removeString -v $($vpcExists.VPCS.VpcID)"
         $componentsReady++
         # Component: Subnets
         $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
         if ($subnetsExists.Subnets) {
+            Send-Update -c "exists"
             $subnetCounter = 0
             foreach ($subnet in $subnetsExists.Subnets) {
                 if ($subnet.SubnetId) {
                     $subnetCounter++
-                    set-Prefs -k "Subnet$subnetCounter" -v "$($subnet.SubnetId)"
+                    set-Prefs -k "AWSSubnet$subnetCounter" -v "$($subnet.SubnetId)"
                     Send-Update -c "Subnet $subnetCounter found"
                     $componentsReady++
                 }
@@ -590,10 +589,10 @@ function Add-AWSSteps() {
     else {
         Send-Update -c "no vpc" -t 1
     }
-    # Add choices
+    # Add component choices
     if ($componentsReady -eq $targetComponents) {
         # Need to confirm total components and if enough, provide remove components option and create cluster option
-        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents $removeString"
+        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
     }
     elseif ($componentsReady -eq 0) {
         # No components yet.  Add option to create
@@ -602,20 +601,20 @@ function Add-AWSSteps() {
     }
     else {
         # Some components installed.  Offer removal option
-        Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents $removeString"
+        Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
         return
     }
-    # Passed the Components steps.  Check for existing cluster.
+    # Passed the components step.  Check for existing cluster.
     $clusterName = "scw-AWS-$userid"
-    $clusterExists = Send-Update -c "Check for EKS Cluster" -r "aws eks list-clusters --output json" | ConvertFrom-Json
-    #TODO: Adjust above to find 1 cluster
-    if ($clusterExists.clusters) {
+    Set-Prefs -k AWScluster -v $clusterName
+    $clusterExists = Send-Update -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $clusterName --output json" | ConvertFrom-Json
+    if ($clusterExists) {
         Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster -c $clusterName"
         Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $clusterName" -t 0 -o
         Add-CommonSteps
     }
     else {
-        Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster -c $clusterName"
+        Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster"
     }
 }
 function Add-AWSComponents {
@@ -644,11 +643,11 @@ function Add-AWSComponents {
     Add-AwsSteps
 }
 function Add-AWSCluster {
-    param(
-        [string] $clusterName,
-        [string] $roleArn,
-        [string] $vpcConfig
-    )
+    Send-Update -a -c "Create Cluster" -t 0 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSrole) --resources-vpc-config subnetIds=$($config.AWSSubnet1),$($config.AWSSubnet2)"
+    While ($clusterExists.cluster.status -ne "ACTIVE") {
+        $clusterExists = Send-Update -t 0 -a -e -c "." -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
+        Start-Sleep -s 2
+    }
 }
 function Remove-AWSComponents {
     param (
@@ -680,6 +679,18 @@ function Remove-AWSComponents {
         Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $vpcId"
     }
     Add-Awssteps
+}
+function Remove-AWSCluster {
+    param(
+        [string] $clusterName
+    )
+    $clusterState = Send-Update -a -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $clusterName --output json" -t 1 | Convertfrom-Json
+    While ($clusterState) {
+        Start-Sleep -s 5
+        $clusterState = Send-Update -a -e -c "." -r "aws eks describe-cluster --name $clusterName --output json" | ConvertFrom-Json
+    }
+    SEnd-Update -c "Done" -t 1
+    Add-AWsSteps
 }
 
 # GCP Functions
@@ -932,8 +943,6 @@ function Add-Dynatrace {
 # Startup
 Get-Prefs($Myinvocation.MyCommand.Source)
 Get-Providers
-
-# Main Menu loop
 while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
     if ($cmd) {
