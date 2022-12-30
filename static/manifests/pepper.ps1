@@ -313,6 +313,24 @@ function Remove-NameSpace {
     Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
     Add-CommonSteps
 }
+function Get-Joke {
+    $allJokes = @("Knock Knock (Who's there?);Little old lady (Little old lady who?);I didn't know you could yoddle!",
+        "What did the fish say when he ran into the wall?;DAM!",
+        "What do you call a fish with no eyes?;Dead!",
+        "What do you get when you cross a rhetorical question and a joke? (I don't know, what?);...",
+        "There are 3 types of people in this world.;Those who can count. And those who can't.",
+        "I sold my vacuum the other day.;All it was doing was collecting dust.",
+        "My new thesaurus is terrible.;Not only that, but it's terrible.",
+        "What do you call a psychic little person who escaped from prison?;A small medium at large!",
+        "What did Blackbeard say when he turned 80?; Aye, Matey!",
+        "What's the best part about living in Switzerland?;I don't know- but the flag's a big plus!",
+        "What do you call a bear in a bar?;Lost!",
+        "I can cut a piece of in half just by looking at it.;You might not believe me, but I saw it with my own eyes.",
+        "A limbo champion walk into a bar.;He loses.",
+        "What's the leading cause of dry sking?;Towels.",
+        "When does a joke become a Dad joke?;When it becomes apparent.")
+    return (Get-Random $allJokes).split(";")
+}
 
 # Provider Functions
 function Add-Provider() {
@@ -548,30 +566,41 @@ function Add-AWSSteps() {
     $userid = $userProperties.userid
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
     $componentsReady = 0
-    $targetComponents = 4
-    # Component: AWS Role
-    $roleName = "scw-awsrole-$userid"
-    set-Prefs -k AWSroleName -v $roleName
-    $roleExists = Send-Update -s -c "Checking for AWS Component: role" -r "aws iam get-role --role-name $roleName --output json" -a | COnvertfrom-Json
+    $targetComponents = 5
+    # Component: AWS cluster role
+    set-Prefs -k AWSroleName -v "scw-awsrole-$userid"
+    $roleExists = Send-Update -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --role-name $($config.AWSroleName) --output json" -a | Convertfrom-Json
     if ($roleExists) {
-        Send-Update -c "exists" -t 1
-        Set-Prefs -k AWSrole -v $($roleExists.Role.Arn)
+        Send-Update -c "AWS cluster role: exists" -t 1
+        Set-Prefs -k AWSclusterRoleArn -v $($roleExists.Role.Arn)
         $componentsReady++
     }
     else {
-        Send-Update -c "not found" -t 1
+        Send-Update -c "AWS cluster role: not found" -t 1
+    }
+    # Component: AWS node role
+    set-Prefs -k AWSnodeRoleName -v "scw-awsngrole-$userid"
+    $nodeRoleExists = Send-Update -e -c "Checking for AWS Component: node role" -r "aws iam get-role --role-name $($config.AWSnodeRoleName) --output json" -a | Convertfrom-Json
+    if ($nodeRoleExists) {
+        Send-Update -c "AWS node role: exists" -t 1
+        Set-Prefs -k AWSnodeRoleArn -v $($nodeRoleExists.Role.Arn)
+        $componentsReady++
+    }
+    else {
+        Send-Update -c "AWS node role: not found" -t 1
     }
     # Component: VPC
     $vpcName = "scw-vpc-$userid"
     set-Prefs -k AWSvpc -v $vpcName
-    $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$vpcName --output json" | Convertfrom-Json
+    $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$($config.AWSvpc) --output json" | Convertfrom-Json
     if ($vpcExists.Vpcs) {
-        Send-Update -c "exists" -t 1
+        Send-Update -c "AWS VPC: exists" -t 1
+        Set-Prefs -k AWSVpcId -v $($vpcExists.Vpcs.VpcId)
         $componentsReady++
         # Component: Subnets
         $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
         if ($subnetsExists.Subnets) {
-            Send-Update -c "exists"
+            Send-Update -c "AWS Subnets: exist" -t 1
             $subnetCounter = 0
             foreach ($subnet in $subnetsExists.Subnets) {
                 if ($subnet.SubnetId) {
@@ -583,11 +612,11 @@ function Add-AWSSteps() {
             }
         }
         else {
-            Send-Update -c "no subnets" -t 1
+            Send-Update -c "AWS Subnets: not found" -t 1
         }
     }
     else {
-        Send-Update -c "no vpc" -t 1
+        Send-Update -c "AWS VPC: not found" -t 1
     }
     # Add component choices
     if ($componentsReady -eq $targetComponents) {
@@ -596,7 +625,7 @@ function Add-AWSSteps() {
     }
     elseif ($componentsReady -eq 0) {
         # No components yet.  Add option to create
-        Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents -r $roleName -v $vpcName"
+        Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents"
         return
     }
     else {
@@ -605,67 +634,110 @@ function Add-AWSSteps() {
         return
     }
     # Passed the components step.  Check for existing cluster.
-    $clusterName = "scw-AWS-$userid"
-    Set-Prefs -k AWScluster -v $clusterName
-    $clusterExists = Send-Update -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $clusterName --output json" | ConvertFrom-Json
+    Set-Prefs -k AWScluster -v "scw-AWS-$userid"
+    Set-Prefs -k AWSnodegroup -v "scw-AWSNG-$userid"
+    $clusterExists = Send-Update -t 1 -a -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
     if ($clusterExists) {
-        Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster -c $clusterName"
-        Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $clusterName" -t 0 -o
+        Send-Update -c "AWS Cluster: exists" -t 1
+        Set-Prefs -k AWSclusterArn -v $($clusterExists.cluster.arn)
+        Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster"
+        Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $($config.AWScluster)" -t 0 -o
         Add-CommonSteps
     }
     else {
+        Send-Update -c "AWS Cluster: not found" -t 1
         Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster"
     }
 }
 function Add-AWSComponents {
-    param (
-        [string] $roleName, # AWS ARN Role
-        [string] $vpcName, # VPC Name
-        [string] $clusterName # Cluster name
-    )
-    # Create the ARN role and add the policy
-    $policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
-    $iamrole = Send-Update -c "Create Role" -r "aws iam create-role --role-name $roleName --assume-role-policy-document '$policy'" -t 1 | Convertfrom-Json
-    if ($iamrole.Role.Arn) {
-        Set-Prefs -k "AWSEksArn" -v "$($iamrole.Role.Arn)"
-        Send-Update -c "Attach Role Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $roleName"
+    # Create the cluster ARN role and add the policy
+    $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    $iamClusterRole = Send-Update -c "Create Cluster Role" -r "aws iam create-role --role-name $($config.AWSroleName) --assume-role-policy-document '$ekspolicy'" -t 1 | Convertfrom-Json
+    if ($iamClusterRole.Role.Arn) {
+        Send-Update -c "Attach Cluster Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $($config.AWSroleName)"
+    }
+    # Create the node role ARN and add 2 policies.  AWS makes me so sad on the inside.
+    $ec2policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    $iamNodeRole = Send-Update -c "Create Nodegroup Role" -r "aws iam create-role --role-name $($config.AWSnodeRoleName) --assume-role-policy-document '$ec2policy'" -t 1 | Convertfrom-Json
+    if ($iamNodeRole.Role.Arn) {
+        Send-Update -c "Attach Worker Node Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $($config.AWSnodeRoleName)" -t 1
+        Send-Update -c "Attach EC2 Container Registry Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $($config.AWSnodeRoleName)" -t 1
     }
     # Create a VPC
-    $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc,Tags='[{Key=Name,Value=$vpcName}]' --output json" | Convertfrom-Json
+    $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc,Tags='[{Key=Name,Value=$($config.AWSvpc)}]' --output json" | Convertfrom-Json
     $vpcId = $vpcResult.Vpc.VpcId
-    Set-Prefs -k awsVpcId -v $vpcId
     # Get Availability Zones
     $availabilityZones = (aws ec2 describe-availability-zones --region us-east-2 | Convertfrom-Json).AvailabilityZones.zoneName
-    $firstSubnet = Send-Update -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
-    Set-Prefs -k awsSubnet1 -v $($firstSubnet.Subnet.SubnetId)
-    $secondSubnet = Send-Update -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
-    Set-Prefs -k awsSubnet2 -v $($secondSubnet.Subnet.SubnetId)
+    Send-Update -o -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
+    Send-Update -o -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
     Add-AwsSteps
 }
 function Add-AWSCluster {
-    Send-Update -a -c "Create Cluster" -t 0 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSrole) --resources-vpc-config subnetIds=$($config.AWSSubnet1),$($config.AWSSubnet2)"
+    # Create cluster-  wait for 'active' state
+    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSSubnet1),$($config.AWSSubnet2)"
+    $counter = 0
     While ($clusterExists.cluster.status -ne "ACTIVE") {
-        $clusterExists = Send-Update -t 0 -a -e -c "." -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
-        Start-Sleep -s 2
+        $clusterExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
+        Send-Update -t 1 -c "$($clusterExists.cluster.status)"
+        $counter++
+        if ($counter % 12 -eq 0) { $jokeCounter = 0; $joke = Get-Joke }
+        if ($joke) {
+            if ($joke[$jokeCounter]) {
+                Send-Update -t 1 -c "Joke Generator: $($joke[$jokeCounter])"
+                $jokeCounter++
+            }
+            else {
+                Clear-Variable joke
+            }
+        }
+        Start-Sleep -s 10
+    }
+    # Create nodegroup- wait for active state
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --subnets $($config.AWSSubnet1) $($config.AWSSubnet2)"
+    While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
+        $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
+        Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
+        $counter++
+        if ($counter % 12 -eq 0) { $jokeCounter = 0; $joke = Get-Joke }
+        if ($joke) {
+            if ($joke[$jokeCounter]) {
+                Send-Update -t 1 -c "Joke Generator: $($joke[$jokeCounter])"
+                $jokeCounter++
+            }
+            else {
+                Clear-Variable joke
+            }
+        }
+        Start-Sleep -s 5
     }
 }
 function Remove-AWSComponents {
-    param (
-        [string] $roleName, # User unique identifier
-        [string] $vpcId # VPC identifier
-    )
-    if ($roleName) {
-        # Get and remove any attached policies
-        $attachedPolicies = Send-Update -c "Get Attached Policies" -r "aws iam list-attached-role-policies --role-name $roleName --output json" | Convertfrom-Json
-        foreach ($policy in $attachedPolicies.AttachedPolicies) {
-            Send-Update -c "Remove Policy" -r "aws iam detach-role-policy --role-name $roleName --policy-arn $($policy.PolicyArn)"
-        }
-        # Finally deleted the role.  OMG AWS.
-        Send-Update -c "Delete Role" -r "aws iam delete-role --role-name $roleName" 
+    if ($($config.AWSclusterArn)) {
+        Remove-AWSCluster -b
     }
-    if ($vpcId) {
+    if ($($config.AWSclusterRoleArn)) {
+        # Get and remove any attached policies
+        $attachedPolicies = Send-Update -e -c "Get Attached Policies" -r "aws iam list-attached-role-policies --role-name $($config.AWSroleName) --output json" | Convertfrom-Json
+        foreach ($policy in $attachedPolicies.AttachedPolicies) {
+            Send-Update -c "Remove Policy" -r "aws iam detach-role-policy --role-name $($config.AWSroleName) --policy-arn $($policy.PolicyArn)"
+        }
+        # Finally delete the role.  OMG AWS.
+        Send-Update -c "Delete Role" -r "aws iam delete-role --role-name $($config.AWSroleName)"
+        Set-Prefs -k "AWSclusterRoleArn"
+    }
+    if ($($config.AWSnodeRoleArn)) {
+        # Get and remove any attached policies
+        $attachedPolicies = Send-Update -e -c "Get Attached Policies" -r "aws iam list-attached-role-policies --role-name $($config.AWSnodeRoleName) --output json" | Convertfrom-Json
+        foreach ($policy in $attachedPolicies.AttachedPolicies) {
+            Send-Update -c "Remove Policy" -r "aws iam detach-role-policy --role-name $($config.AWSnodeRoleName) --policy-arn $($policy.PolicyArn)"
+        }
+        # Finally delete the role.
+        Send-Update -c "Delete Role" -r "aws iam delete-role --role-name $($config.AWSnodeRoleName)"
+        Set-Prefs -k "AWSnodeRoleArn"
+    }
+    if ($($config.AWSVpcId)) {
         # Get and remove any dependencies
-        $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id,Values=$vpcId --output json" | Convertfrom-Json
+        $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | Convertfrom-Json
         foreach ($subnet in $depSubnets.Subnets) {
             $depNetworks = Send-Update -c "Get Network Interfaces" -r "aws ec2 describe-network-interfaces --filters Name=subnet-id,Values=$($Subnet.SubnetId) --output json" | Convertfrom-Json
             foreach ($network in $depNetworks.NetworkInterfaces) {
@@ -676,21 +748,33 @@ function Remove-AWSComponents {
             }
             Send-Update -c "Delete subnet" -r "aws ec2 delete-subnet --subnet-id $($subnet.SubnetId)"
         }
-        Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $vpcId"
+        Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $($config.AWSVpcId)"
+        set-Prefs -k "AWSSubnet1"
+        set-Prefs -k "AWSSubnet2"
+        set-Prefs -k "AWSVpcId"
     }
-    Add-Awssteps
+    Add-AWSSteps
 }
 function Remove-AWSCluster {
-    param(
-        [string] $clusterName
+    param (
+        [switch] $bypass # skip adding AWS steps- this is part of a larger process
     )
-    $clusterState = Send-Update -a -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $clusterName --output json" -t 1 | Convertfrom-Json
-    While ($clusterState) {
+    # Remove nodegroup
+    Send-Update -o -c "Delete EKS nodegroup" -r "aws eks delete-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1
+    While ($nodegroupExists) {
         Start-Sleep -s 5
-        $clusterState = Send-Update -a -e -c "." -r "aws eks describe-cluster --name $clusterName --output json" | ConvertFrom-Json
+        $nodegroupExists = Send-Update -a -e -c "Check status" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1 | Convertfrom-Json
+        Send-Update -t 1 -c "nodegroup state: $($nodegroupExists.nodegroup.status)"
     }
-    SEnd-Update -c "Done" -t 1
-    Add-AWsSteps
+    # Remove cluster
+    Send-Update -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $($config.AWScluster) --output json" -t 1
+    While ($clusterExists) {
+        Start-Sleep -s 5
+        $clusterExists = Send-Update -a -e -c "Check status" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
+        Send-Update -t 1 -c "cluster state: $($clusterExists.cluster.status)"
+    }
+    Set-Prefs -k AWSclusterArn
+    if (-not $bypass) { Add-AWSSteps }
 }
 
 # GCP Functions
