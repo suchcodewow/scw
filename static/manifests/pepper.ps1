@@ -355,7 +355,7 @@ function Add-Provider() {
 }
 function Get-Providers() {
     # AZURE
-    Send-Update -content "Gathering provider options: " -type 1 -append
+    Send-Update -content "Gathering provider options  " -type 1 -append
     $providerList.Clear()
     if ($useAzure) {
         Send-Update -content "Azure:" -type 1 -append
@@ -383,32 +383,33 @@ function Get-Providers() {
             #$awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]'
             # instead, check environment variables for a region
             $awsRegion = $env:AWS_REGION
-        }
-        else { Send-Update -content "NA " -type 2 -append }
-        if (-not $awsRegion) {
-            # No region in environment variables, trying pulling from local config
-            $awsRegion = aws configure get region
-        }
-        if ($awsRegion) {
-            # We have a region- get a userid
+            if (-not $awsRegion) {
+                # No region in environment variables, trying pulling from local config
+                $awsRegion = aws configure get region
+            }
+
+            if ($awsRegion) {
+                # We have a region- get a userid
             (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
-            if ($Matches.count -eq 3) {
-                $awsSignedIn = "$($Matches[1])$($Matches[2])"
+                if ($Matches.count -eq 3) {
+                    $awsSignedIn = "$($Matches[1])$($Matches[2])"
+                }
+                else {
+                    $awsSignedIn = (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId.subString(0, 6)
+                }
+                #TODO: Handle situation with root/password accounts
+            }
+            if ($awsSignedIn) {
+                # Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
+                Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsSignedIn -u $awsSignedIn
+                Send-Update -c "1 " -append -type 1
             }
             else {
-                $awsSignedIn = (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId.subString(0, 6)
+                # Total for AWS is just 1 or 0 for now so use this toggle
+                Send-Update -c "0 " -append -type 1
             }
-            #TODO: Handle situation with root/password accounts
         }
-        if ($awsSignedIn) {
-            # Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
-            Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsSignedIn -u $awsSignedIn
-            Send-Update -c "1 " -append -type 1
-        }
-        else {
-            # Total for AWS is just 1 or 0 for now so use this toggle
-            Send-Update -c "0 " -append -type 1
-        }
+        else { Send-Update -content "NA " -type 1 -append }
     }
     # GCP
     if ($useGCP) {
@@ -419,7 +420,7 @@ function Get-Providers() {
         else { Send-Update -content "NA " -type 2 -append }
         if ($accounts.count -gt 0) {
             #$currentProject = gcloud config get-value project
-            #$allProjects = gcloud projects list --format='json' | COnvertfrom-Json
+            #$allProjects = gcloud projects list --format='json' | Convertfrom-Json
             foreach ($i in $accounts) {
                 $Params = @{}
                 if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
@@ -674,7 +675,7 @@ function Add-AWSComponents {
 }
 function Add-AWSCluster {
     # Create cluster-  wait for 'active' state
-    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSSubnet1),$($config.AWSSubnet2)"
+    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSSubnet1),$($config.AWSSubnet2),endpointPrivateAccess=true"
     $counter = 0
     While ($clusterExists.cluster.status -ne "ACTIVE") {
         $clusterExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
@@ -736,7 +737,7 @@ function Remove-AWSComponents {
         Set-Prefs -k "AWSnodeRoleArn"
     }
     if ($($config.AWSVpcId)) {
-        # Get and remove any dependencies
+        # Remove subnets
         $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | Convertfrom-Json
         foreach ($subnet in $depSubnets.Subnets) {
             $depNetworks = Send-Update -c "Get Network Interfaces" -r "aws ec2 describe-network-interfaces --filters Name=subnet-id,Values=$($Subnet.SubnetId) --output json" | Convertfrom-Json
@@ -747,6 +748,11 @@ function Remove-AWSComponents {
                 Send-Update -c "Remove Network Interface" -r "aws ec2 delete-network-interface --network-interface-id $($network.NetworkInterfaceId) --output json"
             }
             Send-Update -c "Delete subnet" -r "aws ec2 delete-subnet --subnet-id $($subnet.SubnetId)"
+        }
+        # Remove route tables
+        $depTables = Send-Update -t 1 -c "Get route tables" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | ConvertFrom-Json
+        foreach ($table in $depTables.RouteTables) {
+            Send-Update -c "Delete route table" -r "aws ec2 delete-route-table --route-table-id $($table.RouteTableId)" -t 1
         }
         Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $($config.AWSVpcId)"
         set-Prefs -k "AWSSubnet1"
