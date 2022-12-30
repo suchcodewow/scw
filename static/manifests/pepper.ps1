@@ -380,17 +380,17 @@ function Get-Providers() {
         Send-Update -content "AWS:" -type 1 -append
         if (get-command 'aws' -ea SilentlyContinue) {
             # below doesn't work for non-admin accounts
-            #$awsSignedIn = aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]'
             # instead, check environment variables for a region
             $awsRegion = $env:AWS_REGION
             if (-not $awsRegion) {
                 # No region in environment variables, trying pulling from local config
                 $awsRegion = aws configure get region
             }
-
             if ($awsRegion) {
+                # Save region to use in commands
+                Set-Prefs -k AWSregion -v $awsRegion
                 # We have a region- get a userid
-            (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
+                (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
                 if ($Matches.count -eq 3) {
                     $awsSignedIn = "$($Matches[1])$($Matches[2])"
                 }
@@ -593,7 +593,7 @@ function Add-AWSSteps() {
     # Component: VPC
     $vpcName = "scw-vpc-$userid"
     set-Prefs -k AWSvpc -v $vpcName
-    $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$($config.AWSvpc) --output json" | Convertfrom-Json
+    $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$($config.AWSvpc) --region $($config.AWSregion) --output json" | Convertfrom-Json
     if ($vpcExists.Vpcs) {
         Send-Update -c "AWS VPC: exists" -t 1
         Set-Prefs -k AWSVpcId -v $($vpcExists.Vpcs.VpcId)
@@ -612,13 +612,9 @@ function Add-AWSSteps() {
                 }
             }
         }
-        else {
-            Send-Update -c "AWS Subnets: not found" -t 1
-        }
+        else { Send-Update -c "AWS Subnets: not found" -t 1 }
     }
-    else {
-        Send-Update -c "AWS VPC: not found" -t 1
-    }
+    else { Send-Update -c "AWS VPC: not found" -t 1 }
     # Add component choices
     if ($componentsReady -eq $targetComponents) {
         # Need to confirm total components and if enough, provide remove components option and create cluster option
@@ -668,7 +664,7 @@ function Add-AWSComponents {
     $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc,Tags='[{Key=Name,Value=$($config.AWSvpc)}]' --output json" | Convertfrom-Json
     $vpcId = $vpcResult.Vpc.VpcId
     # Get Availability Zones
-    $availabilityZones = (aws ec2 describe-availability-zones --region us-east-2 | Convertfrom-Json).AvailabilityZones.zoneName
+    $availabilityZones = (aws ec2 describe-availability-zones --region $($config.AWSregion) | Convertfrom-Json).AvailabilityZones.zoneName
     Send-Update -o -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
     Send-Update -o -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
     Add-AwsSteps
