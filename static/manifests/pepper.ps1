@@ -387,8 +387,6 @@ function Get-Providers() {
                 $awsRegion = aws configure get region
             }
             if ($awsRegion) {
-                # Save region to use in commands
-                Set-Prefs -k AWSregion -v $awsRegion
                 # We have a region- get a userid
                 (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
                 if ($Matches.count -eq 3) {
@@ -403,6 +401,8 @@ function Get-Providers() {
                 # Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
                 Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsSignedIn -u $awsSignedIn
                 Send-Update -c "1 " -append -type 1
+                # Save region to use in commands
+                Set-Prefs -k AWSregion -v $awsRegion
             }
             else {
                 # Total for AWS is just 1 or 0 for now so use this toggle
@@ -689,7 +689,7 @@ function Add-AWSCluster {
         }
         Start-Sleep -s 10
     }
-    # Create nodegroup- wait for active state
+    # Create nodegroup- wait for 'active' state
     Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --subnets $($config.AWSSubnet1) $($config.AWSSubnet2)"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
