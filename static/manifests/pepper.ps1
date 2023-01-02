@@ -563,6 +563,7 @@ function Get-AKSCluster() {
 
 # AWS Functions
 function Add-AWSSteps() {
+    # (aws cloudformation describe-stacks --stack-name scw-AWSstack-shawnpearson | Convertfrom-Json).Stacks.StackStatus
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     $userid = $userProperties.userid
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
@@ -598,6 +599,9 @@ function Add-AWSSteps() {
         Send-Update -c "AWS VPC: exists" -t 1
         Set-Prefs -k AWSVpcId -v $($vpcExists.Vpcs.VpcId)
         $componentsReady++
+        # Save the route table
+        $routeTable = Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$($config.AWSVpcId)" | Convertfrom-Json
+        Set-Prefs -k AWSroutetable -v $($routeTable.Routetables.RouteTableId)
         # Component: Subnets
         $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
         if ($subnetsExists.Subnets) {
@@ -623,14 +627,12 @@ function Add-AWSSteps() {
     elseif ($componentsReady -eq 0) {
         # No components yet.  Add option to create
         Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents"
-        return
     }
     else {
         # Some components installed.  Offer removal option
         Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
-        return
     }
-    # Passed the components step.  Check for existing cluster.
+    # Check for existing cluster.
     Set-Prefs -k AWScluster -v "scw-AWS-$userid"
     Set-Prefs -k AWSnodegroup -v "scw-AWSNG-$userid"
     $clusterExists = Send-Update -t 1 -a -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
@@ -639,14 +641,21 @@ function Add-AWSSteps() {
         Set-Prefs -k AWSclusterArn -v $($clusterExists.cluster.arn)
         Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster"
         Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $($config.AWScluster)" -t 0 -o
-        Add-CommonSteps
+        if ($componentsReady -eq $targetComponents) {
+            # Cluster is ready and all components ready
+            Add-CommonSteps
+        }
     }
     else {
         Send-Update -c "AWS Cluster: not found" -t 1
-        Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster"
+        if ($componentsReady -eq $targetComponents) {
+            # Add cluster deployment option if all components are ready
+            Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster"
+        }
     }
 }
 function Add-AWSComponents {
+    # aws cloudformation create-stack --region us-east-1 --stack-name scw-AWSstack-shawnpearson --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
     # Create the cluster ARN role and add the policy
     $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
     $iamClusterRole = Send-Update -c "Create Cluster Role" -r "aws iam create-role --role-name $($config.AWSroleName) --assume-role-policy-document '$ekspolicy'" -t 1 | Convertfrom-Json
@@ -663,6 +672,15 @@ function Add-AWSComponents {
     # Create a VPC
     $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc,Tags='[{Key=Name,Value=$($config.AWSvpc)}]' --output json" | Convertfrom-Json
     $vpcId = $vpcResult.Vpc.VpcId
+    # Enable DNS host names
+    $dnsSupport = '{\"Value\":true}'
+    Send-Update -c "Allow DNs hostnames" -r "aws ec2 modify-vpc-attribute --vpc-id $vpcId --enable-dns-hostnames '$dnsSupport'" -t 1
+    # Enable VPC Endpoints
+    $routeTable = (Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$vpcId" -t 1 | Convertfrom-Json).RouteTables.RouteTableId
+    Send-Update -o -c "Add VPC endpoint: ec2" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ec2"
+    Send-Update -o -c "Add VPC endpoint: ecr.api" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ecr.api"
+    Send-Update -o -c "Add VPC endpoint: ecr.dkr" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ecr.dkr"
+    Send-Update -o -c "Add VPC endpoint: sts" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).sts"
     # Get Availability Zones
     $availabilityZones = (aws ec2 describe-availability-zones --region $($config.AWSregion) | Convertfrom-Json).AvailabilityZones.zoneName
     Send-Update -o -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
@@ -687,7 +705,7 @@ function Add-AWSCluster {
                 Clear-Variable joke
             }
         }
-        Start-Sleep -s 10
+        Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
     Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --subnets $($config.AWSSubnet1) $($config.AWSSubnet2)"
@@ -705,10 +723,11 @@ function Add-AWSCluster {
                 Clear-Variable joke
             }
         }
-        Start-Sleep -s 5
+        Start-Sleep -s 20
     }
 }
 function Remove-AWSComponents {
+    # aws cloudformation delete-stack --stack-name scw-AWSstack-shawnpearson 
     if ($($config.AWSclusterArn)) {
         Remove-AWSCluster -b
     }
@@ -759,7 +778,7 @@ function Remove-AWSComponents {
 }
 function Remove-AWSCluster {
     param (
-        [switch] $bypass # skip adding AWS steps- this is part of a larger process
+        [switch] $bypass # skip adding AWS steps when this is part of a larger process
     )
     # Remove nodegroup
     Send-Update -o -c "Delete EKS nodegroup" -r "aws eks delete-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1
@@ -769,7 +788,7 @@ function Remove-AWSCluster {
         Send-Update -t 1 -c "nodegroup state: $($nodegroupExists.nodegroup.status)"
     }
     # Remove cluster
-    Send-Update -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $($config.AWScluster) --output json" -t 1
+    Send-Update -o -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $($config.AWScluster) --output json" -t 1
     While ($clusterExists) {
         Start-Sleep -s 5
         $clusterExists = Send-Update -a -e -c "Check status" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
