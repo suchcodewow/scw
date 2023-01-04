@@ -563,13 +563,13 @@ function Get-AKSCluster() {
 
 # AWS Functions
 function Add-AWSSteps() {
-    # (aws cloudformation describe-stacks --stack-name scw-AWSstack-shawnpearson | Convertfrom-Json).Stacks.StackStatus
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     $userid = $userProperties.userid
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
     $componentsReady = 0
-    $targetComponents = 5
+    $targetComponents = 0
     # Component: AWS cluster role
+    $targetComponents++
     set-Prefs -k AWSroleName -v "scw-awsrole-$userid"
     $roleExists = Send-Update -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --role-name $($config.AWSroleName) --output json" -a | Convertfrom-Json
     if ($roleExists) {
@@ -579,8 +579,10 @@ function Add-AWSSteps() {
     }
     else {
         Send-Update -c "AWS cluster role: not found" -t 1
+        Set-Prefs -k AWSclusterRoleArn
     }
     # Component: AWS node role
+    $targetComponents++
     set-Prefs -k AWSnodeRoleName -v "scw-awsngrole-$userid"
     $nodeRoleExists = Send-Update -e -c "Checking for AWS Component: node role" -r "aws iam get-role --role-name $($config.AWSnodeRoleName) --output json" -a | Convertfrom-Json
     if ($nodeRoleExists) {
@@ -590,35 +592,95 @@ function Add-AWSSteps() {
     }
     else {
         Send-Update -c "AWS node role: not found" -t 1
+        Set-Prefs -k AWSnodeRoleArn
+    }
+    # Components: Cloudformation, vpc, subnets, and security group
+    $targetComponents = $targetComponents + 4
+    $cfStack = "scw-AWSstack-$userid"
+    set-prefs -k AWScfstack -v $cfStack
+    $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
+    if ($cfstackExists.Stacks) {
+        Send-Update -c "Cloudformation: exists" -t 1
+        Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
+        $componentsReady++
+        # Get Outputs needed for cluster creation
+        $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
+        $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
+        $cfVpicId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
+        # Component: SecurityGroup
+        if ($cfSecurityGroup) {
+            Send-Update -t 1 -c "CF Security Group: exists"
+            Set-Prefs -k AWSsecurityGroup -v $cfSecurityGroup
+            $componentsReady++
+        }
+        else {
+            Send-Update -c "CF Security Group: not found"
+            Set-Prefs -k AWSsecurityGroup 
+        }
+        # Component: Subnets
+        if ($cfSubnets) {
+            Send-Update -t 1 -c "CF Subnets: exists"
+            Set-Prefs -k AWSsubnets -v $cfSubnets
+            $componentsReady++
+        }
+        else {
+            Send-Update -c "CF Subnets: not found"
+            Set-Prefs -k AWSsubnets
+        }
+        # Component: VPC
+        if ($cfVpicId) {
+            Send-Update -t 1 -c "CF VPC Id: exists"
+            Set-Prefs -k AWSvpcId -v $cfVpicId
+            $componentsReady++
+        }
+        else {
+            Send-Update -c "CF VPC ID: not found"
+            Set-Prefs -k AWSvpcId
+        }
+    }
+    else {
+        Send-Update -c "Cloudformation: not found" -t 1
+        Set-Prefs -k AWScfstackArn
+        Set-Prefs -k AWSsecurityGroup
+        Set-Prefs -k AWSsubnets
+        Set-Prefs -k AWSvpcId
     }
     # Component: VPC
-    $vpcName = "scw-vpc-$userid"
-    set-Prefs -k AWSvpc -v $vpcName
-    $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$($config.AWSvpc) --region $($config.AWSregion) --output json" | Convertfrom-Json
-    if ($vpcExists.Vpcs) {
-        Send-Update -c "AWS VPC: exists" -t 1
-        Set-Prefs -k AWSVpcId -v $($vpcExists.Vpcs.VpcId)
-        $componentsReady++
-        # Save the route table
-        $routeTable = Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$($config.AWSVpcId)" | Convertfrom-Json
-        Set-Prefs -k AWSroutetable -v $($routeTable.Routetables.RouteTableId)
-        # Component: Subnets
-        $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
-        if ($subnetsExists.Subnets) {
-            Send-Update -c "AWS Subnets: exist" -t 1
-            $subnetCounter = 0
-            foreach ($subnet in $subnetsExists.Subnets) {
-                if ($subnet.SubnetId) {
-                    $subnetCounter++
-                    set-Prefs -k "AWSSubnet$subnetCounter" -v "$($subnet.SubnetId)"
-                    Send-Update -c "Subnet $subnetCounter found"
-                    $componentsReady++
-                }
-            }
-        }
-        else { Send-Update -c "AWS Subnets: not found" -t 1 }
-    }
-    else { Send-Update -c "AWS VPC: not found" -t 1 }
+    # $vpcName = "scw-vpc-$userid"
+    # set-Prefs -k AWSvpc -v $vpcName
+    # $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$($config.AWSvpc) --region $($config.AWSregion) --output json" | Convertfrom-Json
+    # if ($vpcExists.Vpcs) {
+    #     Send-Update -c "AWS VPC: exists" -t 1
+    #     Set-Prefs -k AWSVpcId -v $($vpcExists.Vpcs.VpcId)
+    #     $componentsReady++
+    #     # Save the route table
+    #     $routeTable = Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$($config.AWSVpcId)" | Convertfrom-Json
+    #     Set-Prefs -k AWSroutetable -v $($routeTable.Routetables.RouteTableId)
+    #     # Component: Subnets
+    #     $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
+    #     if ($subnetsExists.Subnets) {
+    #         Send-Update -c "AWS Subnets: exists" -t 1
+    #         $subnetCounter = 0
+    #         foreach ($subnet in $subnetsExists.Subnets) {
+    #             if ($subnet.SubnetId) {
+    #                 $subnetCounter++
+    #                 set-Prefs -k "AWSSubnet$subnetCounter" -v "$($subnet.SubnetId)"
+    #                 Send-Update -c "Subnet $subnetCounter found"
+    #                 $componentsReady++
+    #             }
+    #         }
+    #     }
+    #     else { Send-Update -c "AWS Subnets: not found" -t 1 }
+    #     # Component: Security Group
+    #     $securityGroup = Send-Update -t 1 -a -c "Get security Group" -r "aws ec2 describe-security-groups --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | ConvertFrom-Json
+    #     if ($securityGroup.SecurityGroups) {
+    #         Send-Update -c "AWS Security Group: exists" -t 1
+    #         Set-Prefs -k AWSsecurityGroup -v $($securityGroup.SecurityGroups.GroupId)
+    #         $componentsReady++
+    #     }
+    #     else { Send-Update -c "AWS Security Group: not found" -t 1 }  
+    # }
+    # else { Send-Update -c "AWS VPC: not found" -t 1 }
     # Add component choices
     if ($componentsReady -eq $targetComponents) {
         # Need to confirm total components and if enough, provide remove components option and create cluster option
@@ -655,7 +717,6 @@ function Add-AWSSteps() {
     }
 }
 function Add-AWSComponents {
-    # aws cloudformation create-stack --region us-east-1 --stack-name scw-AWSstack-shawnpearson --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
     # Create the cluster ARN role and add the policy
     $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
     $iamClusterRole = Send-Update -c "Create Cluster Role" -r "aws iam create-role --role-name $($config.AWSroleName) --assume-role-policy-document '$ekspolicy'" -t 1 | Convertfrom-Json
@@ -668,28 +729,37 @@ function Add-AWSComponents {
     if ($iamNodeRole.Role.Arn) {
         Send-Update -c "Attach Worker Node Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $($config.AWSnodeRoleName)" -t 1
         Send-Update -c "Attach EC2 Container Registry Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $($config.AWSnodeRoleName)" -t 1
+        Send-Update -c "Attach CNI Policy" -r "aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $($config.AWSnodeRoleName)" -t 1
     }
-    # Create a VPC
-    $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc,Tags='[{Key=Name,Value=$($config.AWSvpc)}]' --output json" | Convertfrom-Json
-    $vpcId = $vpcResult.Vpc.VpcId
-    # Enable DNS host names
-    $dnsSupport = '{\"Value\":true}'
-    Send-Update -c "Allow DNs hostnames" -r "aws ec2 modify-vpc-attribute --vpc-id $vpcId --enable-dns-hostnames '$dnsSupport'" -t 1
-    # Enable VPC Endpoints
-    $routeTable = (Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$vpcId" -t 1 | Convertfrom-Json).RouteTables.RouteTableId
-    Send-Update -o -c "Add VPC endpoint: ec2" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ec2"
-    Send-Update -o -c "Add VPC endpoint: ecr.api" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ecr.api"
-    Send-Update -o -c "Add VPC endpoint: ecr.dkr" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ecr.dkr"
-    Send-Update -o -c "Add VPC endpoint: sts" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).sts"
-    # Get Availability Zones
-    $availabilityZones = (aws ec2 describe-availability-zones --region $($config.AWSregion) | Convertfrom-Json).AvailabilityZones.zoneName
-    Send-Update -o -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
-    Send-Update -o -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
+    # Create VPC with Cloudformation
+    Send-Update -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $($config.AWSregion) --stack-name $($config.AWScfstack) --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+    # Wait for creation
+    While ($cfstackReady -ne "CREATE_COMPLETE") {
+        $cfstackReady = Send-Update -a -t 1 -c "Check for 'CREATE_COMPLETE'" -r "aws cloudformation describe-stacks --stack-name scw-AWSstack-shawnpearson --query Stacks[*].StackStatus --output text"
+        Send-Update -t 1 -c $cfstackReady
+        Start-Sleep -s 10
+    }
+    # # Create a VPC
+    # $vpcResult = Send-Update -c "Create VPC" -r "aws ec2 create-vpc --cidr-block 10.0.0.0/16 --tag-specification ResourceType=vpc, Tags='[{Key=Name,Value=$($config.AWSvpc)}]' --output json" | Convertfrom-Json
+    # $vpcId = $vpcResult.Vpc.VpcId
+    # # Enable DNS host names
+    # $dnsSupport = '{\"Value\":true}'
+    # Send-Update -c "Allow DNs hostnames" -r "aws ec2 modify-vpc-attribute --vpc-id $vpcId --enable-dns-hostnames '$dnsSupport'" -t 1
+    # # Enable VPC Endpoints
+    # $routeTable = (Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id, Values=$vpcId" -t 1 | Convertfrom-Json).RouteTables.RouteTableId
+    # Send-Update -o -c "Add VPC endpoint: ec2" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ec2"
+    # Send-Update -o -c "Add VPC endpoint: ecr.api" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ecr.api"
+    # Send-Update -o -c "Add VPC endpoint: ecr.dkr" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).ecr.dkr"
+    # Send-Update -o -c "Add VPC endpoint: sts" -r "aws ec2 create-vpc-endpoint --vpc-endpoint-type Interface --vpc-id $vpcId --service-name com.amazonaws.$($config.AWSregion).sts"
+    # # Get Availability Zones
+    # $availabilityZones = (aws ec2 describe-availability-zones --region $($config.AWSregion) | Convertfrom-Json).AvailabilityZones.zoneName
+    # Send-Update -o -c "Add subnet 1" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.0.0/24 --availability-zone $($availabilityZones[0])"
+    # Send-Update -o -c "Add subnet 2" -r "aws ec2 create-subnet --vpc-id $vpcId --cidr-block 10.0.1.0/24 --availability-zone $($availabilityZones[1])"
     Add-AwsSteps
 }
 function Add-AWSCluster {
     # Create cluster-  wait for 'active' state
-    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSSubnet1),$($config.AWSSubnet2),endpointPrivateAccess=true"
+    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSsubnets),securityGroupIds=$($config.AWSsecurityGroup)"
     $counter = 0
     While ($clusterExists.cluster.status -ne "ACTIVE") {
         $clusterExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
@@ -708,7 +778,7 @@ function Add-AWSCluster {
         Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
-    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --subnets $($config.AWSSubnet1) $($config.AWSSubnet2)"
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(","," "))  --instance-types t3.large"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
@@ -725,6 +795,7 @@ function Add-AWSCluster {
         }
         Start-Sleep -s 20
     }
+    Add-AWSSteps
 }
 function Remove-AWSComponents {
     # aws cloudformation delete-stack --stack-name scw-AWSstack-shawnpearson 
@@ -751,50 +822,63 @@ function Remove-AWSComponents {
         Send-Update -c "Delete Role" -r "aws iam delete-role --role-name $($config.AWSnodeRoleName)"
         Set-Prefs -k "AWSnodeRoleArn"
     }
-    if ($($config.AWSVpcId)) {
-        # Remove subnets
-        $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | Convertfrom-Json
-        foreach ($subnet in $depSubnets.Subnets) {
-            $depNetworks = Send-Update -c "Get Network Interfaces" -r "aws ec2 describe-network-interfaces --filters Name=subnet-id,Values=$($Subnet.SubnetId) --output json" | Convertfrom-Json
-            foreach ($network in $depNetworks.NetworkInterfaces) {
-                if ($($network.Attachment.AttachmentId)) {
-                    Send-Update -c "Detach Network Interface" -r "aws ec2 detach-network-interface --attachment-id $($network.Attachment.AttachmentId)"
-                }
-                Send-Update -c "Remove Network Interface" -r "aws ec2 delete-network-interface --network-interface-id $($network.NetworkInterfaceId) --output json"
-            }
-            Send-Update -c "Delete subnet" -r "aws ec2 delete-subnet --subnet-id $($subnet.SubnetId)"
-        }
-        # Remove route tables
-        $depTables = Send-Update -t 1 -c "Get route tables" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | ConvertFrom-Json
-        foreach ($table in $depTables.RouteTables) {
-            Send-Update -c "Delete route table" -r "aws ec2 delete-route-table --route-table-id $($table.RouteTableId)" -t 1
-        }
-        Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $($config.AWSVpcId)"
-        set-Prefs -k "AWSSubnet1"
-        set-Prefs -k "AWSSubnet2"
-        set-Prefs -k "AWSVpcId"
+    if ($($config.AWScfstackArn)) {
+        Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --stack-name $($config.AWScfstack)"
+        Do {
+            $cfstackExists = Send-Update -a -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --stack-name scw-AWSstack-shawnpearson --query Stacks[*].StackStatus --output text"
+            Send-Update -c $cfstackExists -t 1
+            Start-Sleep -s 5
+        } While ($cfstackExists)
     }
+    # if ($($config.AWSVpcId)) {
+    #     # Remove subnets
+    #     $depSubnets = Send-Update -c "Get VPC subnets" -r "aws ec2 describe-subnets --filters Name=vpc-id, Values=$($config.AWSVpcId) --output json" | Convertfrom-Json
+    #     foreach ($subnet in $depSubnets.Subnets) {
+    #         $depNetworks = Send-Update -c "Get Network Interfaces" -r "aws ec2 describe-network-interfaces --filters Name=subnet-id, Values=$($Subnet.SubnetId) --output json" | Convertfrom-Json
+    #         foreach ($network in $depNetworks.NetworkInterfaces) {
+    #             if ($($network.Attachment.AttachmentId)) {
+    #                 Send-Update -c "Detach Network Interface" -r "aws ec2 detach-network-interface --attachment-id $($network.Attachment.AttachmentId)"
+    #             }
+    #             Send-Update -c "Remove Network Interface" -r "aws ec2 delete-network-interface --network-interface-id $($network.NetworkInterfaceId) --output json"
+    #         }
+    #         Send-Update -c "Delete subnet" -r "aws ec2 delete-subnet --subnet-id $($subnet.SubnetId)"
+    #     }
+    #     # Remove route tables
+    #     $depTables = Send-Update -t 1 -c "Get route tables" -r "aws ec2 describe-route-tables --filters Name=vpc-id, Values=$($config.AWSVpcId) --output json" | ConvertFrom-Json
+    #     foreach ($table in $depTables.RouteTables) {
+    #         Send-Update -c "Delete route table" -r "aws ec2 delete-route-table --route-table-id $($table.RouteTableId)" -t 1
+    #     }
+    #     Send-Update -c "Remove VPC" -r "aws ec2 delete-vpc --vpc-id $($config.AWSVpcId)"
+    #     set-Prefs -k "AWSSubnet1"
+    #     set-Prefs -k "AWSSubnet2"
+    #     set-Prefs -k "AWSVpcId"
+    # }
     Add-AWSSteps
 }
 function Remove-AWSCluster {
     param (
         [switch] $bypass # skip adding AWS steps when this is part of a larger process
     )
-    # Remove nodegroup
-    Send-Update -o -c "Delete EKS nodegroup" -r "aws eks delete-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1
-    While ($nodegroupExists) {
-        Start-Sleep -s 5
-        $nodegroupExists = Send-Update -a -e -c "Check status" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1 | Convertfrom-Json
-        Send-Update -t 1 -c "nodegroup state: $($nodegroupExists.nodegroup.status)"
+    if ($($config.AWSnodeRoleArn)) {
+        # Remove nodegroup
+        Send-Update -o -c "Delete EKS nodegroup" -r "aws eks delete-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1
+        Do {
+            Start-Sleep -s 20
+            $nodegroupExists = Send-Update -a -e -c "Check status" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup)" -t 1 | Convertfrom-Json
+            Send-Update -t 1 -c $($nodegroupExists.nodegroup.status)
+        } while ($nodegroupExists) 
+        Set-Prefs -k AWSnodeRoleArn
     }
-    # Remove cluster
-    Send-Update -o -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $($config.AWScluster) --output json" -t 1
-    While ($clusterExists) {
-        Start-Sleep -s 5
-        $clusterExists = Send-Update -a -e -c "Check status" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
-        Send-Update -t 1 -c "cluster state: $($clusterExists.cluster.status)"
+    if ($($config.AWSclusterArn)) {
+        # Remove cluster
+        Send-Update -o -c "Delete EKS CLuster" -r "aws eks delete-cluster --name $($config.AWScluster) --output json" -t 1
+        Do {
+            Start-Sleep -s 20
+            $clusterExists = Send-Update -a -e -c "Check status" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
+            Send-Update -t 1 -c $($clusterExists.cluster.status)
+        } while ($clusterExists)
+        Set-Prefs -k AWSclusterArn
     }
-    Set-Prefs -k AWSclusterArn
     if (-not $bypass) { Add-AWSSteps }
 }
 

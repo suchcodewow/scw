@@ -75,7 +75,11 @@ $useGCP = $true # [$true/$false] use GCP
 
 #### Azure specific notes
 
+1 node x Standard_D2s_v4 (2x8) .08/hour
+
 #### AWS specific notes
+
+1 node x t3.large (2x8) 0.0832/hour
 
 If your AWS account is not found (espiecally on a terminal with cli tools installed):
 
@@ -83,6 +87,9 @@ If your AWS account is not found (espiecally on a terminal with cli tools instal
 - Check that pepper can find your account with `aws sys get-caller-identity`. Ideally the ARN should have an email in it. Pepper will extract the alpha characters. If not, it will fall back to whatever is after user/.
 
 #### GCP Specific notes
+
+1 node x e2-standard-2 (2x8) .07/hour
+Cluster Management fee .11/hour
 
 You might need to run `gcloud components update` if you run into script issues.
 You might need to authorize google cloud services via popup.
