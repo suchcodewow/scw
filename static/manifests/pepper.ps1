@@ -259,8 +259,10 @@ function Add-CommonSteps() {
         if ($existingNamespaces.contains($ns)) {
             # Namespace exists- add status option
             Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
+            # add restart option
+            Add-Choice -k "RESTART$ns" -d "$ns : Restart Pods" -f "Restart-Pods -n $ns"
             # add remove option
-            Add-Choice -k "DEL$ns" -d "$ns : Remove" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
+            Add-Choice -k "DEL$ns" -d "$ns : Remove Pods" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
         }
         else {
             # Yaml is available but not yet applied.  Add option to apply it
@@ -297,6 +299,12 @@ function Get-Pods {
     )
     Send-Update -t 1 -c "Showing pod status" -r "kubectl get pods -n $namespace"
     Add-CommonSteps
+}
+function Restart-Pods {
+    param(
+        [string] $namespace #namespace to recycle pods
+    )
+    Send-Update -t 1 -c "Restarting Pods" -r "kubectl -n $namespace rollout restart deploy"
 }
 function Get-PodReadyCount {
     param(
@@ -464,7 +472,7 @@ function Set-Provider() {
     $functionProperties = @{provider = $providerSelected.Provider; id = $providerSelected.identifier.tolower(); userid = $providerSelected.userid.tolower() }
     # Reset choices
     # Add option to change destination again
-    Add-Choice -k "TARGET" -d "Change Target" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
+    Add-Choice -k "TARGET" -d "Switch Cloud Provider" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
     # build options for specified provider
     switch ($providerSelected.Provider) {
         "Azure" {
@@ -645,42 +653,6 @@ function Add-AWSSteps() {
         Set-Prefs -k AWSsubnets
         Set-Prefs -k AWSvpcId
     }
-    # Component: VPC
-    # $vpcName = "scw-vpc-$userid"
-    # set-Prefs -k AWSvpc -v $vpcName
-    # $vpcExists = Send-Update -a -c "Checking AWS Component: VPC" -r "aws ec2 describe-vpcs --filters Name=tag:Name,Values=$($config.AWSvpc) --region $($config.AWSregion) --output json" | Convertfrom-Json
-    # if ($vpcExists.Vpcs) {
-    #     Send-Update -c "AWS VPC: exists" -t 1
-    #     Set-Prefs -k AWSVpcId -v $($vpcExists.Vpcs.VpcId)
-    #     $componentsReady++
-    #     # Save the route table
-    #     $routeTable = Send-Update -c "Get Route Table" -r "aws ec2 describe-route-tables --filters Name=vpc-id,Values=$($config.AWSVpcId)" | Convertfrom-Json
-    #     Set-Prefs -k AWSroutetable -v $($routeTable.Routetables.RouteTableId)
-    #     # Component: Subnets
-    #     $subnetsExists = Send-Update -a -c "Checking AWS Componnent: Subnets" -r "aws ec2 describe-subnets --filter Name=vpc-id,Values=$($vpcExists.VPCS.VpcID) --output json" | Convertfrom-Json
-    #     if ($subnetsExists.Subnets) {
-    #         Send-Update -c "AWS Subnets: exists" -t 1
-    #         $subnetCounter = 0
-    #         foreach ($subnet in $subnetsExists.Subnets) {
-    #             if ($subnet.SubnetId) {
-    #                 $subnetCounter++
-    #                 set-Prefs -k "AWSSubnet$subnetCounter" -v "$($subnet.SubnetId)"
-    #                 Send-Update -c "Subnet $subnetCounter found"
-    #                 $componentsReady++
-    #             }
-    #         }
-    #     }
-    #     else { Send-Update -c "AWS Subnets: not found" -t 1 }
-    #     # Component: Security Group
-    #     $securityGroup = Send-Update -t 1 -a -c "Get security Group" -r "aws ec2 describe-security-groups --filters Name=vpc-id,Values=$($config.AWSVpcId) --output json" | ConvertFrom-Json
-    #     if ($securityGroup.SecurityGroups) {
-    #         Send-Update -c "AWS Security Group: exists" -t 1
-    #         Set-Prefs -k AWSsecurityGroup -v $($securityGroup.SecurityGroups.GroupId)
-    #         $componentsReady++
-    #     }
-    #     else { Send-Update -c "AWS Security Group: not found" -t 1 }  
-    # }
-    # else { Send-Update -c "AWS VPC: not found" -t 1 }
     # Add component choices
     if ($componentsReady -eq $targetComponents) {
         # Need to confirm total components and if enough, provide remove components option and create cluster option
@@ -701,7 +673,7 @@ function Add-AWSSteps() {
     if ($clusterExists) {
         Send-Update -c "AWS Cluster: exists" -t 1
         Set-Prefs -k AWSclusterArn -v $($clusterExists.cluster.arn)
-        Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $clusterName -f "Remove-AWSCluster"
+        Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $($config.AWScluster) -f "Remove-AWSCluster"
         Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $($config.AWScluster)" -t 0 -o
         if ($componentsReady -eq $targetComponents) {
             # Cluster is ready and all components ready
