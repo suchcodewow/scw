@@ -1,5 +1,6 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions. Check '.vscode/launch.json' for any current parameters
 param (
+    [switch] $help, # show other command options and exit
     [switch] $verbose, # default output level is 1 (info/errors), use -v for level 0 (debug/info/errors)
     [switch] $cloudCommands, # enable to show commands
     [switch] $logReset, # enable to reset log between runs
@@ -53,6 +54,7 @@ function Send-Update {
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
+    if ($help) { Get-Help }
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
     if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
     if ($logReset) { $script:retainLog = $false } else { $script:retainLog = $true }
@@ -339,6 +341,15 @@ function Get-Joke {
         "When does a joke become a Dad joke?;When it becomes apparent.")
     return (Get-Random $allJokes).split(";")
 }
+function Get-Help {
+    # Hey let's do Get Help! -What? Get Help! -No.
+    write-host "Options:"
+    write-host "                    -v Show debug/trivial messages"
+    write-host "                    -c Show cloud commands as they run"
+    write-host "                    -l Reset the log on each run"
+    write-host "    -aws, -azure, -gcp Use specific cloud only (can be combined)"
+    exit
+}
 
 # Provider Functions
 function Add-Provider() {
@@ -362,15 +373,15 @@ function Add-Provider() {
     [void]$providerList.add($provider)
 }
 function Get-Providers() {
-    # AZURE
     Send-Update -content "Gathering provider options  " -type 1 -append
     $providerList.Clear()
+    # AZURE
     if ($useAzure) {
         Send-Update -content "Azure:" -type 1 -append
         if (get-command 'az' -ea SilentlyContinue) {
             $azureSignedIn = az ad signed-in-user show 2>$null 
         }
-        else { Send-Update -content "NA " -type 2 -append }
+        else { Send-Update -content "NA " -type 1 -append }
         if ($azureSignedIn) {
             #Azure connected, get current subscription
             $currentAccount = az account show --query '{name:name,email:user.name,id:id}' | Convertfrom-Json
@@ -425,10 +436,8 @@ function Get-Providers() {
         if (get-command 'gcloud' -ea SilentlyContinue) {
             $accounts = gcloud auth list --format="json" | ConvertFrom-Json 
         }
-        else { Send-Update -content "NA " -type 2 -append }
+        else { Send-Update -content "NA " -type 1 -append }
         if ($accounts.count -gt 0) {
-            #$currentProject = gcloud config get-value project
-            #$allProjects = gcloud projects list --format='json' | Convertfrom-Json
             foreach ($i in $accounts) {
                 $Params = @{}
                 if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
