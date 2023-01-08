@@ -262,7 +262,7 @@ function Add-CommonSteps() {
             # Namespace exists- add status option
             Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
             # add restart option
-            Add-Choice -k "RESTART$ns" -d "$ns : Restart Pods" -f "Restart-Pods -n $ns"
+            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -f "Restart-Pods -n $ns"
             # add remove option
             Add-Choice -k "DEL$ns" -d "$ns : Remove Pods" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
         }
@@ -306,7 +306,7 @@ function Restart-Pods {
     param(
         [string] $namespace #namespace to recycle pods
     )
-    Send-Update -t 1 -c "Restarting Pods" -r "kubectl -n $namespace rollout restart deploy"
+    Send-Update -t 1 -c "Resetting Pods" -r "kubectl -n $namespace delete pods --field-selector=status.phase=Running"
 }
 function Get-PodReadyCount {
     param(
@@ -373,7 +373,7 @@ function Add-Provider() {
     [void]$providerList.add($provider)
 }
 function Get-Providers() {
-    Send-Update -content "Gathering provider options  " -type 1 -append
+    Send-Update -content "Gathering provider options... " -type 1 -append
     $providerList.Clear()
     # AZURE
     if ($useAzure) {
