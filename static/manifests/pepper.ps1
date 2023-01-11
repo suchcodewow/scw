@@ -401,7 +401,10 @@ function Get-Providers() {
                     $awsSignedIn = "$($Matches[1])$($Matches[2])"
                 }
                 else {
-                    $awsSignedIn = (aws sts get-caller-identity --output json | Convertfrom-JSon).UserId.subString(0, 6)
+                    $awsSts = aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon
+                    if ($awsSts) {
+                        $awsSignedIn = $awsSts.UserId.subString(0, 6)
+                    }
                 }
                 #TODO: Handle situation with root/password accounts
             }
