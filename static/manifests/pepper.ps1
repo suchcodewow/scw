@@ -1,5 +1,6 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions. Check '.vscode/launch.json' for any current parameters
 param (
+    [switch] $help, # show other command options and exit
     [switch] $verbose, # default output level is 1 (info/errors), use -v for level 0 (debug/info/errors)
     [switch] $cloudCommands, # enable to show commands
     [switch] $logReset, # enable to reset log between runs
@@ -53,6 +54,7 @@ function Send-Update {
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
+    if ($help) { Get-Help }
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
     if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
     if ($logReset) { $script:retainLog = $false } else { $script:retainLog = $true }
@@ -260,7 +262,7 @@ function Add-CommonSteps() {
             # Namespace exists- add status option
             Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
             # add restart option
-            Add-Choice -k "RESTART$ns" -d "$ns : Restart Pods" -f "Restart-Pods -n $ns"
+            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -f "Restart-Pods -n $ns"
             # add remove option
             Add-Choice -k "DEL$ns" -d "$ns : Remove Pods" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
         }
@@ -304,7 +306,7 @@ function Restart-Pods {
     param(
         [string] $namespace #namespace to recycle pods
     )
-    Send-Update -t 1 -c "Restarting Pods" -r "kubectl -n $namespace rollout restart deploy"
+    Send-Update -t 1 -c "Resetting Pods" -r "kubectl -n $namespace delete pods --field-selector=status.phase=Running"
 }
 function Get-PodReadyCount {
     param(
@@ -339,6 +341,15 @@ function Get-Joke {
         "When does a joke become a Dad joke?;When it becomes apparent.")
     return (Get-Random $allJokes).split(";")
 }
+function Get-Help {
+    # Hey let's do Get Help! -What? Get Help! -No.
+    write-host "Options:"
+    write-host "                    -v Show debug/trivial messages"
+    write-host "                    -c Show cloud commands as they run"
+    write-host "                    -l Reset the log on each run"
+    write-host "    -aws, -azure, -gcp Use specific cloud only (can be combined)"
+    exit
+}
 
 # Provider Functions
 function Add-Provider() {
@@ -362,15 +373,15 @@ function Add-Provider() {
     [void]$providerList.add($provider)
 }
 function Get-Providers() {
-    # AZURE
-    Send-Update -content "Gathering provider options  " -type 1 -append
+    Send-Update -content "Gathering provider options... " -type 1 -append
     $providerList.Clear()
+    # AZURE
     if ($useAzure) {
         Send-Update -content "Azure:" -type 1 -append
         if (get-command 'az' -ea SilentlyContinue) {
             $azureSignedIn = az ad signed-in-user show 2>$null 
         }
-        else { Send-Update -content "NA " -type 2 -append }
+        else { Send-Update -content "NA " -type 1 -append }
         if ($azureSignedIn) {
             #Azure connected, get current subscription
             $currentAccount = az account show --query '{name:name,email:user.name,id:id}' | Convertfrom-Json
@@ -428,10 +439,8 @@ function Get-Providers() {
         if (get-command 'gcloud' -ea SilentlyContinue) {
             $accounts = gcloud auth list --format="json" | ConvertFrom-Json 
         }
-        else { Send-Update -content "NA " -type 2 -append }
+        else { Send-Update -content "NA " -type 1 -append }
         if ($accounts.count -gt 0) {
-            #$currentProject = gcloud config get-value project
-            #$allProjects = gcloud projects list --format='json' | Convertfrom-Json
             foreach ($i in $accounts) {
                 $Params = @{}
                 if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
@@ -513,7 +522,7 @@ function Add-AzureSteps() {
     }
     #AKS Cluster Check
     $targetCluster = "scw-AKS-$($userProperties.userid)"
-    $aksExists = Send-Update -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id" -append
+    $aksExists = Send-Update -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id" -append
     if ($aksExists) {
         send-Update -content "yes" -type 0
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
@@ -551,7 +560,7 @@ function Add-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D2s_v4' --generate-ssh-keys"
+    Send-Update -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
     Get-AKSCluster -g $g -c $c
     Add-AzureSteps
     Add-CommonSteps
@@ -753,7 +762,7 @@ function Add-AWSCluster {
         Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
-    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(","," "))  --instance-types t3.large"
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(","," "))  --instance-types t3.xlarge"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
@@ -934,7 +943,7 @@ function Add-GCPCluster {
     }
     # Create the GKE cluster using name and zone
 
-    Send-Update -content "GCP: Create GKE cluster" -t 1 -run "gcloud container clusters create --zone $zone $clusterName"
+    Send-Update -content "GCP: Create GKE cluster" -t 1 -run "gcloud container clusters create -m e2-standard-4 --num-nodes=1 --zone=$zone $clusterName"
     Add-GCPSteps
 }
 function get-GCPCluster {
