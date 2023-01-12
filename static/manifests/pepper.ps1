@@ -9,7 +9,7 @@ param (
     [switch] $gcp # use gcp
 )
 
-# Core Script Functions
+# Core Functions
 function Send-Update {
     # Handle output to screen & log, execute commands to cloud systems and return results
     param(
@@ -182,147 +182,6 @@ function Get-Quote {
     write-host
     Get-Random -InputObject $list | Out-Host
 }
-
-# Utility Functions
-function Get-Apps() {
-    foreach ($yaml in $yamlList) {
-        [uri]$uri = $yaml
-        #$yamlName = $uri.Segments[-1]
-        #$yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
-        Invoke-WebRequest -Uri $uri.OriginalString -OutFile $uri.Segments[-1] | Out-Host
-    }
-    Send-Update -c "Downloaded $($yamlList.count)" -type 1
-    Add-CommonSteps
-}
-function Get-AppUrls {
-    #example: Get-AppUrls -n [namespace]
-    param(
-        [string] $namespace #namespace to search for ingress
-    )
-    #Pull services from the requested namespace
-    $services = (kubectl get svc -n $namespace -ojson | Convertfrom-Json).items
-    #Get any external ingress for this app
-    foreach ($service in $services) {
-        if ($service.status.loadBalancer.ingress.count -gt 0) {
-            if (-not $returnList) { $returnList = "URLS:" }
-            $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
-        }
-    }
-    #Return list
-    return $returnList
-
-}
-function Add-CommonSteps() {
-    # Get namespaces so we know what's installed or not
-    $existingNamespaces = (kubectl get ns -o json | Convertfrom-Json).items.metadata.name
-    # Determine appropriate Dynatrace option
-    if ($existingNamespaces.contains("dynatrace")) {
-        #1 Dynatrace installed.  Add status and removal options
-        Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
-        Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "tenant: $($config.tenantID)"
-    }
-    elseif (test-path dynakube.yaml) {
-        #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
-        $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
-        # Dynakube file found. Provide install option
-        Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
-    }
-    else {
-        #3 Nothing done for dynatrace yet.  Add option to download YAML
-        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
-    }
-    # Option to download any needed support files
-    [System.Collections.ArrayList]$yamlReady = @()
-    foreach ($yaml in $yamlList) {
-        [uri]$uri = $yaml
-        $yamlName = $uri.Segments[-1]
-        $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
-        if (test-path $yamlName) {
-            $newYaml = New-Object PSCustomObject -Property @{
-                Option    = $yamlReady.count + 1
-                name      = $yamlName
-                namespace = $yamlNameSpace
-            }
-            [void]$yamlReady.add($newYaml)
-        }
-    }
-    if ($yamlReady.count -eq 0) {
-        $downloadType = "<not done>"
-    }
-    else {
-        $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
-    }
-    Add-Choice -k "DLAPPS" -d "Download Sample Apps Yaml" -f Get-Apps -c $downloadType
-    # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
-    
-    foreach ($app in $yamlReady) {
-        # check if this app is deployed using main part of filename as namespace
-        $ns = $app.namespace
-        if ($existingNamespaces.contains($ns)) {
-            # Namespace exists- add status option
-            Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
-            # add restart option
-            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -f "Restart-Pods -n $ns"
-            # add remove option
-            Add-Choice -k "DEL$ns" -d "$ns : Remove Pods" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
-        }
-        else {
-            # Yaml is available but not yet applied.  Add option to apply it
-            Add-Choice -k "INST$ns" -d "$ns : Deploy App" -f "Add-App -y $($app.name) -n $ns"        
-        }
-    }
-}
-function Add-App {
-    param (
-        [string] $yaml, #yaml to apply
-        [string] $namespace #namespace to confirm
-    )
-    Send-Update -c "Adding deployment" -t 1 -r "kubectl apply -f $yaml"
-    Send-Update -c "Waiting 10s for namespace [$namespace] to activate" -a -t 1
-    $counter = 0
-    While ($namespaceState -ne "Active") {
-        if ($counter -ge 10) {
-            Send-Update -t 2 -c " Failed to create namespace!"
-            break
-        }
-        $counter++
-        Send-Update -c " $counter" -t 1 -a
-        Start-Sleep -s 1
-        #Query for namespace viability
-        $namespaceState = (kubectl get ns $namespace -ojson | Convertfrom-Json).status.phase
-
-    }
-    Send-Update -c " Activated!" -t 1
-    Add-CommonSteps
-}
-function Get-Pods {
-    param(
-        [string] $namespace #namespace to return pods
-    )
-    Send-Update -t 1 -c "Showing pod status" -r "kubectl get pods -n $namespace"
-    Add-CommonSteps
-}
-function Restart-Pods {
-    param(
-        [string] $namespace #namespace to recycle pods
-    )
-    Send-Update -t 1 -c "Resetting Pods" -r "kubectl -n $namespace delete pods --field-selector=status.phase=Running"
-}
-function Get-PodReadyCount {
-    param(
-        [string] $namespace # namespace to count pods
-    )
-    $totalPods = (kubectl get pods -n $namespace  -ojson | Convertfrom-Json).items.count
-    $runningPods = (kubectl get pods -n $namespace --field-selector status.phase=Running -ojson | Convertfrom-Json).items.count
-    return "$runningPods/$totalPods pods READY"
-}
-function Remove-NameSpace {
-    param(
-        [string] $namespace
-    )
-    Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
-    Add-CommonSteps
-}
 function Get-Joke {
     $allJokes = @("Knock Knock (Who's there?);Little old lady (Little old lady who?);I didn't know you could yoddle!",
         "What did the fish say when he ran into the wall?;DAM!",
@@ -406,21 +265,20 @@ function Get-Providers() {
                 $awsRegion = aws configure get region
             }
             if ($awsRegion) {
-                # We have a region- get a userid
+                # We have a region- get a userid using Email
                 (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
                 if ($Matches.count -eq 3) {
                     $awsSignedIn = "$($Matches[1])$($Matches[2])"
                 }
                 else {
+                    # No Email- try alternate method to get a unique identifier
                     $awsSts = aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon
                     if ($awsSts) {
                         $awsSignedIn = $awsSts.UserId.subString(0, 6)
                     }
                 }
-                #TODO: Handle situation with root/password accounts
             }
             if ($awsSignedIn) {
-                # Add-Provider(New-object PSCustomObject -Property @{Provider = "AWS"; Name = "region:  $($awsSignedIn)"; Identifier = $awsSignedIn; default = $true })
                 Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsSignedIn -u $awsSignedIn
                 Send-Update -c "1 " -append -type 1
                 # Save region to use in commands
@@ -526,7 +384,9 @@ function Add-AzureSteps() {
     if ($aksExists) {
         send-Update -content "yes" -type 0
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
-        Add-Choice -k "AZCRED" -d "Refresh k8s credential" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
+        #Add-Choice -k "AZCRED" -d "Refresh k8s credential" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
+        #Refresh cluster credentials
+        Get-AKSCluster -g $targetGroup -c $targetCluster
         #We have a cluster so add common things to do with it
         Add-CommonSteps
     }
@@ -548,7 +408,7 @@ function Add-AzureResourceGroup($targetGroup) {
         $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
         if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    Send-Update -content "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
+    Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
     Add-AzureSteps
 }
 function Remove-AzureResourceGroup($targetGroup) {
@@ -578,7 +438,7 @@ function Get-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -content "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
+    Send-Update -o -e -c "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
 }
 
 # AWS Functions
@@ -957,6 +817,36 @@ function Remove-GCPCluster {
     Send-Update -c "Delete GKE cluster" -t 1 -r "gcloud container clusters delete --zone $($config.gcpzone) $($config.gcpclustername)"
 }
 
+# Kubernetes Functions
+function Get-Pods {
+    param(
+        [string] $namespace #namespace to return pods
+    )
+    Send-Update -t 1 -c "Showing pod status" -r "kubectl get pods -n $namespace"
+    Add-CommonSteps
+}
+function Restart-Pods {
+    param(
+        [string] $namespace #namespace to recycle pods
+    )
+    Send-Update -t 1 -c "Resetting Pods" -r "kubectl -n $namespace delete pods --field-selector=status.phase=Running"
+}
+function Get-PodReadyCount {
+    param(
+        [string] $namespace # namespace to count pods
+    )
+    $totalPods = (kubectl get pods -n $namespace  -ojson | Convertfrom-Json).items.count
+    $runningPods = (kubectl get pods -n $namespace --field-selector status.phase=Running -ojson | Convertfrom-Json).items.count
+    return "$runningPods/$totalPods pods READY"
+}
+function Remove-NameSpace {
+    param(
+        [string] $namespace
+    )
+    Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
+    Add-CommonSteps
+}
+
 # Dynatrace Functions
 function Set-DTConfig() {
     While (-not $k8sToken) {
@@ -1110,6 +1000,119 @@ function Add-Dynatrace {
     Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
     Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
     Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
+    Add-CommonSteps
+}
+
+# Application Functions
+function Add-CommonSteps() {
+    # Get namespaces so we know what's installed or not
+    $existingNamespaces = (kubectl get ns -o json 2>$null | Convertfrom-Json).items.metadata.name
+    # Determine appropriate Dynatrace option
+    if ($existingNamespaces.contains("dynatrace")) {
+        #1 Dynatrace installed.  Add status and removal options
+        Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+        Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "tenant: $($config.tenantID)"
+    }
+    elseif (test-path dynakube.yaml) {
+        #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
+        $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
+        # Dynakube file found. Provide install option
+        Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
+    }
+    else {
+        #3 Nothing done for dynatrace yet.  Add option to download YAML
+        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
+    }
+    # Option to download any needed support files
+    [System.Collections.ArrayList]$yamlReady = @()
+    foreach ($yaml in $yamlList) {
+        [uri]$uri = $yaml
+        $yamlName = $uri.Segments[-1]
+        $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
+        if (test-path $yamlName) {
+            $newYaml = New-Object PSCustomObject -Property @{
+                Option    = $yamlReady.count + 1
+                name      = $yamlName
+                namespace = $yamlNameSpace
+            }
+            [void]$yamlReady.add($newYaml)
+        }
+    }
+    if ($yamlReady.count -eq 0) {
+        $downloadType = "<not done>"
+    }
+    else {
+        $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
+    }
+    Add-Choice -k "DLAPPS" -d "Download Sample Apps Yaml" -f Get-Apps -c $downloadType
+    # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
+    
+    foreach ($app in $yamlReady) {
+        # check if this app is deployed using main part of filename as namespace
+        $ns = $app.namespace
+        if ($existingNamespaces.contains($ns)) {
+            # Namespace exists- add status option
+            Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
+            # add restart option
+            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -f "Restart-Pods -n $ns"
+            # add remove option
+            Add-Choice -k "DEL$ns" -d "$ns : Remove Pods" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
+        }
+        else {
+            # Yaml is available but not yet applied.  Add option to apply it
+            Add-Choice -k "INST$ns" -d "$ns : Deploy App" -f "Add-App -y $($app.name) -n $ns"        
+        }
+    }
+}
+function Get-Apps() {
+    foreach ($yaml in $yamlList) {
+        [uri]$uri = $yaml
+        #$yamlName = $uri.Segments[-1]
+        #$yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
+        Invoke-WebRequest -Uri $uri.OriginalString -OutFile $uri.Segments[-1] | Out-Host
+    }
+    Send-Update -c "Downloaded $($yamlList.count)" -type 1
+    Add-CommonSteps
+}
+function Get-AppUrls {
+    #example: Get-AppUrls -n [namespace]
+    param(
+        [string] $namespace #namespace to search for ingress
+    )
+    #Pull services from the requested namespace
+    $services = (kubectl get svc -n $namespace -ojson | Convertfrom-Json).items
+    #Get any external ingress for this app
+    foreach ($service in $services) {
+        if ($service.status.loadBalancer.ingress.count -gt 0) {
+            if (-not $returnList) { $returnList = "URLS:" }
+            $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
+        }
+    }
+    #Return list
+    return $returnList
+
+}
+function Add-App {
+    param (
+        [string] $yaml, #yaml to apply
+        [string] $namespace #namespace to confirm
+    )
+    Send-Update -c "Adding deployment" -t 1 -r "kubectl apply -f $yaml"
+    Send-Update -c "Waiting 10s for namespace [$namespace] to activate" -a -t 1
+    $counter = 0
+    While ($namespaceState -ne "Active") {
+        if ($counter -ge 10) {
+            Send-Update -t 2 -c " Failed to create namespace!"
+            break
+        }
+        $counter++
+        Send-Update -c " $counter" -t 1 -a
+        Start-Sleep -s 1
+        #Query for namespace viability
+        $namespaceState = (kubectl get ns $namespace -ojson | Convertfrom-Json).status.phase
+
+    }
+    Send-Update -c " Activated!" -t 1
     Add-CommonSteps
 }
 
