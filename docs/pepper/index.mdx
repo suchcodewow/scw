@@ -44,7 +44,7 @@ It is purposefully written as a single script to allow a quick download vs cloni
 
 You can run this assistant either in the cloud shell or a local terminal with the cli tools available for your cloud vendor. Please check out the cloud vendor specific notes below if relevant.
 
-### Assistant guide
+## Assistant guide
 
 In summary, Pepper will:
 
@@ -54,7 +54,7 @@ In summary, Pepper will:
 - Assist with the deployment of [Dynatrace Observability Platform](http://www.dynatrace.com)
 - Deploy, remove, and display status of sample applications
 
-#### Startup
+### Startup
 
 When started, Pepper will check for access to AWS, Azure, or GCLOUD (possibly multiple when running in a local terminal). It will add viable environments to the providers list.
 
@@ -64,7 +64,7 @@ If not, Pepper will present you with a list of cloud options. When you select on
 
 If you want to switch providers at any time, select the `Switch Cloud Provider` menu option.
 
-#### Azure
+### Azure
 
 Pepper checks for the following required Azure Kubernetes components.
 
@@ -77,7 +77,7 @@ Where **[ id ]** is the alpha part of your email address before the '@' symbol.
 
 When all components are present, Pepper moves to the _common steps_ below.
 
-#### AWS
+### AWS
 
 Pepper checks for the following required AWS components.
 
@@ -98,10 +98,9 @@ If your AWS account is not found (typically on a terminal with cli tools install
 
 - Check configuration with `aws configure list`. Ensure you have a secret, key, and valid region available.
 - Check that pepper can find your account with `aws sys get-caller-identity`. Ideally the ARN should have an email in it. Pepper will extract the alpha characters. If not, it will fall back to whatever is after user/.
+  :::
 
-:::
-
-#### GCP
+### GCP
 
 Pepper checks for the following required GCLOUD components.
 
@@ -117,7 +116,7 @@ You might need to run `gcloud components update` if you run into script issues.
 You might need to authorize google cloud services via popup.
 :::
 
-#### Common steps
+### Common steps
 
 Pepper checks the existing namespaces and offers deploy/status/remove options as appropriate.
 
@@ -127,7 +126,7 @@ As of this writing, Pepper is pre-loaded with DynabankInsuraCart (dbic). The `Do
 
 Once you download the sample app(s), Pepper will offer to deploy, check status, and remove the application.
 
-#### Dynatrace
+### Dynatrace
 
 These steps are completely optional. Pepper can do each step for you, give you a jumpstart with a dynakube.yaml, or you can do all steps in the Dynatrace UI.
 
