@@ -40,9 +40,9 @@ Run
 
 Supported options:
 
-- `-c` Show cloud commands as they run within `[ ]`. Super helpful if you want examples to use on your own later.
-- `-v` Show trivial/verbose commands in pepper. Chatty, but good if you are planning to modify Pepper.
-- `-h` Shows help at the prompt.
+- `-c` Show cloud commands as they run within `[ ]`. Hopefully useful as examples to use on your own later.
+- `-v` Show trivial/verbose commands in pepper. Chatty, but good feedback when modifying Pepper.
+- `-h` Shows these options and more.
 
 ```bash
 pwsh ~/pepper.ps1 -c
@@ -63,11 +63,11 @@ You can run this assistant either in the cloud shell or a local terminal with th
 
 #### Startup
 
-When started, Pepper will check if it has access to AWS, Azure, or GCLOUD (possibly multiple when running in a from a terminal on your PC). It will add viable environments to the providers list.
+When started, Pepper will check for access to AWS, Azure, or GCLOUD (possibly multiple when running in a local terminal). It will add viable environments to the providers list.
 
-If there is a fairly obvious default (typical when running in a cloud provider's shell), Pepper will automatically select it and move to the relevant cloud specific setup.
+If there is one default, Pepper will automatically select it and move to the appropriate provider requirements (see below).
 
-If not, Pepper will present you with a list of cloud options. When you select one, Pepper will remember it for the rest of the script.
+If not, Pepper will present you with a list of cloud options. When you select one, Pepper will remember it.
 
 If you want to switch providers at any time, select the `Switch Cloud Provider` menu option.
 
@@ -81,7 +81,7 @@ Pepper checks for the following required Azure Kubernetes components.
 
 Where **[ id ]** is the alpha part of your email address before the '@' symbol.
 
-When all components are present, Pepper moves to the common steps below.
+When all components are present, Pepper moves to the _common steps_ below.
 
 #### AWS
 
@@ -96,12 +96,15 @@ Pepper checks for the following required AWS components.
 
 Where **[ id ]** is either the last six characters of your access token ID or the alpha characters up to the '@' of your root account email address.
 
-When all components are present, Pepper moves to the common steps below.
+When all components are present, Pepper moves to the _common steps_ below.
 
+:::info
 If your AWS account is not found (typically on a terminal with cli tools installed):
 
 - Check configuration with `aws configure list`. Ensure you have a secret, key, and valid region available.
 - Check that pepper can find your account with `aws sys get-caller-identity`. Ideally the ARN should have an email in it. Pepper will extract the alpha characters. If not, it will fall back to whatever is after user/.
+
+:::
 
 #### GCLOUD
 
@@ -112,16 +115,17 @@ Pepper checks for the following required GCLOUD components.
 
 where **[ id ]** is the alpha characters of your account email up to the '@' symbol.
 
-When all components are present, Pepper moves to the common steps below.
-
-You might need to run `gcloud components update` if you run into script issues.
+When all components are present, Pepper moves to the _common steps_ below.
+:::info
+You might need to run `gcloud components update` if you run into script issues.  
 You might need to authorize google cloud services via popup.
+:::
 
 #### Common steps
 
 Pepper checks the existing namespaces and offers deploy/status/remove options as appropriate.
 
-For the dynatrace namespace, Pepper has built in options to help create Paas tokens, generate dynakube.yaml, and even deploy automatically. See Dynatrace below.
+For the dynatrace namespace, Pepper has built in options to help create Paas tokens, generate dynakube.yaml, and even deploy automatically. See _Dynatrace_ below.
 
 As of this writing, Pepper is pre-loaded with DynabankInsuraCart (dbic). The `Download sample apps Yaml` wil retrieve this file. Other sample apps could easily be added if they are deployable via a yaml file.
 
@@ -129,6 +133,38 @@ Once you download the sample app(s), Pepper will offer to deploy for you, check 
 
 #### Dynatrace
 
-These steps are completely optional. Pepper can do each step for you, have it create the dynakube.yaml file for you to use via the Dynatrace UI, or you can download the dynakube.yaml from the Dynatrace UI and do all steps yourself.
+These steps are completely optional. Pepper can do each step for you, give you a jumpstart with a dynakube.yaml, or you can simply do all steps in the Dynatrace UI yourself.
 
-When you select
+When you select `dynatrace: Create dynakube.yaml`, Pepper will ask for:
+
+- A Dynatrace tenant ID (i.e. abc12345). It should easily extract it from complete URLS like `https://abc1235.live.>>`, `abc12345.live.>>`, etc.
+- A Dynatrace token that has the **Write API Tokens** permission. ![API Token](/img/token.jpg)
+
+Pepper will confirm access and then:
+
+- Create a Paas token & convert it to base64
+- Write a local dynakube.yaml file using your tenant URL and token
+
+Then, you can choose the `dynatrace: Deploy to k8s` to have Pepper complete the dynatrace deployment.
+
+Alternatively, you can copy and paste the kubernetes commands from the Dynatrace UI (skipping the download dynakube.yaml part). ![Copy Command](/img/commands.jpg)
+
+### DynaBankInsuraCart
+
+When you choose the `dbic: Deploy App` option, Pepper will apply the downloaded dbic.yaml file. This will deploy the app.
+
+During deployment, you'll see a report in Pepper of the current status similar to:
+
+```bash
+     6 dbic : Refresh/Show Pods            0/9 pods READY
+     7 dbic : Reset Pods
+     8 dbic : Remove Pods
+```
+
+If you choose `Refresh/Show Pods`, Pepper will show the result of the pods & update the summary screen with pods currently running.
+
+The `Reset Pods` option will delete all pods in that namespace. This is useful to deployed the app prior to Dynatrace or simply want to lobotimize the application back to starting state.
+
+The `Reset Pods` option shows the URL to your application as well. In most cloud shells, you can ctrl+click to launch the app directly from here. Or copy/paste the URL to a new window.
+
+The `Remove Pods` option simply deletes the application namespace leaving all other applications and the kubernetes cluster running.

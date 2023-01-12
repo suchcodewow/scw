@@ -983,7 +983,7 @@ function Add-CommonSteps() {
         #3 Nothing done for dynatrace yet.  Add option to download YAML
         Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
     }
-    # Option to download any needed support files
+    # Option to download yaml files with current status
     [System.Collections.ArrayList]$yamlReady = @()
     foreach ($yaml in $yamlList) {
         [uri]$uri = $yaml
@@ -1004,19 +1004,18 @@ function Add-CommonSteps() {
     else {
         $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
     }
-    Add-Choice -k "DLAPPS" -d "Download Sample Apps Yaml" -f Get-Apps -c $downloadType
+    Add-Choice -k "DLAPPS" -d "Download demo apps yaml files" -f Get-Apps -c $downloadType
     # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
-    
     foreach ($app in $yamlReady) {
-        # check if this app is deployed using main part of filename as namespace
+        # check if this app is deployed. Use name of yaml file as namespace (dbic.yaml should have dbic namespace)
         $ns = $app.namespace
         if ($existingNamespaces.contains($ns)) {
             # Namespace exists- add status option
             Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
             # add restart option
-            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -f "Restart-Pods -n $ns"
+            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -c  $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
             # add remove option
-            Add-Choice -k "DEL$ns" -d "$ns : Remove Pods" -c  $(Get-AppUrls -n $ns ) -f "Remove-NameSpace -n $ns"
+            Add-Choice -k "DEL$ns" -d "$ns : Remove Pods"  -f "Remove-NameSpace -n $ns"
         }
         else {
             # Yaml is available but not yet applied.  Add option to apply it
@@ -1061,7 +1060,7 @@ function Add-App {
     Send-Update -c "Waiting 10s for namespace [$namespace] to activate" -a -t 1
     $counter = 0
     While ($namespaceState -ne "Active") {
-        if ($counter -ge 10) {
+        if ($counter -ge 20) {
             Send-Update -t 2 -c " Failed to create namespace!"
             break
         }
