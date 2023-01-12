@@ -247,7 +247,7 @@ function Get-Providers() {
             foreach ($i in $allAccounts) {
                 $Params = @{}
                 if ($i.id -eq $currentAccount.id) { $Params['d'] = $true }
-                Add-Provider @Params -p "Azure" -n "subscription: $($i.name)" -i $i.id -u (($currentAccount.email).split("@")[0]).replace(".", "")
+                Add-Provider @Params -p "Azure" -n "subscription: $($i.name)" -i $i.id -u (($currentAccount.email).split("@")[0]).replace(".", "").ToLower()
             }
         }
         Send-Update -content "$($allAccounts.count) " -a -t 1
@@ -278,7 +278,7 @@ function Get-Providers() {
                 }
             }
             if ($awsSignedIn) {
-                Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsRegion -u $awsSignedIn
+                Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsRegion -u $($awsSignedIn.ToLower())
                 Send-Update -c "1 " -a -t 1
             }
             else {
@@ -299,7 +299,7 @@ function Get-Providers() {
             foreach ($i in $accounts) {
                 $Params = @{}
                 if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
-                Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "")
+                Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "").ToLower()
             }
         }
         Send-Update -c "$($accounts.count) " -a -t 1
