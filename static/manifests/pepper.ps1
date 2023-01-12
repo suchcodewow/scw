@@ -967,22 +967,6 @@ function Add-Dynatrace {
 function Add-CommonSteps() {
     # Get namespaces so we know what's installed or not
     $existingNamespaces = (kubectl get ns -o json 2>$null | Convertfrom-Json).items.metadata.name
-    # Determine appropriate Dynatrace option
-    if ($existingNamespaces.contains("dynatrace")) {
-        #1 Dynatrace installed.  Add status and removal options
-        Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
-        Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "tenant: $($config.tenantID)"
-    }
-    elseif (test-path dynakube.yaml) {
-        #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
-        $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
-        # Dynakube file found. Provide install option
-        Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
-    }
-    else {
-        #3 Nothing done for dynatrace yet.  Add option to download YAML
-        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
-    }
     # Option to download yaml files with current status
     [System.Collections.ArrayList]$yamlReady = @()
     foreach ($yaml in $yamlList) {
@@ -1005,6 +989,22 @@ function Add-CommonSteps() {
         $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
     }
     Add-Choice -k "DLAPPS" -d "Download demo apps yaml files" -f Get-Apps -c $downloadType
+    # Determine appropriate Dynatrace option
+    if ($existingNamespaces.contains("dynatrace")) {
+        #1 Dynatrace installed.  Add status and removal options
+        Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+        Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "tenant: $($config.tenantID)"
+    }
+    elseif (test-path dynakube.yaml) {
+        #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
+        $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
+        # Dynakube file found. Provide install option
+        Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
+    }
+    else {
+        #3 Nothing done for dynatrace yet.  Add option to download YAML
+        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
+    }
     # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
     foreach ($app in $yamlReady) {
         # check if this app is deployed. Use name of yaml file as namespace (dbic.yaml should have dbic namespace)

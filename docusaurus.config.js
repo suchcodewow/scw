@@ -58,7 +58,7 @@ const config = {
           src: "img/wow.png",
         },
         items: [
-          { type: "doc", label: "DynaBankInsuraCart", docId: "dbic/index" },
+          { type: "doc", label: "Pepper", docId: "pepper/index" },
           {
             type: "dropdown",
             label: "Tutorials",

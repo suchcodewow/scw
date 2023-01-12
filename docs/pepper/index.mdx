@@ -2,51 +2,36 @@
 sidebar_position: 1
 pagination_prev:
 pagination_next:
-title: Overview
+title: Pepper
 ---
 
-## Dynabankinsuracart.com
+## The cloud agnostic kubernetes assistant
 
-The application is a fully-featured application showcasing shopping cart, banking, and insurance sites. In the application diagram below, you can see the various functions provided and the technology stacks used.
+Pepper is designed to help you quickly deploy kubernetes from scratch and add real-world sample applications- no matter which cloud you want to use.
 
-### Features
+Most importantly, Pepper is built from the ground up to show every step along with the exact command it runs on your behalf.
 
-- modern front end design
-- production-grade services architecture
-- user based load generator
-- pre-populated fields making it easy to try out
-
-![DynaBankInsurCart](/img/DynaBankInsuraCart.png)
-
-## Deployment assistant
-
-The application can be easily deployed into a kubernetes environment with Pepper. While not as brilliant as the famous [Pepper Potts](https://en.wikipedia.org/wiki/Pepper_Potts), this installer:
-
-- works seamlessly across Azure, AWS, and GCP
-- creates a kubernetes cluster using best practices for each cloud
-- guides you through full deployment or lets you take over at any point
-- shows each command as it runs so you can repeat any step yourself later
-- can be expanded with any number of kubernetes deployment (yaml) files
+You'll get a useful kubernetes installation very quickly while seeing how to do it yourself.
 
 ### Assistant download
 
-Download
+Download:
 
 ```bash
 curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1
 ```
 
-Run
-
-Supported options:
-
-- `-c` Show cloud commands as they run within `[ ]`. Hopefully useful as examples to use on your own later.
-- `-v` Show trivial/verbose commands in pepper. Chatty, but good feedback when modifying Pepper.
-- `-h` Shows these options and more.
+Run:
 
 ```bash
 pwsh ~/pepper.ps1 -c
 ```
+
+Supported options:
+
+- `-c` Show cloud commands as they run within `[ ]`. Command history logged to **pepper.ps1.log** file for reference.
+- `-v` Show trivial/verbose commands in pepper. Chatty, but good feedback when modifying Pepper.
+- `-h` Shows all options.
 
 ### About the assistant
 
@@ -60,6 +45,14 @@ It is purposefully written as a single script to allow a quick download vs cloni
 You can run this assistant either in the cloud shell or a local terminal with the cli tools available for your cloud vendor. Please check out the cloud vendor specific notes below if relevant.
 
 ### Assistant guide
+
+In summary, Pepper will:
+
+- Query all authenticated cloud environments
+- Check the chosen environment for necessary kubernetes components specific to that provider
+- Suggest next steps and deploy them when selected
+- Assist with the deployment of [Dynatrace Observability Platform](http://www.dynatrace.com)
+- Deploy, remove, and display status of sample applications
 
 #### Startup
 
@@ -75,6 +68,7 @@ If you want to switch providers at any time, select the `Switch Cloud Provider` 
 
 Pepper checks for the following required Azure Kubernetes components.
 
+- Availability of the az command
 - Azure resource group **scw-group-[ id ]**
 - AKS kubernetes cluster **scw-AKS-[ id ]** 1 node x Standard_D4s_v5 (4cpu x 16GB)
 - AKS credentials to enable kubectl commands (done automatically)
@@ -87,6 +81,7 @@ When all components are present, Pepper moves to the _common steps_ below.
 
 Pepper checks for the following required AWS components.
 
+- Availability of the aws command
 - AWS role Arn **scw-awsrole-[ id ]**
 - AWs nodegroup Arn **scw-awsngrole-[ id ]**
 - AWS cloudformation stack **scw-AWSstack-[ id ]** (contains VPC, subnets, security group)
@@ -106,11 +101,12 @@ If your AWS account is not found (typically on a terminal with cli tools install
 
 :::
 
-#### GCLOUD
+#### GCP
 
 Pepper checks for the following required GCLOUD components.
 
-- A valid GCP project for this account
+- Availability of the gcloud command
+- A valid GCP project for the authenticated account
 - GKE kubernetes cluster **scw-GKE-[ id ]** 1 node x e2-standard-4 (4cpu x 16GB)
 
 where **[ id ]** is the alpha characters of your account email up to the '@' symbol.
@@ -125,15 +121,15 @@ You might need to authorize google cloud services via popup.
 
 Pepper checks the existing namespaces and offers deploy/status/remove options as appropriate.
 
-For the dynatrace namespace, Pepper has built in options to help create Paas tokens, generate dynakube.yaml, and even deploy automatically. See _Dynatrace_ below.
+For the dynatrace namespace, Pepper has built-in options to create Paas token, generate dynakube.yaml, and deploy. See _Dynatrace_ below.
 
-As of this writing, Pepper is pre-loaded with DynabankInsuraCart (dbic). The `Download sample apps Yaml` wil retrieve this file. Other sample apps could easily be added if they are deployable via a yaml file.
+As of this writing, Pepper is pre-loaded with DynabankInsuraCart (dbic). The `Download sample apps Yaml` will retrieve the latest deployment file. Any sample app with a yaml file could be added to Pepper.
 
-Once you download the sample app(s), Pepper will offer to deploy for you, check status of pods, or remove.
+Once you download the sample app(s), Pepper will offer to deploy, check status, and remove the application.
 
 #### Dynatrace
 
-These steps are completely optional. Pepper can do each step for you, give you a jumpstart with a dynakube.yaml, or you can simply do all steps in the Dynatrace UI yourself.
+These steps are completely optional. Pepper can do each step for you, give you a jumpstart with a dynakube.yaml, or you can do all steps in the Dynatrace UI.
 
 When you select `dynatrace: Create dynakube.yaml`, Pepper will ask for:
 
@@ -149,16 +145,16 @@ Then, you can choose the `dynatrace: Deploy to k8s` to have Pepper complete the 
 
 Alternatively, you can copy and paste the kubernetes commands from the Dynatrace UI (skipping the download dynakube.yaml part). ![Copy Command](/img/commands.jpg)
 
-### DynaBankInsuraCart
+### Other Applications
 
-When you choose the `dbic: Deploy App` option, Pepper will apply the downloaded dbic.yaml file. This will deploy the app.
+When you choose the `<app>: Deploy App` option, Pepper will apply the downloaded yaml file & install the application.
 
 During deployment, you'll see a report in Pepper of the current status similar to:
 
 ```bash
-     6 dbic : Refresh/Show Pods            0/9 pods READY
-     7 dbic : Reset Pods
-     8 dbic : Remove Pods
+     <app> : Refresh/Show Pods            x/y pods READY
+     <app> : Reset Pods
+     <app> : Remove Pods
 ```
 
 If you choose `Refresh/Show Pods`, Pepper will show the result of the pods & update the summary screen with pods currently running.
