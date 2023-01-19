@@ -443,7 +443,7 @@ function Add-AWSSteps() {
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     $userid = $userProperties.userid
     # Save region to use in commands
-    Set-Prefs -k AWSregion -v $($userProperties.identifier)
+    Set-Prefs -k AWSregion -v $($userProperties.id)
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
     $componentsReady = 0
     $targetComponents = 0
@@ -562,7 +562,7 @@ function Add-AWSSteps() {
 function Add-AWSComponents {
     # Create the cluster ARN role and add the policy
     $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
-    $iamClusterRole = Send-Update -t 1 -c "Create Cluster Role" -r "aws iam create-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --assume-role-policy-document '$ekspolicy'" -t 1 | Convertfrom-Json
+    $iamClusterRole = Send-Update -t 1 -c "Create Cluster Role" -r "aws iam create-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --assume-role-policy-document '$ekspolicy'" | Convertfrom-Json
     if ($iamClusterRole.Role.Arn) {
         Send-Update -t 1 -c "Attach Cluster Policy" -r "aws iam attach-role-policy --region $($config.AWSregion) --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $($config.AWSroleName)"
     }
