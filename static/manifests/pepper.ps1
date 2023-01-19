@@ -561,13 +561,15 @@ function Add-AWSSteps() {
 }
 function Add-AWSComponents {
     # Create the cluster ARN role and add the policy
-    $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    #$ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
     $iamClusterRole = Send-Update -t 1 -c "Create Cluster Role" -r "aws iam create-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --assume-role-policy-document '$ekspolicy'" | Convertfrom-Json
     if ($iamClusterRole.Role.Arn) {
         Send-Update -t 1 -c "Attach Cluster Policy" -r "aws iam attach-role-policy --region $($config.AWSregion) --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $($config.AWSroleName)"
     }
     # Create the node role ARN and add 2 policies.  AWS makes me so sad on the inside.
-    $ec2policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    #$ec2policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
     $iamNodeRole = Send-Update -c "Create Nodegroup Role" -r "aws iam create-role --region $($config.AWSregion) --role-name $($config.AWSnodeRoleName) --assume-role-policy-document '$ec2policy'" -t 1 | Convertfrom-Json
     if ($iamNodeRole.Role.Arn) {
         Send-Update -c "Attach Worker Node Policy" -r "aws iam attach-role-policy --region $($config.AWSregion) --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $($config.AWSnodeRoleName)" -t 1
