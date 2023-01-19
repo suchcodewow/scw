@@ -625,7 +625,6 @@ function Add-AWSCluster {
     Add-AWSSteps
 }
 function Remove-AWSComponents {
-    # aws cloudformation delete-stack --stack-name scw-AWSstack-shawnpearson 
     if ($($config.AWSclusterArn)) {
         Remove-AWSCluster -b
     }
