@@ -653,7 +653,7 @@ function Remove-AWSComponents {
     if ($($config.AWScfstackArn)) {
         Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $($config.AWSregion) --stack-name $($config.AWScfstack)"
         Do {
-            $cfstackExists = Send-Update -a -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --query Stacks[*].StackStatus --output text"
+            $cfstackExists = Send-Update -e -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --query Stacks[*].StackStatus --output text"
             Send-Update -c $cfstackExists -t 1
             Start-Sleep -s 5
         } While ($cfstackExists)
