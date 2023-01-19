@@ -578,7 +578,7 @@ function Add-AWSComponents {
     Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $($config.AWSregion) --stack-name $($config.AWScfstack) --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
     # Wait for creation
     While ($cfstackReady -ne "CREATE_COMPLETE") {
-        $cfstackReady = Send-Update -a -t 1 -c "Check for 'CREATE_COMPLETE'" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name scw-AWSstack-shawnpearson --query Stacks[*].StackStatus --output text"
+        $cfstackReady = Send-Update -a -t 1 -c "Check for 'CREATE_COMPLETE'" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --query Stacks[*].StackStatus --output text"
         Send-Update -t 1 -c $cfstackReady
         Start-Sleep -s 10
     }
