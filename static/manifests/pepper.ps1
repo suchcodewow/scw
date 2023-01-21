@@ -69,7 +69,7 @@ function Get-Prefs($scriptPath) {
     $script:currentLogEntry = $null
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml" )
-    $script:ProgressPreference = "SilentlyContinue"
+    #$script:ProgressPreference = "SilentlyContinue"
     if ($scriptPath) {
         $script:logFile = "$($scriptPath).log"
         Send-Update -t 0 -c "Log: $logFile"
@@ -97,7 +97,7 @@ function Get-Prefs($scriptPath) {
         }
         else {
             $script:config = @{}
-            $config["schemaVersion"] = "1.2"
+            $config["schemaVersion"] = "2.0"
             if ($MyInvocation.MyCommand.Name) {
                 $config | ConvertTo-Json | Out-File $configFile
                 Send-Update -c "CREATED config" -t 0
@@ -109,23 +109,60 @@ function Get-Prefs($scriptPath) {
 }
 function Set-Prefs {
     param(
+        $u, # Add this value to a user's settings (mostly for mult-user setup sweetness)
         $k, # key
         $v # value
     )
-    if ($v) {
-        Send-Update -c "Updating key: $k -> $v" -t 0
-        $config[$k] = $v 
-    }
-    else {
-        if ($k -and $config.containsKey($k)
-        ) {
-            Send-Update -c "Deleting config key: $k" -t 0
-            $config.remove($k)
+    # Create Users hashtable if needed
+    if (-not $config.Users) { $config.Users = @{} }
+    if ($u) {
+        # Focus on user subkey
+        if ($k) {
+            # Create User nested hashtable if needed
+            if (-not $config.Users.$u) { $config.Users.$u = @{} }
+            if ($v) {
+                # Update User Value
+                Send-Update -c "Updating $u user key: $k -> $v" -t 0
+                $config.Users.$u[$k] = $v 
+            }
+            else {
+                if ($k -and $config.Users.$u.containsKey($k)) {
+                    # Attempt to delete the user's key
+                    Send-Update -c "Deleting $u user key: $k" -t 0
+                    $config.Users.$u.remove($k)
+                }
+                else {
+                    Send-Update -c "$u Key didn't exist: $k" -t 0
+                }
+            }
         }
         else {
-            Send-Update -c "Key didn't exist: $k" -t 0
+            if ($config.Users.$u) {
+                # Attempt to remove the entire user
+                Send-Update -c "Removing $u user" -t 0
+                $config.Users.remove($u)
+            }
+            else {
+                Send-Update -c "User $u didn't exists" -t 0
+            }
         }
-         
+    }
+    else {
+        # Update at main schema level
+        if ($v) {
+            Send-Update -c "Updating key: $k -> $v" -t 0
+            $config[$k] = $v 
+        }
+        else {
+            if ($k -and $config.containsKey($k)
+            ) {
+                Send-Update -c "Deleting config key: $k" -t 0
+                $config.remove($k)
+            }
+            else {
+                Send-Update -c "Key didn't exist: $k" -t 0
+            }
+        }     
     }
     if ($MyInvocation.MyCommand.Name) {
         $config | ConvertTo-Json | Out-File $configFile
@@ -207,6 +244,204 @@ function Get-Help {
     write-host "                    -l Reset the log on each run"
     write-host "    -aws, -azure, -gcp Use specific cloud only (can be combined)"
     exit
+}
+function Get-UserName {
+    $Prefix = @(
+        "abundant",
+        "delightful",
+        "high",
+        "nutritious",
+        "square",
+        "adorable",
+        "dirty",
+        "hollow",
+        "obedient",
+        "steep",
+        "agreeable",
+        "drab",
+        "hot",
+        "living",
+        "dry",
+        "hot",
+        "odd",
+        "straight",
+        "dusty",
+        "huge",
+        "strong",
+        "beautiful",
+        "eager",
+        "icy",
+        "orange",
+        "substantial",
+        "better",
+        "early",
+        "immense",
+        "panicky",
+        "sweet",
+        "bewildered",
+        "easy",
+        "important",
+        "petite",
+        "swift",
+        "big",
+        "elegant",
+        "inexpensive",
+        "plain",
+        "tall",
+        "embarrassed",
+        "itchy",
+        "powerful",
+        "tart",
+        "black",
+        "prickly",
+        "tasteless",
+        "faint",
+        "jolly",
+        "proud",
+        "teeny",
+        "brave",
+        "famous",
+        "kind",
+        "purple",
+        "tender",
+        "breeze",
+        "fancy",
+        "broad",
+        "fast",
+        "quaint",
+        "thoughtful",
+        "tiny",
+        "bumpy",
+        "light",
+        "quiet",
+        "calm",
+        "fierce",
+        "little",
+        "rainy",
+        "careful",
+        "lively",
+        "rapid",
+        "uneven",
+        "chilly",
+        "flaky",
+        "interested",
+        "flat",
+        "relieved",
+        "unsightly",
+        "clean",
+        "fluffy",
+        "loud",
+        "uptight",
+        "clever",
+        "freezing",
+        "vast",
+        "clumsy",
+        "fresh",
+        "lumpy",
+        "victorious",
+        "cold",
+        "magnificent",
+        "warm",
+        "colossal",
+        "gentle",
+        "mammoth",
+        "salty",
+        "gifted",
+        "scary",
+        "gigantic",
+        "massive",
+        "scrawny",
+        "glamorous",
+        "screeching",
+        "whispering",
+        "cuddly",
+        "messy",
+        "shallow",
+        "curly",
+        "miniature",
+        "curved",
+        "great",
+        "modern",
+        "shy",
+        "wide-eyed",
+        "witty",
+        "damp",
+        "grumpy",
+        "mysterious",
+        "skinny",
+        "wooden",
+        "handsome",
+        "narrow",
+        "worried",
+        "deafening",
+        "happy",
+        "nerdy",
+        "heavy",
+        "soft",
+        "helpful",
+        "noisy",
+        "sparkling",
+        "young",
+        "delicious"
+    );
+      
+    $Name = @(
+        "apple",
+        "seashore",
+        "badge",
+        "flock",
+        "sidewalk",
+        "basket",
+        "basketball",
+        "furniture",
+        "smoke",
+        "battle",
+        "geese",
+        "bathtub",
+        "beast",
+        "ghost",
+        "nose",
+        "beetle",
+        "giraffe",
+        "sidewalk",
+        "beggar",
+        "governor",
+        "honey",
+        "stage",
+        "bubble",
+        "hope",
+        "station",
+        "bucket",
+        "income",
+        "cactus",
+        "island",
+        "throne",
+        "cannon",
+        "cow",
+        "judge",
+        "toothbrush",
+        "celery",
+        "lamp",
+        "turkey",
+        "cellar",
+        "lettuce",
+        "umbrella",
+        "marble",
+        "underwear",
+        "coach",
+        "month",
+        "vacation",
+        "coast",
+        "vegetable",
+        "crate",
+        "ocean",
+        "plane",
+        "donkey",
+        "playground",
+        "visitor",
+        "voyage"
+    )      
+    return "$Prefix$Name"
 }
 
 # Provider Functions
@@ -444,6 +679,15 @@ function Get-AKSCluster() {
 }
 
 # AWS Functions
+function Add-AWSUser() {
+    # Generate a user
+    $randomUser = Get-UserName
+    Send-Update -r "aws iam create-user --user-name $randomUser" -c "Create $randomUser" -t 1 -o
+    # Use standard password
+    Send-Update -r "aws iam create-login-profile --user-name $randomUser --password 1Dynatrace#" -c "Add Password $randomUser" -t 1 -o
+    # Assign to group(s)
+    Send-Update -r "aws iam add-user-to-group --group-name Attendees --user-name $randomUser" -c "Add group $randomUser" -t 1 -o
+}
 function Add-AWSSteps() {
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     $userid = $userProperties.userid

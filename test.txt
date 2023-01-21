@@ -1,0 +1,10 @@
+{
+  "User": {},
+  "Users": {
+    "Test2": {
+      "region": "region1",
+      "yourmom": "mymom"
+    },
+    "Test1": {}
+  }
+}
