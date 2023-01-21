@@ -264,11 +264,16 @@ function Get-Providers() {
                 $awsRegion = aws configure get region
             }
             if ($awsRegion) {
-                # We have a region- get a userid using Email
-                (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
-                if ($Matches.count -eq 3) {
-                    $awsSignedIn = "$($Matches[1])$($Matches[2])"
+                # For workshops, using ARN maybe?
+                $arnCheck = (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).Arn
+                if ($arnCheck) {
+                    $awsSignedIn = $arnCheck.split("/")[1]
                 }
+                # Old Method with Email- switched to ARN
+                # (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
+                # if ($Matches.count -eq 3) {
+                #     $awsSignedIn = "$($Matches[1])$($Matches[2])"
+                # }
                 else {
                     # No Email- try alternate method to get a unique identifier
                     $awsSts = aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon
