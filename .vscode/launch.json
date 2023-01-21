@@ -9,7 +9,7 @@
       "type": "PowerShell",
       "request": "launch",
       "script": "${file}",
-      "args": ["-c", "-l", "-v"]
+      "args": ["-c", "-l", "-v", "-u 2"]
     }
   ]
 }
