@@ -746,19 +746,30 @@ function Add-AWSEverything() {
             $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
             $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
         }
+        write-host "$user $ekspolicy"
         $user = $_
         # Set variables
         $awsRoleName = "scw-awsrole-$user"
         $awsNodeRoleName = "scw-awsngrole-$user"
-
+        $awsCFStack = "scw-AWSstack-$user"
         # Create User
         aws iam create-user --user-name $user
         aws iam create-login-profile --user-name $user --password 1Dynatrace#
         aws iam add-user-to-group --group-name Attendees --user-name $user
         # Add components for User
-        aws iam create-role --role-name $awsRoleName --assume-role-policy-document '$ekspolicy'
+        aws iam create-role --role-name $awsRoleName --assume-role-policy-document ""$ekspolicy""
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName
-        aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document '$ec2policy'
+        aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document ""$ec2policy""
+        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $awsNodeRoleName
+        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
+        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
+        # Add Cloudformation
+        aws cloudformation create-stack --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
+        While ($cfstackReady -ne "CREATE_COMPLETE") {
+            $cfstackReady = aws cloudformation describe-stacks --stack-name $awsCFStack --query Stacks[*].StackStatus --output text
+            write-host "$user $cfstackReady"
+            Start-Sleep -s 5
+        }
     }
     exit
 
