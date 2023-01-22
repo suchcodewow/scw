@@ -520,7 +520,7 @@ function Get-Providers() {
                 }
             }
             if ($awsSignedIn) {
-                Add-Provider -d -p "AWS" -n "region: $awsRegion" -i $awsRegion -u $($awsSignedIn.ToLower())
+                Add-Provider -d -p "AWS" -n "$awsRegion/$($awsSignedIn.ToLower())" -i $awsRegion -u $($awsSignedIn.ToLower())
                 Send-Update -c "1 " -a -t 1
             }
             else {
@@ -712,49 +712,17 @@ function Add-AWSMultiBits() {
         set-Prefs -u $user -k AWSnodeRoleName -v "scw-awsngrole-$user"
         set-prefs -u $user -k AWScfstack -v "scw-AWSstack-$user"
         Add-AWSComponents -u $user
-        $roleExists = Send-Update -t 1 -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --region $($config.Users.$userID.AWSregion) --role-name $($config.Users.$userID.AWSroleName) --output json" -a | Convertfrom-Json
+        $roleExists = Send-Update -t 1 -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --region $($config.Users.$user.AWSregion) --role-name $($config.Users.$user.AWSroleName) --output json" -a | Convertfrom-Json
         if ($roleExists) { Set-Prefs -u $user -k AWSclusterRoleArn -v $($roleExists.Role.Arn) }
-        $nodeRoleExists = Send-Update -t 1 -e -c "Checking for AWS Component: node role" -r "aws iam get-role --region $($config.Users.$userID.AWSregion) --role-name $($config.Users.$userID.AWSnodeRoleName) --output json" -a | Convertfrom-Json
+        $nodeRoleExists = Send-Update -t 1 -e -c "Checking for AWS Component: node role" -r "aws iam get-role --region $($config.Users.$user.AWSregion) --role-name $($config.Users.$user.AWSnodeRoleName) --output json" -a | Convertfrom-Json
         if ($nodeRoleExists) { Set-Prefs -u $user -k AWSnodeRoleArn -v $($nodeRoleExists.Role.Arn) }
-        $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.Users.$userID.AWSregion) --stack-name $($config.Users.$userID.AWScfstack) --output json" | Convertfrom-Json
+        $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.Users.$user.AWSregion) --stack-name $($config.Users.$user.AWScfstack) --output json" | Convertfrom-Json
         if ($cfstackExists.Stacks) {
-            Send-Update -c "Cloudformation: exists" -t 1
-            Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
-            $componentsReady++
-            # Get Outputs needed for cluster creation
-            $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
-            $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
-            $cfVpicId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
-            # Component: SecurityGroup
-            if ($cfSecurityGroup) {
-                Send-Update -t 1 -c "CF Security Group: exists"
-                Set-Prefs -k AWSsecurityGroup -v $cfSecurityGroup
-                $componentsReady++
-            }
-            else {
-                Send-Update -c "CF Security Group: not found"
-                Set-Prefs -k AWSsecurityGroup 
-            }
-            # Component: Subnets
-            if ($cfSubnets) {
-                Send-Update -t 1 -c "CF Subnets: exists"
-                Set-Prefs -k AWSsubnets -v $cfSubnets
-                $componentsReady++
-            }
-            else {
-                Send-Update -t 1 -c "CF Subnets: not found"
-                Set-Prefs -k AWSsubnets
-            }
-            # Component: VPC
-            if ($cfVpicId) {
-                Send-Update -t 1 -c "CF VPC Id: exists"
-                Set-Prefs -k AWSvpcId -v $cfVpicId
-                $componentsReady++
-            }
-            else {
-                Send-Update -t 1 -c "CF VPC ID: not found"
-                Set-Prefs -k AWSvpcId
-            }
+            Set-Prefs -u $user -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
+            # $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
+            # $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
+            # $cfVpicId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
+ 
         }
 
     }
@@ -764,15 +732,49 @@ function Remove-AWSMultiBIts() {
         Remove-AWSComponents -u $user
     }
 }
+function Add-AWSEverything() {
+    Write-Host "Running attendee setup"
+    # Kick off process for all users
+    $config.Users.Keys | Foreach-Object -Parallel {
+        # Every parallel process runs in a separate shell, so must define everything in-line for now.
+        if ($IsWindows) {
+            # Build a multi-cloud/multi-OS script they said.  It will be FUN, they said...
+            $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+            $ec2policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+        }
+        else {
+            $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+            $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+        }
+        $user = $_
+        # Set variables
+        $awsRoleName = "scw-awsrole-$user"
+        $awsNodeRoleName = "scw-awsngrole-$user"
+
+        # Create User
+        aws iam create-user --user-name $user
+        aws iam create-login-profile --user-name $user --password 1Dynatrace#
+        aws iam add-user-to-group --group-name Attendees --user-name $user
+        # Add components for User
+        aws iam create-role --role-name $awsRoleName --assume-role-policy-document '$ekspolicy'
+        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName
+        aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document '$ec2policy'
+    }
+    exit
+
+}
 
 # AWS Functions
 function Add-AWSSteps() {
     if ($($config.UserCount)) {
+        # Parallel Processing is a bit limited.  Using this cludgy process for now.
+        Add-AWSEverything
+
         # Multiuser Option: Users
-        Add-Choice -k "AWSMULTIUSERS" -d "Create AWS Attendee Accounts" -f Add-AWSUsers -c $($config.UserCount)
+        #Add-Choice -k "AWSMULTIUSERS" -d "Create AWS Attendee Accounts" -f Add-AWSUsers -c $($config.UserCount)
         # Multiuser Option: Components
-        Add-Choice -k "AWSMULTIBITS" -d "Create AWS Attendee Components" -f Add-AWSMultiBIts -c "User Count $($config.UserCount)"
-        Add-Choice -k "AWSMULTIREMOVEBITS" -d "Remove AWS Attendee Components" -f Remove-AWSMultiBits
+        #Add-Choice -k "AWSMULTIBITS" -d "Create AWS Attendee Components" -f Add-AWSMultiBIts -c "User Count $($config.UserCount)"
+        #Add-Choice -k "AWSMULTIREMOVEBITS" -d "Remove AWS Attendee Components" -f Remove-AWSMultiBits
         # Multiuser Option: Cluster 
     }
     else {
@@ -990,8 +992,13 @@ function Remove-AWSComponents {
         [string] $userID # override user in multi-deploy scenarios
     )
     # If userID, switch to Users subkey config
-    if ($userID) { $conf = $config.Users.$userid } else { $conf = $config }
-    $AWSregion = $conf.AWSRegion
+    if ($userID) {
+        $Params = @{}
+        $Params['u'] = $userID
+        $conf = $config.Users.$userID 
+    }
+    else { $conf = $config }
+    $AWSregion = $conf.AWSregion
     $AWSclusterRoleArn = $conf.AWSclusterRoleArn
     $awsRoleName = $conf.AWSroleName
     $awsNodeRoleName = $conf.AWSnodeRoleName
@@ -1010,7 +1017,7 @@ function Remove-AWSComponents {
         }
         # Finally delete the role.  OMG AWS.
         Send-Update -t 1 -c "Delete Role" -r "aws iam delete-role --region $AWSregion --role-name $awsRoleName"
-        Set-Prefs -k "AWSclusterRoleArn"
+        Set-Prefs @Params -k "AWSclusterRoleArn"
     }
     if ($AWSnodeRoleArn) {
         # Get and remove any attached policies
@@ -1020,7 +1027,7 @@ function Remove-AWSComponents {
         }
         # Finally delete the role.
         Send-Update -t 1 -c "Delete Role" -r "aws iam delete-role --region $AWSregion --role-name $awsNodeRoleName"
-        Set-Prefs -k "AWSnodeRoleArn"
+        Set-Prefs @Params -k "AWSnodeRoleArn"
     }
     if ($AWScfstackArn) {
         Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
