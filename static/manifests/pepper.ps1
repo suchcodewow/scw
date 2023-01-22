@@ -770,6 +770,12 @@ function Add-AWSEverything() {
             write-host "$user $cfstackReady"
             Start-Sleep -s 5
         }
+        aws eks create-cluster--name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$AWSsubnets, securityGroupIds=$AWSsecurityGroup
+        While ($clusterExists.cluster.status -ne "ACTIVE") {
+            $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
+            write-host "$user $($clusterExists.cluster.status)"
+            Start-Sleep -s 5
+        }
     }
     exit
 
