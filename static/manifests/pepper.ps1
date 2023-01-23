@@ -233,7 +233,7 @@ function Get-Joke {
         "What's the best part about living in Switzerland?;I don't know- but the flag's a big plus!",
         "What do you call a bear in a bar?;Lost!",
         "I can cut a piece of in half just by looking at it.;You might not believe me, but I saw it with my own eyes.",
-        "A limbo champion walk into a bar.;He loses.",
+        "A limbo champion walks into a bar.;He loses.",
         "What's the leading cause of dry sking?;Towels.",
         "When does a joke become a Dad joke?;When it becomes apparent.")
     return (Get-Random $allJokes).split(";")
@@ -749,17 +749,20 @@ function Add-AWSEverything() {
         write-host "$user $ekspolicy"
         $user = $_
         # Set variables
-        $awsRoleName = "scw-awsrole-$user"
-        $awsNodeRoleName = "scw-awsngrole-$user"
-        $awsCFStack = "scw-AWSstack-$user"
+        $AWSRoleName = "scw-awsrole-$user"
+        $AWSNodeRoleName = "scw-awsngrole-$user"
+        #$AWScfStack = "scw-AWSstack-$user"
+        $AWScfStack = "scw-AWSstack-test"
+        $AWScluster = "scw-AWS-$user"
+        $AWSnodegroup = "scw-AWSNG-$user"
         # Create User
         aws iam create-user --user-name $user
         aws iam create-login-profile --user-name $user --password 1Dynatrace#
         aws iam add-user-to-group --group-name Attendees --user-name $user
         # Add components for User
-        aws iam create-role --role-name $awsRoleName --assume-role-policy-document ""$ekspolicy""
+        aws iam create-role --role-name $awsRoleName --assume-role-policy-document ""$ekspolicy"" --output json | ConvertFrom-Json
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName
-        aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document ""$ec2policy""
+        aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document ""$ec2policy"" --output json | ConvertFrom-Json
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $awsNodeRoleName
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
@@ -770,15 +773,34 @@ function Add-AWSEverything() {
             write-host "$user $cfstackReady"
             Start-Sleep -s 5
         }
-        aws eks create-cluster--name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$AWSsubnets, securityGroupIds=$AWSsecurityGroup
+        # Collect Results
+        $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
+        $AWSclusterRoleArn = $roleExists.Role.Arn
+        $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
+        $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
+        $cfstackExists = aws cloudformation describe-stacks --stack-name $AWScfstack --output json | Convertfrom-Json
+        $AWScfstackArn = $cfstackExists.Stacks.StackId
+        $AWSsecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
+        $AWSsubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
+        $AWSvpcId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
+        # Create EKS Cluster
+        aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
         While ($clusterExists.cluster.status -ne "ACTIVE") {
             $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
             write-host "$user $($clusterExists.cluster.status)"
+            Start-Sleep -s 15
+        }
+        # Create NodeGroup
+        $subnets = $AWSsubnets.replace(",", " ")
+        write-host $subnets
+        aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --scaling-config "minSize=1,maxSize=1,desiredSize=1" --subnets $subnets  --instance-types t3.xlarge
+        While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
+            $nodeGroupExists = aws eks describe-nodegroup  --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --output json | ConvertFrom-Json
+            write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
             Start-Sleep -s 5
         }
     }
     exit
-
 }
 
 # AWS Functions
@@ -786,13 +808,6 @@ function Add-AWSSteps() {
     if ($($config.UserCount)) {
         # Parallel Processing is a bit limited.  Using this cludgy process for now.
         Add-AWSEverything
-
-        # Multiuser Option: Users
-        #Add-Choice -k "AWSMULTIUSERS" -d "Create AWS Attendee Accounts" -f Add-AWSUsers -c $($config.UserCount)
-        # Multiuser Option: Components
-        #Add-Choice -k "AWSMULTIBITS" -d "Create AWS Attendee Components" -f Add-AWSMultiBIts -c "User Count $($config.UserCount)"
-        #Add-Choice -k "AWSMULTIREMOVEBITS" -d "Remove AWS Attendee Components" -f Remove-AWSMultiBits
-        # Multiuser Option: Cluster 
     }
     else {
         $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
@@ -953,9 +968,9 @@ function Add-AWSComponents {
         Send-Update -c "Attach CNI Policy" -r "aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName" -t 1
     }
     # Create VPC with Cloudformation
-    #Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+    Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
     # Wait for creation
-    $cfstackReady = "CREATE_COMPLETE"
+    #$cfstackReady = "CREATE_COMPLETE"
     While ($cfstackReady -ne "CREATE_COMPLETE") {
         $cfstackReady = Send-Update -a -t 1 -c "Check for 'CREATE_COMPLETE'" -r "aws cloudformation describe-stacks --region $awsRegion --stack-name $awsCFStack --query Stacks[*].StackStatus --output text"
         Send-Update -t 1 -c $cfstackReady
@@ -972,6 +987,7 @@ function Add-AWSCluster {
         $clusterExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --region $($config.AWSregion) --name $($config.AWScluster) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($clusterExists.cluster.status)"
         $counter++
+        if ($counter -eq 11) { Send-Update -t 1 -c "ZZzzzzzz... Taking too long.  Initiating Bad Joke Generator" }
         if ($counter % 12 -eq 0) { $jokeCounter = 0; $joke = Get-Joke }
         if ($joke) {
             if ($joke[$jokeCounter]) {
@@ -985,7 +1001,7 @@ function Add-AWSCluster {
         Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
-    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(","," "))  --instance-types t3.xlarge"
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
