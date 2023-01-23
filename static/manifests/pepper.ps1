@@ -734,8 +734,15 @@ function Remove-AWSMultiBIts() {
 }
 function Add-AWSEverything() {
     Write-Host "Running attendee setup"
+    $AWScfStack = "scw-AWSstack"
+    aws cloudformation create-stack --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
+    While ($cfstackReady -ne "CREATE_COMPLETE") {
+        $cfstackReady = aws cloudformation describe-stacks --stack-name $awsCFStack --query Stacks[*].StackStatus --output text
+        write-host "CloudFormation Stack: $cfstackReady"
+        Start-Sleep -s 5
+    }
     # Kick off process for all users
-    $config.Users.Keys | Foreach-Object -Parallel -ThrottleLimit 50 {
+    $config.Users.Keys | Foreach-Object -Parallel {
         # Every parallel process runs in a separate shell, so defining everything in-line for now.
         if ($IsWindows) {
             # Build a multi-cloud/multi-OS script they said.  It will be FUN, they said...
@@ -746,12 +753,17 @@ function Add-AWSEverything() {
             $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
             $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
         }
+        # Get Cloudformation stack info
+        $AWScfStack = "scw-AWSstack"
+        $cfstackExists = aws cloudformation describe-stacks --stack-name $AWScfstack --output json | Convertfrom-Json
+        $AWScfstackArn = $cfstackExists.Stacks.StackId
+        $AWSsecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
+        $AWSsubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
+        $AWSvpcId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
         $user = $_
         # Set variables
         $AWSRoleName = "scw-awsrole-$user"
         $AWSNodeRoleName = "scw-awsngrole-$user"
-        #$AWScfStack = "scw-AWSstack-$user"
-        $AWScfStack = "scw-AWSstack-test"
         $AWScluster = "scw-AWS-$user"
         $AWSnodegroup = "scw-AWSNG-$user"
         # Create User
@@ -766,22 +778,17 @@ function Add-AWSEverything() {
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
         #Add Cloudformation
-        aws cloudformation create-stack --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
-        While ($cfstackReady -ne "CREATE_COMPLETE") {
-            $cfstackReady = aws cloudformation describe-stacks --stack-name $awsCFStack --query Stacks[*].StackStatus --output text
-            write-host "$user $cfstackReady"
-            Start-Sleep -s 5
-        }
+        # aws cloudformation create-stack --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
+        # While ($cfstackReady -ne "CREATE_COMPLETE") {
+        #     $cfstackReady = aws cloudformation describe-stacks --stack-name $awsCFStack --query Stacks[*].StackStatus --output text
+        #     write-host "$user $cfstackReady"
+        #     Start-Sleep -s 5
+        # }
         # Collect Results
         $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
         $AWSclusterRoleArn = $roleExists.Role.Arn
         $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
         $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
-        $cfstackExists = aws cloudformation describe-stacks --stack-name $AWScfstack --output json | Convertfrom-Json
-        $AWScfstackArn = $cfstackExists.Stacks.StackId
-        $AWSsecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
-        $AWSsubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
-        $AWSvpcId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
         # Create EKS Cluster
         aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
         While ($clusterExists.cluster.status -ne "ACTIVE") {
@@ -797,7 +804,7 @@ function Add-AWSEverything() {
             write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
             Start-Sleep -s 15
         }
-    }
+    } -ThrottleLimit 10
     exit
 }
 
