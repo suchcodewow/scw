@@ -735,8 +735,8 @@ function Remove-AWSMultiBIts() {
 function Add-AWSEverything() {
     Write-Host "Running attendee setup"
     # Kick off process for all users
-    $config.Users.Keys | Foreach-Object -Parallel {
-        # Every parallel process runs in a separate shell, so must define everything in-line for now.
+    $config.Users.Keys | Foreach-Object -Parallel -ThrottleLimit 50 {
+        # Every parallel process runs in a separate shell, so defining everything in-line for now.
         if ($IsWindows) {
             # Build a multi-cloud/multi-OS script they said.  It will be FUN, they said...
             $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
@@ -746,7 +746,6 @@ function Add-AWSEverything() {
             $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
             $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
         }
-        write-host "$user $ekspolicy"
         $user = $_
         # Set variables
         $AWSRoleName = "scw-awsrole-$user"
@@ -766,7 +765,7 @@ function Add-AWSEverything() {
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $awsNodeRoleName
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
-        # Add Cloudformation
+        #Add Cloudformation
         aws cloudformation create-stack --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
         While ($cfstackReady -ne "CREATE_COMPLETE") {
             $cfstackReady = aws cloudformation describe-stacks --stack-name $awsCFStack --query Stacks[*].StackStatus --output text
@@ -792,12 +791,11 @@ function Add-AWSEverything() {
         }
         # Create NodeGroup
         $subnets = $AWSsubnets.replace(",", " ")
-        write-host $subnets
-        aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --scaling-config "minSize=1,maxSize=1,desiredSize=1" --subnets $subnets  --instance-types t3.xlarge
+        invoke-expression "aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --subnets $subnets --scaling-config minSize=1,maxSize=1,desiredSize=1 --instance-types t3.xlarge"
         While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
             $nodeGroupExists = aws eks describe-nodegroup  --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --output json | ConvertFrom-Json
             write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
-            Start-Sleep -s 5
+            Start-Sleep -s 15
         }
     }
     exit
