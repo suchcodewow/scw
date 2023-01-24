@@ -1073,8 +1073,8 @@ function Remove-AWSComponents {
         Send-Update -t 1 -c "Delete Role" -r "aws iam delete-role --region $AWSregion --role-name $awsNodeRoleName"
         Set-Prefs @Params -k "AWSnodeRoleArn"
     }
-    if ($AWScfstackArn) {
-        Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
+    if ($AWScfstackArn -and -not $network) {
+        #Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
         Do {
             $cfstackExists = Send-Update -e -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $AWSregion --stack-name $AWScfstack --query Stacks[*].StackStatus --output text"
             Send-Update -c $cfstackExists -t 1
