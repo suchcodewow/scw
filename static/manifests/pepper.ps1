@@ -790,7 +790,7 @@ function Add-AWSEverything() {
         $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
         $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
         # Create EKS Cluster
-        aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
+        aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup" 1>$null
         While ($clusterExists.cluster.status -ne "ACTIVE") {
             $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
             write-host "$user $($clusterExists.cluster.status)"
@@ -804,7 +804,7 @@ function Add-AWSEverything() {
             write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
             Start-Sleep -s 15
         }
-    } -ThrottleLimit 10
+    } -ThrottleLimit 5
     exit
 }
 
