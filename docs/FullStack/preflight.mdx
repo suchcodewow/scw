@@ -1,11 +1,11 @@
 ---
 sidebar_position: 2
-title: "1) Pre-flight Check"
+title: "2) Pre-flight Check"
 ---
 
 ## Environment setup
 
-We'll spin up a Dynatrace tenant and build an application together from scratch.
+We'll spin up a Dynatrace tenant and build an application together from scratch. Please keep in mind that this is a "life-fire" exercise. It's instructor led- but can be more like white-water rafting than a museum tour.
 
 ### A) Dynatrace tenant setup
 
@@ -26,6 +26,7 @@ We'll spin up a Dynatrace tenant and build an application together from scratch.
 2. You have full access to the various features of AWS. You could search for "Elastic Kubernetes Service" or "EC2". Aside from a Cloudformation VPC, you shouldn't see anything today as we'll build it all together.
 3. in the top bar, open an AWS cloud shell session by clicking the shell icon.
    ![cloudshell](/img/preflight2.jpg)
+4. If the text is ridiculously tiny, there is a gear icon in the top right you can select to pick something other than "microscopic".
 
 ### C) Setup
 
@@ -47,4 +48,15 @@ pwsh ./pepper.ps1 -c -n scw-AWSstack
 Pepper will generate a running checklist of deployment items. Anything showing `[-]` is information, while anything with `[>]` shows the exact command you could run yourself with everything filled it.
 :::
 
-3. bleh
+3. You should see something similar to below. Select any items marked `Required`. The step that builds your kubernetes cluster takes some time across all cloud providers. (Some take more than others. _sideways glance at AWS_)
+
+```bash
+Option description                     current
+------ -----------                     -------
+     1 Switch Cloud Provider           AWS us-east-2/bravecannon
+     2 Required: Create AWS Components
+```
+
+:::info
+The first line shows which cloud provider you're using, the space within that cloud, and a unique identifier. If used in a local terminal with multiple available cloud providers, the option to `switch cloud providers` would let you switch between them.
+:::

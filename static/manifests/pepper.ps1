@@ -1468,7 +1468,8 @@ function Get-AppUrls {
     foreach ($service in $services) {
         if ($service.status.loadBalancer.ingress.count -gt 0) {
             if (-not $returnList) { $returnList = "URLS:" }
-            $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
+            # Azure was using IP address.  Switched to hostname for default AWS
+            $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
         }
     }
     #Return list
