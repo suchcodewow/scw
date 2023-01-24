@@ -778,12 +778,7 @@ function Add-AWSEverything() {
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
         aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
         #Add Cloudformation
-        # aws cloudformation create-stack --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
-        # While ($cfstackReady -ne "CREATE_COMPLETE") {
-        #     $cfstackReady = aws cloudformation describe-stacks --stack-name $awsCFStack --query Stacks[*].StackStatus --output text
-        #     write-host "$user $cfstackReady"
-        #     Start-Sleep -s 5
-        # }
+
         # Collect Results
         $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
         $AWSclusterRoleArn = $roleExists.Role.Arn

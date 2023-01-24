@@ -1,6 +1,4 @@
 $clusters = aws eks list-clusters --output json --query clusters | ConvertFrom-Json
-
-$cluster = "scw-AWS-livelynose"
 $clusters | ForEach-Object -Parallel {
     $cluster = $_
     $nodegroups = aws eks list-nodegroups --cluster-name $cluster --query nodegroups | Convertfrom-Json
