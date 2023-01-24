@@ -1,0 +1,46 @@
+---
+sidebar_position: 2
+title: "1) Pre-flight Check"
+---
+
+## Environment setup
+
+We'll spin up a Dynatrace tenant and build an application together from scratch.
+
+### A) Dynatrace tenant setup
+
+1. Launch the [Dyantrace trial](https://www.dynatrace.com/trial/) page.
+2. Enter an email address and "Start free trial".
+3. Follow the prompts.
+4. Check email (junk/spam folders!) for a "Welcome" message.
+
+### B) Cloud setup
+
+1. Dynatrace works across all clouds. Follow the instructor prompts to connect.
+2. Once logged in follow check out the section below matching your provider.
+
+#### AWS
+
+1. In the top right bar, confirm the region is Ohio. If not, click the region and select "US EAST (OHIO)"
+   ![regionselect](/img/preflight1.jpg)
+2. You have full access to the various features of AWS. You could search for "Elastic Kubernetes Service" or "EC2". Aside from a Cloudformation VPC, you shouldn't see anything today as we'll build it all together.
+3. in the top bar, open an AWS cloud shell session by clicking the shell icon.
+   ![cloudshell](/img/preflight2.jpg)
+
+### C) Setup
+
+We'll use [Pepper](/docs/pepper) today. It's a cloud-agnostic deployment assistant built to help setup applications while providing every step along the way. (No magic whooosh and done!)
+
+1. In your cloud shell, download Pepper.
+
+```bash
+curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1
+```
+
+2. Start Pepper with the `-c` option to show commands as they run so you could use them manually later, and `-n` option to specify the existing VPC.
+
+```bash
+pwsh ./pepper.ps1 -c -n scw-AWSstack
+```
+
+Pepper will generate a running checklist of deployment items. Anything showing `[-]` is information, while anything with `[>]` shows the exact command you could run yourself with everything filled it.

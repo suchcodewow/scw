@@ -5,6 +5,7 @@ param (
     [switch] $cloudCommands, # enable to show commands
     [switch] $logReset, # enable to reset log between runs
     [int] $users, # Users to create, switches to multiuser mode
+    [string] $network, # Allows multiple attendees to use the same CloudFormation VPC for faster deployment
     [switch] $aws, # use aws
     [switch] $azure, # use azure
     [switch] $gcp # use gcp
@@ -780,25 +781,25 @@ function Add-AWSEverything() {
         #Add Cloudformation
 
         # Collect Results
-        $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
-        $AWSclusterRoleArn = $roleExists.Role.Arn
-        $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
-        $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
-        # Create EKS Cluster
-        aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
-        While ($clusterExists.cluster.status -ne "ACTIVE") {
-            $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
-            write-host "$user $($clusterExists.cluster.status)"
-            Start-Sleep -s 15
-        }
-        # Create NodeGroup
-        $subnets = $AWSsubnets.replace(",", " ")
-        invoke-expression "aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --subnets $subnets --scaling-config minSize=1,maxSize=1,desiredSize=1 --instance-types t3.xlarge"
-        While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
-            $nodeGroupExists = aws eks describe-nodegroup  --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --output json | ConvertFrom-Json
-            write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
-            Start-Sleep -s 15
-        }
+        # $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
+        # $AWSclusterRoleArn = $roleExists.Role.Arn
+        # $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
+        # $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
+        # # Create EKS Cluster
+        # aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
+        # While ($clusterExists.cluster.status -ne "ACTIVE") {
+        #     $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
+        #     write-host "$user $($clusterExists.cluster.status)"
+        #     Start-Sleep -s 15
+        # }
+        # # Create NodeGroup
+        # $subnets = $AWSsubnets.replace(",", " ")
+        # invoke-expression "aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --subnets $subnets --scaling-config minSize=1,maxSize=1,desiredSize=1 --instance-types t3.xlarge"
+        # While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
+        #     $nodeGroupExists = aws eks describe-nodegroup  --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --output json | ConvertFrom-Json
+        #     write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
+        #     Start-Sleep -s 15
+        # }
     } -ThrottleLimit 10
     exit
 }
@@ -844,13 +845,21 @@ function Add-AWSSteps() {
             Set-Prefs -k AWSnodeRoleArn
         }
         # Components: Cloudformation, vpc, subnets, and security group
-        $targetComponents = $targetComponents + 4
-        set-prefs -k AWScfstack -v "scw-AWSstack-$userid"
+        
+        if ($network) {
+            # use group Cloudformation VPC
+            set-prefs -k AWScfstack -v $network
+        }
+        else {
+            set-prefs -k AWScfstack -v "scw-AWSstack-$userid"
+            $targetComponents = $targetComponents + 4
+
+        }
         $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
         if ($cfstackExists.Stacks) {
             Send-Update -c "Cloudformation: exists" -t 1
             Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
-            $componentsReady++
+            if (-not $network) { $componentsReady++ }
             # Get Outputs needed for cluster creation
             $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
             $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
@@ -859,7 +868,7 @@ function Add-AWSSteps() {
             if ($cfSecurityGroup) {
                 Send-Update -t 1 -c "CF Security Group: exists"
                 Set-Prefs -k AWSsecurityGroup -v $cfSecurityGroup
-                $componentsReady++
+                if (-not $network) { $componentsReady++ }
             }
             else {
                 Send-Update -c "CF Security Group: not found"
@@ -869,7 +878,7 @@ function Add-AWSSteps() {
             if ($cfSubnets) {
                 Send-Update -t 1 -c "CF Subnets: exists"
                 Set-Prefs -k AWSsubnets -v $cfSubnets
-                $componentsReady++
+                if (-not $network) { $componentsReady++ }
             }
             else {
                 Send-Update -t 1 -c "CF Subnets: not found"
@@ -879,7 +888,7 @@ function Add-AWSSteps() {
             if ($cfVpicId) {
                 Send-Update -t 1 -c "CF VPC Id: exists"
                 Set-Prefs -k AWSvpcId -v $cfVpicId
-                $componentsReady++
+                if (-not $network) { $componentsReady++ }
             }
             else {
                 Send-Update -t 1 -c "CF VPC ID: not found"
@@ -968,13 +977,15 @@ function Add-AWSComponents {
         Send-Update -c "Attach CNI Policy" -r "aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName" -t 1
     }
     # Create VPC with Cloudformation
-    Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+    if (-not  $network) {
+        Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+    }
     # Wait for creation
     #$cfstackReady = "CREATE_COMPLETE"
     While ($cfstackReady -ne "CREATE_COMPLETE") {
         $cfstackReady = Send-Update -a -t 1 -c "Check for 'CREATE_COMPLETE'" -r "aws cloudformation describe-stacks --region $awsRegion --stack-name $awsCFStack --query Stacks[*].StackStatus --output text"
         Send-Update -t 1 -c $cfstackReady
-        Start-Sleep -s 10
+        Start-Sleep -s 5
     }
     # Bypass reloading steps for multi-user scenarios
     if (-not $userID) { Add-AwsSteps }
