@@ -35,3 +35,14 @@ Apply.
 ```bash
 kubectl apply -f ~/dbic.yaml
 ```
+
+Once deployed, the load generator will immediately start creating traffic. On default cloud kubernetes installations, you can login to the application as well.
+
+Find the IP/hostname by running:
+
+```bash
+kubectl get svc -n dbic
+```
+
+Paste the result into your browser.
+![Dynabank](/img/dynabank.jpg)
