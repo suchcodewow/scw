@@ -1036,21 +1036,21 @@ function Remove-AWSComponents {
         [string] $userID # override user in multi-deploy scenarios
     )
     # If userID, switch to Users subkey config
-    if ($userID) {
-        $Params = @{}
-        $Params['u'] = $userID
-        $conf = $config.Users.$userID 
-    }
-    else { $conf = $config }
-    $AWSregion = $conf.AWSregion
-    $AWSclusterRoleArn = $conf.AWSclusterRoleArn
-    $awsRoleName = $conf.AWSroleName
-    $awsNodeRoleName = $conf.AWSnodeRoleName
-    $awsCFStack = $conf.AWScfstack
-    $AWScfstackArn = $conf.AWScfstackArn
-    $AWSNodeRoleArn = $conf.AWSnodeRoleArn
+    # if ($userID) {
+    #     $Params = @{}
+    #     $Params['u'] = $userID
+    #     $conf = $config.Users.$userID 
+    # }
+    # else { $conf = $config }
+    $AWSregion = $config.AWSregion
+    $AWSclusterRoleArn = $config.AWSclusterRoleArn
+    $awsRoleName = $config.AWSroleName
+    $awsNodeRoleName = $config.AWSnodeRoleName
+    $awsCFStack = $config.AWScfstack
+    $AWScfstackArn = $config.AWScfstackArn
+    $AWSNodeRoleArn = $config.AWSnodeRoleArn
 
-    if ($AWSclusterRoleArn) {
+    if ($AWSclusterArn) {
         Remove-AWSCluster -b
     }
     if ($AWSclusterRoleArn) {

@@ -19,3 +19,25 @@ $clusters | ForEach-Object -Parallel {
     }
 } -ThrottleLimit 50
 
+$roles = aws iam list-roles --query Roles[*].RoleName | Convertfrom-Json
+$roles | Foreach-Object -ThrottleLimit 10 -Parallel {
+    $role = $_
+    if ($role.SubString(0, 4) -eq "scw-") {
+        write-host "nuke $role"
+        $attachedPolicies = aws iam list-attached-role-policies --role-name $role --output json | Convertfrom-Json
+        foreach ($policy in $attachedPolicies.AttachedPolicies) {
+            aws iam detach-role-policy --role-name $role --policy-arn $($policy.PolicyArn)
+        }
+        aws iam delete-role --role-name $role
+    }
+    else {
+        write-host "let it alone $role"
+    }
+    #$attachedPolicies = Send-Update -t 1 -e -c "Get Attached Policies" -r "aws iam list-attached-role-policies --region $AWSregion --role-name $awsRoleName --output json" | Convertfrom-Json
+    #foreach ($policy in $attachedPolicies.AttachedPolicies) {
+    #    Send-Update -t 1 -c "Remove Policy" -r "aws iam detach-role-policy --region $AWSregion --role-name $awsRoleName --policy-arn $($policy.PolicyArn)"
+    #}
+    
+}
+
+
