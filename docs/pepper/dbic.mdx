@@ -17,3 +17,21 @@ The application is a fully-featured application showcasing shopping cart, bankin
 - pre-populated fields making it easy to try out
 
 ![DynaBankInsurCart](/img/DynaBankInsuraCart.png)
+
+### Deployment
+
+The application has been tested on AKS/EKS/GKE clusters. The smallest recommended size is 4 cpu and 16gb memory. The smallest possible size is 2cpu 8GB memory.
+
+It will install into the dbic namespace.
+
+Download the yaml.
+
+```bash
+curl https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml > ~/dbic.yaml
+```
+
+Apply.
+
+```bash
+kubectl apply -f ~/dbic.yaml
+```

@@ -811,6 +811,7 @@ function Add-AWSSteps() {
         Add-AWSEverything
     }
     else {
+        # Regular single user session
         $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
         $userid = $userProperties.userid
         # Save region to use in commands
