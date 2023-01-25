@@ -1,6 +1,6 @@
 ---
 sidebar_position: 6
-title: "6) Release"
+title: "6) Release: Dynabank"
 ---
 
 ## The story so far
@@ -31,4 +31,11 @@ kubectl get svc -n dbic
 
 ```bash
 /api/api/features
+```
+
+3. You should see the feature flags and enabled status of "false".
+4. Enable the feature flag by setting the
+
+```bash
+/api/api/features/enable/fraud_service
 ```
