@@ -1,4 +1,5 @@
 $clusters = aws eks list-clusters --output json --query clusters | ConvertFrom-Json
+write-host "Removing $($clusters.count) clusters"
 $clusters | ForEach-Object -Parallel {
     $cluster = $_
     $nodegroups = aws eks list-nodegroups --cluster-name $cluster --query nodegroups | Convertfrom-Json
@@ -20,6 +21,7 @@ $clusters | ForEach-Object -Parallel {
 } -ThrottleLimit 50
 
 $roles = aws iam list-roles --query Roles[*].RoleName | Convertfrom-Json
+write-host "Removing $($roles.count) roles"
 $roles | Foreach-Object -ThrottleLimit 10 -Parallel {
     $role = $_
     if ($role.SubString(0, 4) -eq "scw-") {
@@ -31,13 +33,22 @@ $roles | Foreach-Object -ThrottleLimit 10 -Parallel {
         aws iam delete-role --role-name $role
     }
     else {
-        write-host "let it alone $role"
-    }
-    #$attachedPolicies = Send-Update -t 1 -e -c "Get Attached Policies" -r "aws iam list-attached-role-policies --region $AWSregion --role-name $awsRoleName --output json" | Convertfrom-Json
-    #foreach ($policy in $attachedPolicies.AttachedPolicies) {
-    #    Send-Update -t 1 -c "Remove Policy" -r "aws iam detach-role-policy --region $AWSregion --role-name $awsRoleName --policy-arn $($policy.PolicyArn)"
-    #}
-    
+        write-host "Ignore Role: $role"
+    }    
 }
-
-
+$users = aws iam get-group --group-name attendees --query Users[*].UserName | convertfrom-Json
+write-host "Removing $($users.count) users"
+$users | Foreach-Object -ThrottleLimit 10 -Parallel {
+    $user = $_
+    if ($user -eq "shyplane" -or $user -eq "consoleadmin") {
+        write-host "Ignore User: $user"
+    }
+    else {
+        $groups = aws iam list-groups-for-user --user-name consoleadmin --query Groups[*].GroupName | Convertfrom-Json
+        foreach ($group in $groups) {
+            aws iam remove-user-from-group --group-name $group --user-name $user
+        }
+        aws iam delete-login-profile --user-name $user
+        aws iam delete-user --user-name $user
+    }
+}
