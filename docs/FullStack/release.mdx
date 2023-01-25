@@ -1,0 +1,34 @@
+---
+sidebar_position: 6
+title: "6) Release"
+---
+
+## The story so far
+
+The organization is implementing a fraud detection service.
+
+- Large transactions are targets for fraud.
+- The fraud service will check those transactions prior to posting them.
+- Users should receive a negative response when fraud is detected.
+
+As developers:
+
+- You spent a solid 10 minutes to confirm this works on your dev laptop.
+- You've staged the change as a feature flag in the application's main API.
+- At 4:50PM you put on your jacket and enable the flag as you leave for the week-end.
+
+## Enable the service
+
+First check the feature flag status:
+
+1. Obtain the application URL either from Pepper, or be running
+
+```bash
+kubectl get svc -n dbic
+```
+
+2. Paste the URL into your browser while changing the ending to look like:
+
+```bash
+your mom
+```

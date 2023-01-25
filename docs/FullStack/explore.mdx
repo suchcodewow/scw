@@ -1,0 +1,38 @@
+---
+sidebar_position: 5
+title: "5) Explore"
+---
+
+In this section we'll look at the front to back visibility provided by Dynatrace immediately after deployment.
+
+## Smartscape
+
+1. In your Dynatrace tenant, select the "Smartscape" option from the menu. You'll see that Dynatrace has already generated a topology view.
+   ![smartscape](/img/explore1.jpg)
+2. By clicking on any of the selected components Dynatrace shows the vertical relationships for that entity.
+   ![verticalsmartscape](/img/explore2.jpg)
+
+## Services View
+
+![services](/img/explore3.jpg)
+
+1. Select "Services" on the left menu. Dynatrace shows all detected services and key metrics for each.
+2. Select the "OrdersAPI" service to see a dashboard and further drilldowns for it:
+
+- The top left block shows what calls this service, what this service depends on, and where it's running
+- Bottom left shows service KPI's like failure rate & throughput
+- Dynatrace always keeps everything connected. The right side shows ways to view the service flow, back up the chain, and individual traces
+
+## Databases View
+
+![services](/img/explore4.jpg)
+
+1. Select "Databases" on the left menu, then "dbic". Similar to services, Dynatrace constantly tracks service dependencies, and underlying infrastructure at all times.
+2. Database calls from any source are shown here with the ability to reverse back up the chain with the "view backtrace" button.
+
+## Logs
+
+![services](/img/explore5.jpg)
+
+1. Select "Logs" on the left menu.
+2. Select from log types, messages, and sources in "available attributes".
