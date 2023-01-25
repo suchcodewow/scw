@@ -921,7 +921,7 @@ function Add-AWSSteps() {
         Set-Prefs -k AWSnodegroup -v "scw-AWSNG-$userid"
         $clusterExists = Send-Update -t 1 -a -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
         if ($clusterExists) {
-            if ($clusterExists.cluster.status) { Add-AWSCluster }
+            if ($clusterExists.cluster.status -eq "CREATING") { Add-AWSCluster }
             Send-Update -c "AWS Cluster: exists" -t 1
             Set-Prefs -k AWSclusterArn -v $($clusterExists.cluster.arn)
             Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $($config.AWScluster) -f "Remove-AWSCluster"
