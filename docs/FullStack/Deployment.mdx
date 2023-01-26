@@ -9,12 +9,16 @@ Dynatrace provides a managed token system to make deployments secure and easy. I
 
 ### A) Create a Token
 
+:::tip
+If you have used Dynatrace before it might automatically login to other tenants. Open an "incognito" style browser if that might be the case and login there.
+:::
+
 1. Navigate to your Dynatrace tenant. You should have a welcome email with link.
 2. Once you login, copy the main part of the URL and paste somewhere handy.
    ![url](/img/deploy0.jpg)
 3. Click "Access Tokens" on the left side very near the bottom. (You might have to expand "Manage")
    ![menu](/img/deploy1.jpg)
-4. In the tokens screen, click "Generate Token" on the right side. Give it a name. It could be "Fullstack Workshop" or "Rick".
+4. In the tokens screen, click "Generate New Token" on the right side. Give it a name. It could be "Fullstack Workshop" or "Rick".
 5. In the "search scopes" box, type "write api tokens", then select the option when it appears below.
    ![API Token](/img/token.jpg)
 6. Click "Generate Token" at the bottom of the screen. Click Copy on the following screen. Make sure to **paste** your token before clicking done.
@@ -29,19 +33,23 @@ Dynatrace provides a managed token system to make deployments secure and easy. I
 
 ### C) Deploy Dynatrace
 
-1. Navigate to the "Dynatrace Hub" on the left side of Dynatrace (also under the "Manage" heading)
-2. Select the big "OneAgent" panel, then "Download OneAgent" at the bottom of screen.
-3. Pick Kubernetes from the most common deployment options.
+1. In your Dynatrace tenant, click "Deploy Dynatrace" in the top right, then "Start installation."
+
+:::info
+Alternatively, open the Manage subheading at the bottom of left menu, then "Deploy Dynatrace"
+:::
+
+2. Pick Kubernetes from the most common deployment options.
    ![kubernetes](/img/deploy2.jpg)
-4. Give it a friendly name like "CloudKubernetes" or "Morty".
-5. Click "Create token" for Dynatrace Operator & then click "copy" near the bottom.
+3. Give it a friendly name like "CloudKubernetes" or "Morty".
+4. Click "Create token" for Dynatrace Operator & then click "copy" near the bottom.
    ![copybutton](/img/deploy3.jpg)
 
-6. In your cloud shell prompt (not Pepper), paste the contents
+5. In your cloud shell prompt (not Pepper), paste the contents
 
    ![Copy Command](/img/commands.jpg)
 
-7. Press _enter_ a couple of times to ensure your cloud provider runs all 4 steps.
+6. Press _enter_ a couple of times to ensure your cloud provider runs all 4 steps.
 
 ### D) Confirm Deployment
 

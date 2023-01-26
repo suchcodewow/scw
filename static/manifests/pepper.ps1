@@ -235,7 +235,7 @@ function Get-Joke {
         "What do you call a bear in a bar?;Lost!",
         "I can cut a piece of in half just by looking at it.;You might not believe me, but I saw it with my own eyes.",
         "A limbo champion walks into a bar.;He loses.",
-        "What's the leading cause of dry sking?;Towels.",
+        "What's the leading cause of dry skin?;Towels.",
         "When does a joke become a Dad joke?;When it becomes apparent.")
     return (Get-Random $allJokes).split(";")
 }
@@ -1359,7 +1359,7 @@ spec:
       - kubernetes-monitoring
     resources:
       requests:
-        cpu: 250m
+        cpu: 100m
         memory: 256Mi
       limits:
         cpu: 500m
