@@ -7,7 +7,8 @@ title: "7) Troubleshoot!"
 
 - After an hour or so, the support center starts a priority conference call.
 - They report that customers are receiving payment success messages but transactions don't post.
-- Someone suggests that the network must be down.
+- Someone suggests that the network must be down. The network team is paged, searches for an hour, and finds no issue.
+-
 
 ![troubleshoot](/img/troubleshoot1.jpg)
 
@@ -37,3 +38,17 @@ With Dynatrace, you'll see critical context in black/blue and the reason for the
 
 5. Click Analyze failure rate degradation to see root-cause error message, faulty service, and automatic integration with relevant logs.
    ![troubleshoot](/img/troubleshoot2.jpg)
+
+We can easily see the entire flow from front end users impacting back to exact log error message.
+
+6. Disable the fraud service. On the end of the base URL, add:
+
+```bash
+/api/api/features/disable/fraud_service
+```
+
+7. Review the transactionAPI for decrease in failures. After a few minutes without user users, Dynatrace will automatically close the ticket.
+
+![examples](/img/examples.jpg)
+
+[Click for many more enterprise success stories.](https://www.dynatrace.com/news/customers/)

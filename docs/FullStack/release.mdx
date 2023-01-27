@@ -8,14 +8,16 @@ title: "6) Release: Dynabank"
 The organization is implementing a fraud detection service.
 
 - Large transactions are targets for fraud.
-- The fraud service will check those transactions prior to posting them.
-- Users should receive a negative response when fraud is detected.
+- The fraud service will check those transactions for address and account owner details prior to posting them.
+- Users should receive a transaction error message when fraud is detected.
 
 As developers:
 
 - we've confirmed the solution works on our dev laptops.
 - We've staged the change as a feature flag in the application's main API.
-- At 4:50PM Friday we put on our jackets and enable the flag on the way out the door.
+- At 4:50PM Friday we put on our jackets, enable the flag, and start a week long beach vacation.
+
+![leavework](/img/leavework.jpg)
 
 ## Enable the service
 
@@ -33,9 +35,11 @@ kubectl get svc -n dbic
 /api/api/features
 ```
 
-3. You should see the feature flags and enabled status of "false".
-4. Enable the feature flag by setting the
+3. Confirm the current status for all flags is "false".
+4. Enable the feature flag with the enable endpoint:
 
 ```bash
 /api/api/features/enable/fraud_service
 ```
+
+5. To confirm everything is working, go into banking, transfer & pay, and confirm at $5 payment works.

@@ -5,15 +5,16 @@ title: "5) Explore: Dynabank"
 
 In this section we'll look at the front to back visibility provided by Dynatrace immediately after deployment.
 
-We'll also share a few highlights of user-configurable options available. (Any could be automated)
+We'll also share a few highlights of user-configurable options available. Any of them could be automated.
 
 ## A) Smartscape
 
 1. In your Dynatrace tenant, select the "Smartscape" option from the menu. You'll see that Dynatrace has already generated a topology view.
    ![smartscape](/img/explore1.jpg)
-2. By clicking on any of the selected components Dynatrace shows the vertical relationships for that entity.
+2. Click any components in Dynatrace to show the automatically tracked vertical relationships for that entity.
    ![verticalsmartscape](/img/explore2.jpg)
-3. This real-time visibility is great when planning to move an application; All dependencies are clearly visible.
+
+This visibility is unparalled when planning to move applications to another data center or cloud; All dependencies are clearly visible.
 
 ## B) Services View
 
@@ -28,14 +29,16 @@ We'll also share a few highlights of user-configurable options available. (Any c
 
 ### Dynatrace workshops versus real deployment or evaluations
 
-While Dynatrace will immediately evaluate every transaction on deploy, it waits a few hours before generating problem cards.
+While Dynatrace will immediately evaluate every transaction, it builds data and context about the environment for a few hours prior to automatically raising problem cards.
 
 4. To avoid 6 hour workshops, return to the services screen & click the "transactionAPI" service.
 5. In the service, click the more button "...", then "settings".
-6. Select "Anomaly Detection" (under Failure detection).
+6. Select "Anomaly Detection".
    ![service settings](/img/service1.jpg)
 7. Under **failure rate** switch from automatic detection to "Using fixed thresholds" & set a threshold of "5"%.
    ![thresholds](/img/service2.jpg)
+8. Make sure to save!
+   ![save](/img/savebottomleft.jpg)
 
 ## C) Kubernetes View
 
@@ -46,7 +49,9 @@ You'll see a cluster overview, namespaces, workloads, and the option to turn on 
 
 2. Try clicking on the "dbic" namespace on the lower right to see infrastructure metrics.
 
-From here, check out the services detected running in kubernetes and
+3. From here, check out the services running and click ordersAPI.
+
+4. On this page, you can see Dynatrace automatically building visibility up to the services provided & down into the infrastructure.
 
 ## D) Databases View
 
@@ -63,8 +68,9 @@ From here, check out the services detected running in kubernetes and
    ![services](/img/explore9.jpg)
 2. Make sure to save changes!
    ![services](/img/savelogs.jpg)
-3. Select "Logs" on the left menu.
-4. Select from log types, messages, and sources in "available attributes".
+3. **Hang tight for a couple of minutes.**
+4. Select "Logs" on the left menu.
+5. Select from log types, messages, and sources in "available attributes".
    ![services](/img/explore5.jpg)
 
 ## F) Application View
@@ -83,14 +89,17 @@ It's easy to split applications into their own views. It's done by selecting the
 
 ### Feature Highlight: Session Replay
 
-3. Edit the application with the more button "..." top right.
-4. In Capturing -> Async web requests and SPAs, enable both options under "Generic Support".
+1. Return to the main application page.
+2. Edit the application with the more button "..." top right.
+3. In Capturing -> Async web requests and SPAs, enable both options under "Generic Support".
    ![genericsupport](/img/genericsupport.jpg)
-5. Enable Session Replay from the "enablement and cost control" page.
+4. Enable Session Replay from the "enablement and cost control" page (under "General Settings").
    ![sessionplay](/img/sessionreplay.jpg)
-6. (Optional!) In the "Data Privacy" -> "Session Replay" section, select the "Recording" and then "Block List." Do the same for "Playback".
-7. (Optional!) Dynatrace defaults to high security settings. You can unblock all items to see everything in the replay today.
+5. (Optional!) In the "Data Privacy" -> "Session Replay" section, select the "Recording" and then "Block List." Do the same for "Playback".
+6. (Optional!) Dynatrace defaults to high security settings. You can unblock all items to see everything in the replay today.
    ![services](/img/explore8.jpg)
+7. Make sure to save!
+   ![save](/img/savebottomleft.jpg)
 
 :::tip
 Dynatrace offers granular control at the point of capture for security and privacy. Your organization's needs might be open, closed, or a very unique combination. For today's session, it's often more interesting to allow more visibility to see replay capabilities in realtime.

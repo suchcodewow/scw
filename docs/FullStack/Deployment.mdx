@@ -60,21 +60,23 @@ pwsh ./pepper.ps1 -c -n scw-AWSstack
 2. If you don't see the new section below showing Dynatrace running 5/5 pods, select the option to "Show Pods". It might take a few minutes until ready.
 
 ```bash
-Option description                   current
------- -----------                   -------
-     5 dynatrace : Show Pods         5/5 pods READY
-     6 dynatrace : Remove            tenant: kge67267
+NAME                                  READY   STATUS    RESTARTS   AGE
+dynatrace-operator-6dfbfd5768-tqk88   1/1     Running   0          3m2s
+dynatrace-webhook-8954d9c5b-gwrmh     1/1     Running   0          3m2s
+dynatrace-webhook-8954d9c5b-wgnxp     1/1     Running   0          3m2s
+k8sagreeableapple-activegate-0        1/1     Running   0          2m15s
+k8sagreeableapple-oneagent-bw5pm      1/1     Running   0          2m15s
 ```
 
 3. In Dynatrace, you can check on deployment status from the menu. Select "active gates" from the inner menu to confirm Dynatrace is connected.
 
 ## DynaBank
 
-### E) Deploy DynabankInsuracart
+### E) Deploy DynaBankInsuraCart
 
 Pepper is able to deploy any number of applications via a yaml file. This session has one yaml file for Dynabank.
 
-1. In your cloud shell, select the option to `download dempo apps yaml files`.
+1. In Pepper, select the option to `download dempo apps yaml files`.
 2. You'll see a new application deployment option (similar to Dynatrace) for DynabankInsuracart (dbic).
 3. Select the `dbic: Deploy App` option. Deployment will take a few minutes.
 4. Check the status of deployment with the `dbic: Refresh/Show Pods` option.
@@ -96,6 +98,7 @@ To facilitate quick demos when you shop or bank, Dynabank will create an account
 - a Dynacard credit card
 
 You are also added to the administrators group. Access administration from your account button to see transactions as they process.
+![admin](/img/admin.jpg)
 
 ## Section Complete!
 
