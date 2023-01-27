@@ -8,11 +8,16 @@ title: "7) Troubleshoot!"
 - After an hour or so, the support center starts a priority conference call.
 - They report that customers are receiving payment success messages but transactions don't post.
 - Someone suggests that the network must be down. The network team is paged, searches for an hour, and finds no issue.
--
+- The network team suggests last time this happened their might have been a database error.
+- The database team is paged.
+- Hours pass and more teams are called.
 
 ![troubleshoot](/img/troubleshoot1.jpg)
 
 ## Enter Dynatrace
+
+Just kidding. That didn't happen.
+![relief](/img/relief.jpg)
 
 With Dynatrace, any problem in the enterprise affecting users is automatically analyzed and the Davis AI provides root cause.
 
@@ -24,7 +29,7 @@ Dynatrace has a full suite of options to route problem types to an array of emai
 
 2. Click on the "failure rate increase" problem.
 
-You'll see start (and eventually stop time at top) of the problem, user impact analysis, and the root cause of the problem.
+You'll see start and end time of the problem, user impact analysis, and the root cause of the problem.
 
 :::tip
 Incidentally, all of the other context is present to clearly show where the problem **isn't**. By clicking on the "python" box top left, you can jump right into the host and confirm all infrastructure is A-OK.
@@ -34,20 +39,23 @@ Incidentally, all of the other context is present to clearly show where the prob
 
 With Dynatrace, you'll see critical context in black/blue and the reason for the alert in red.
 
-4. Click on Failure rate to see a view of service performance with the problem area highlighted.
+4. Quick aside: Dynatrace shows the python services and databases in blue. Dynatrace automatically checked all of the network traffic and databases on the way to providing you root cause.
+5. Click on Failure rate to see a view of service performance with the problem area highlighted.
 
-5. Click Analyze failure rate degradation to see root-cause error message, faulty service, and automatic integration with relevant logs.
+6. Click Analyze failure rate degradation to see root-cause error message, faulty service, and automatic integration with relevant logs.
    ![troubleshoot](/img/troubleshoot2.jpg)
 
-We can easily see the entire flow from front end users impacting back to exact log error message.
+With Dynatrace you have immediate full visibility front to back.
 
-6. Disable the fraud service. On the end of the base URL, add:
+7. Disable the fraud service. On the end of the base URL, add:
 
 ```bash
 /api/api/features/disable/fraud_service
 ```
 
-7. Review the transactionAPI for decrease in failures. After a few minutes without user users, Dynatrace will automatically close the ticket.
+8. Review the transactionAPI for decrease in failures. After a few minutes without user users, Dynatrace will automatically close the ticket.
+
+## Companies using this today
 
 ![examples](/img/examples.jpg)
 
