@@ -580,17 +580,7 @@ function Set-Provider() {
         }
     }
     $functionProperties = @{provider = $providerSelected.Provider; id = $providerSelected.identifier.tolower(); userid = $providerSelected.userid.tolower() }
-    # Multiuser: User Create
-    if ($config.UserCount) {
-        # Create Users
-        for (($i = 1); $i -le $($config.UserCount); $i++) {
-            $indexExists = $config.Users.GetEnumerator() | Where-object { $_.Value.index -eq $i }
-            if (-not $indexExists) {
-                # Generate a user
-                Set-Prefs -u $(Get-UserName) -k index -v $i
-            } # Move on since user already exists
-        }
-    }
+
     # Reset choices
     # Add option to change destination again
     Add-Choice -k "TARGET" -d "Switch Cloud Provider" -c "$($providerSelected.Provider) $($providerSelected.Name)" -f "Set-Provider" -p $functionProperties
@@ -772,12 +762,12 @@ function Add-AWSEverything() {
         aws iam create-login-profile --user-name $user --password 1Dynatrace#
         aws iam add-user-to-group --group-name Attendees --user-name $user
         # Add components for User
-        aws iam create-role --role-name $awsRoleName --assume-role-policy-document ""$ekspolicy"" --output json | ConvertFrom-Json
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName
-        aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document ""$ec2policy"" --output json | ConvertFrom-Json
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $awsNodeRoleName
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
-        aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
+        # aws iam create-role --role-name $awsRoleName --assume-role-policy-document ""$ekspolicy"" --output json | ConvertFrom-Json
+        # aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName
+        # aws iam create-role --role-name $awsNodeRoleName --assume-role-policy-document ""$ec2policy"" --output json | ConvertFrom-Json
+        # aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy --role-name $awsNodeRoleName
+        # aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly --role-name $awsNodeRoleName
+        # aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
         #Add Cloudformation
 
         # Collect Results

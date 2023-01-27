@@ -18,17 +18,17 @@ If you have used Dynatrace before it might automatically login to other tenants.
    ![url](/img/deploy0.jpg)
 3. Click "Access Tokens" on the left side very near the bottom. (You might have to expand "Manage")
    ![menu](/img/deploy1.jpg)
-4. In the tokens screen, click "Generate New Token" on the right side. Give it a name. It could be "Fullstack Workshop" or "Rick".
+4. In the tokens screen, click "Generate New Token" on the right side. Give it a name. It could be "fullstack workshop" or "rick".
 5. In the "search scopes" box, type "write api tokens", then select the option when it appears below.
    ![API Token](/img/token.jpg)
-6. Click "Generate Token" at the bottom of the screen. Click Copy on the following screen. Make sure to **paste** your token before clicking done.
+6. Click "Generate Token" at the bottom of the screen. Click Copy on the following screen. Make sure to **copy/paste** your token somewhere safe before clicking done.
 7. Click Done.
 
 ### B) Save token in Pepper
 
 1. In your cloud shell, select the menu option to `create dynakube.yaml`.
 2. Paste your tenant into the tenant ID prompt, then paste the token into the follow prompt.
-3. If it works, you'll return to the main menu.
+3. Pepper will confirm a valid connection and save the token.
 4. Press _enter_ to stop Pepper for now.
 
 ### C) Deploy Dynatrace
@@ -41,13 +41,11 @@ Alternatively, open the Manage subheading at the bottom of left menu, then "Depl
 
 2. Pick Kubernetes from the most common deployment options.
    ![kubernetes](/img/deploy2.jpg)
-3. Give it a friendly name like "CloudKubernetes" or "Morty".
+3. Give it a friendly name like "cloudkubernetes" or "morty".
 4. Click "Create token" for Dynatrace Operator & then click "copy" near the bottom.
    ![copybutton](/img/deploy3.jpg)
 
 5. In your cloud shell prompt (not Pepper), paste the contents
-
-   ![Copy Command](/img/commands.jpg)
 
 6. Press _enter_ a couple of times to ensure your cloud provider runs all 4 steps.
 
@@ -70,7 +68,9 @@ Option description                   current
 
 3. In Dynatrace, you can check on deployment status from the menu. Select "active gates" from the inner menu to confirm Dynatrace is connected.
 
-### E) Deploy Dynabank
+## DynaBank
+
+### E) Deploy DynabankInsuracart
 
 Pepper is able to deploy any number of applications via a yaml file. This session has one yaml file for Dynabank.
 
@@ -79,6 +79,7 @@ Pepper is able to deploy any number of applications via a yaml file. This sessio
 3. Select the `dbic: Deploy App` option. Deployment will take a few minutes.
 4. Check the status of deployment with the `dbic: Refresh/Show Pods` option.
 5. When all pods are ready, you can copy the application URL into a new browser.
+   ![browserurl](/img/appurl.jpg)
 
 ### F) Dynabank (Quick) Overview
 
@@ -95,3 +96,9 @@ To facilitate quick demos when you shop or bank, Dynabank will create an account
 - a Dynacard credit card
 
 You are also added to the administrators group. Access administration from your account button to see transactions as they process.
+
+## Section Complete!
+
+Congratulations, you've deployed Dynatrace for end to end observability and a real-world application.
+
+1. Update the Workshop Tracker.

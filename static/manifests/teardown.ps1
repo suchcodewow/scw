@@ -1,3 +1,5 @@
+# ADD LOAD BALANCER REMOVALS
+
 $clusters = aws eks list-clusters --output json --query clusters | ConvertFrom-Json
 write-host "Removing $($clusters.count) clusters"
 $clusters | ForEach-Object -Parallel {

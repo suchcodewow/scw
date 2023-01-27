@@ -64,7 +64,7 @@ const config = {
             label: "Tutorials",
             position: "left",
             items: [
-              { type: "doc", docId: "FullStack/index", label: "Full Stack: Front to Back" },
+              { type: "doc", docId: "fullstack/index", label: "Full Stack: Front to Back" },
               {
                 type: "doc",
                 docId: "intro",

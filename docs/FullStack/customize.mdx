@@ -5,7 +5,7 @@ title: "8) Customization"
 
 ## Easy ways to make Dynatrace your own <3
 
-### A) Service Request Attributes
+## A) Service Request Attributes
 
 1. Click "Settings" under "Manage".
 2. On inner menu, click "request attributes" under "Server-side service monitoring".
@@ -25,9 +25,33 @@ title: "8) Customization"
 
 5. Remember to click "save" in the top right corner.
 
-### B) Application Tags
+## B) Application Tags
 
 4. Click "Frontend" in the menu (under "Applications & Microservices").
 5. Click "my web application", then the "..." button, then "edit".
    ![edit](/img/customize1.jpg)
-6. In the inner menu, select Capturing -> User tag.
+6. In the inner menu, select Capturing -> User tag & specify settings as shown.
+
+| Setting           | Value                               |
+| ----------------- | ----------------------------------- |
+| Source Type       | Server side request attribute       |
+| Request Attribute | DynaUser (or whatever you selected) |
+
+![appuser](/img/appuser.jpg)
+
+7. Make sure to save!
+   ![save](/img/usertagsave.jpg)
+
+   ##
+
+## C) Dashboards
+
+Hopefully you've seen that Dynatrace goes way beyond dashboards by watching every transaction, click, and process for you and simply raising problem cards when negative events occur. But Dynatrace has a full suite of dashboard capabilities built in.
+
+1. Click "Dashboards" on the top left and then select a specific dashboard from the list- or you can choose to make your own.
+
+## Section Complete!
+
+You've successfully see how Dynatrace can be tailored to your specific needs.
+
+1. Update the Workshop Tracker.

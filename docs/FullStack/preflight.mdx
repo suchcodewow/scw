@@ -7,30 +7,43 @@ title: "2) Pre-flight Check"
 
 We'll spin up a Dynatrace tenant and build an application together from scratch. Please keep in mind that this is a "life-fire" exercise. It's instructor led- but can be more like white-water rafting than a museum tour.
 
-### A) Dynatrace tenant setup
+## A) Dynatrace tenant setup
 
 1. Launch the [Dyantrace trial](https://www.dynatrace.com/trial/) page.
 2. Enter an email address and "Start free trial".
 3. Follow the prompts.
 4. Check email (junk/spam folders!) for a "Welcome" message.
 
-### B) Cloud setup
+## B) Cloud setup
 
-1. Dynatrace works across all clouds. Follow the instructor prompts to connect.
-2. Once logged in follow check out the section below matching your provider.
+1. Dynatrace works natively across cloud providers. Follow the instructor prompts to connect to your selected environment.
+2. Once logged in check the section below matching your provider.
 
-#### AWS
+### AWS
 
 1. In the top right bar, confirm the region is Ohio. If not, click the region and select "US EAST (OHIO)"
    ![regionselect](/img/preflight1.jpg)
-2. You have full access to the various features of AWS. You could search for "Elastic Kubernetes Service" or "EC2". Aside from a Cloudformation VPC, you shouldn't see anything today as we'll build it all together.
+2. You have full access to the various features of AWS. You could search for "Elastic Kubernetes Service" or "EC2". Aside from a Cloudformation VPC, everything should be empty as we'll build it all today.
 3. in the top bar, open an AWS cloud shell session by clicking the shell icon.
    ![cloudshell](/img/preflight2.jpg)
 4. If the text is ridiculously tiny, there is a gear icon in the top right you can select to pick something other than "microscopic".
 
-### C) Setup
+### AZURE
 
-We'll use [Pepper](/docs/pepper) today. It's a cloud-agnostic deployment assistant built to help setup applications while providing every step along the way. (No magic whooosh and done!)
+1. Click the shell icon in the top bar of the Azure portal login.
+   ![cloudgoogle](/img/cloudazure.jpg)
+2. The setup steps should automatically connect you to the correct subscription.
+3. A resource group will be created for you during setup steps. You'll have full access to all items in this group.
+
+### GCLOUD
+
+1. In your google cloud console, start a shell from the prompt icon top right.
+   ![cloudgoogle](/img/cloudgoogle.jpg)
+2. You have full access to the **project** in Google Cloud. Ensure you select your designated project during setup steps.
+
+## C) Setup
+
+We'll use [Pepper](/docs/pepper) today. It's a cloud-agnostic deployment assistant built to help setup applications while providing every step along the way. (No magic whooosh then done!)
 
 1. In your cloud shell, download Pepper.
 
@@ -60,3 +73,9 @@ Option description                     current
 :::info
 The first line shows which cloud provider you're using, the space within that cloud, and a unique identifier. If used in a local terminal with multiple available cloud providers, the option to `switch cloud providers` would let you switch between them.
 :::
+
+## Section Complete!
+
+Congratulations, you've built an AWS cluster!
+
+1. Update the Workshop Tracker.
