@@ -545,8 +545,9 @@ function Get-Providers() {
                 if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
                 Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "").ToLower()
             }
+            Send-Update -c "$($accounts.count) " -a -t 1
         }
-        Send-Update -c "$($accounts.count) " -a -t 1
+        
         
     }
     # Done getting options
