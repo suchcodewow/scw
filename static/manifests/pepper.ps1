@@ -1029,13 +1029,6 @@ function Remove-AWSComponents {
     param (
         [string] $userID # override user in multi-deploy scenarios
     )
-    # If userID, switch to Users subkey config
-    # if ($userID) {
-    #     $Params = @{}
-    #     $Params['u'] = $userID
-    #     $conf = $config.Users.$userID 
-    # }
-    # else { $conf = $config }
     $AWSregion = $config.AWSregion
     $AWSclusterRoleArn = $config.AWSclusterRoleArn
     $awsRoleName = $config.AWSroleName
@@ -1068,7 +1061,7 @@ function Remove-AWSComponents {
         Set-Prefs @Params -k "AWSnodeRoleArn"
     }
     if ($AWScfstackArn -and -not $network) {
-        #Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
+        Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
         Do {
             $cfstackExists = Send-Update -e -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $AWSregion --stack-name $AWScfstack --query Stacks[*].StackStatus --output text"
             Send-Update -c $cfstackExists -t 1
