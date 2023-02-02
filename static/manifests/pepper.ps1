@@ -550,8 +550,6 @@ function Get-Providers() {
         
         
     }
-    # Done getting options
-    Send-Update -c "Done!" -type 1
     #Take action based on # of providers
     if ($providerList.count -eq 0) { write-output "`nCouldn't find a valid target cloud environment. `nLogin to Azure (az login), AWS, or GCP (gcloud auth login) and retry.`n"; exit }
     #If there's one default, set it as the current option
