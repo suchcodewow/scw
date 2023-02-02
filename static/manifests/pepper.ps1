@@ -56,6 +56,7 @@ function Send-Update {
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
+    # Do the things for the command line switched selected
     if ($help) { Get-Help }
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
     if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
@@ -64,14 +65,14 @@ function Get-Prefs($scriptPath) {
     if ($azure -eq $true) { $script:useAzure = $true }
     if ($gcp) { $script:useGCP = $true }
     # If no cloud selected, use all
-    if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { write-host "setting all"; $script:useAWS = $true; $script:useAzure = $true; $script:useGCP = $true }
+    if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { $script:useAWS = $true; $script:useAzure = $true; $script:useGCP = $true }
     # Set Script level variables and housekeeping stuffs
     [System.Collections.ArrayList]$script:providerList = @()
     [System.Collections.ArrayList]$script:choices = @()
     $script:currentLogEntry = $null
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml" )
-    #$script:ProgressPreference = "SilentlyContinue"
+    $script:ProgressPreference = "SilentlyContinue"
     if ($scriptPath) {
         $script:logFile = "$($scriptPath).log"
         Send-Update -t 0 -c "Log: $logFile"
@@ -661,7 +662,7 @@ function Add-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
+    Send-Update -s -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
     Get-AKSCluster -g $g -c $c
     Add-AzureSteps
     Add-CommonSteps
@@ -1211,8 +1212,9 @@ function Get-PodReadyCount {
     param(
         [string] $namespace # namespace to count pods
     )
-    $totalPods = (kubectl get pods -n $namespace  -ojson | Convertfrom-Json).items.count
-    $runningPods = (kubectl get pods -n $namespace --field-selector status.phase=Running -ojson | Convertfrom-Json).items.count
+    $allPods = kubectl get pods -n $namespace  -ojson | Convertfrom-Json
+    $totalPods = $allPods.items.count
+    $runningPods = ($allPods.items.status.containerStatuses.ready | Where-Object { $_ -eq "True" }).count
     return "$runningPods/$totalPods pods READY"
 }
 function Remove-NameSpace {
@@ -1461,7 +1463,12 @@ function Get-AppUrls {
         if ($service.status.loadBalancer.ingress.count -gt 0) {
             if (-not $returnList) { $returnList = "URLS:" }
             # Azure was using IP address.  Switched to hostname for default AWS
-            $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
+            if ($service.status.loadBalancer.ingress[0].hostname) {
+                $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
+            }
+            if ($service.status.loadBalancer.ingress[0].ip) {
+                $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
+            }
         }
     }
     #Return list
