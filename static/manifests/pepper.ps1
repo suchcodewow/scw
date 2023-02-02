@@ -599,7 +599,7 @@ function Set-Provider() {
         }
         "GCP" { 
             # set the GCP Project
-            Send-Update -OutputSuppression -t 1 -c "GCP: Set Project" -r "gcloud config set account '$($providerSelected.identifier)'"
+            Send-Update -OutputSuppression -t 1 -c "GCP: Set Project" -r "gcloud config set account '$($providerSelected.identifier)' --no-user-output-enabled"
             Add-GCPSteps 
         }
     }
