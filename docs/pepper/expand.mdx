@@ -1,0 +1,14 @@
+---
+sidebar_position: 3
+pagination_prev:
+pagination_next:
+title: Adding a new app
+---
+
+Pepper is designed to support multiple applications. By telling where to find new yaml files, it will offer to download, configure, and install them. This is generally intended to be done in conjunction with the maintainers of Pepper, could be easily adjusted to your needs with a fork or clone.
+
+Key considerations:
+
+- Add new deployments to the `yamlList` array of the `Get-Prefs` function.
+- The name of the yaml file (before .yaml) will be the namespace Pepper checks (i.e. Pepper will check for the dbic namespace for dbic.yaml)
+- If your yaml will want to access the Dynatrace tenant, you can specify `<dynatraceURL>` and `<dynatraceToken>` in your yaml file. Pepper collects and confirms these both work prior to allowing downloads & will automatically update these for you.

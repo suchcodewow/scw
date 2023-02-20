@@ -71,7 +71,8 @@ function Get-Prefs($scriptPath) {
     [System.Collections.ArrayList]$script:choices = @()
     $script:currentLogEntry = $null
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
-    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml" )
+    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml",
+        "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos.yaml" )
     $script:ProgressPreference = "SilentlyContinue"
     if ($scriptPath) {
         $script:logFile = "$($scriptPath).log"
@@ -1226,21 +1227,25 @@ function Set-DTConfig() {
         While (-not $cleantenantID) {
             $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel: "
             if (-not $tenantID) {
-                Set-Prefs -k tenantID
-                Set-Prefs -k writeToken
-                Set-Prefs -k k8stoken
-                Add-CommonSteps
+                # Set-Prefs -k tenantID
+                # Set-Prefs -k writeToken
+                # Set-Prefs -k k8stoken
+                # Add-CommonSteps
                 return
             }
             if ($Matches) { Clear-Variable Matches }
             $tenantID -match '\w{8}' | Out-Null
-            if ($Matches) {
-                $cleanTenantID = $Matches[0]
-                
-            }
-            else {
-                write-host "Tenant ID should be at least 8 alphanumeric characters."
-            }
+            if ($Matches) { $cleanTenantID = $Matches[0] }
+            else { write-host "Tenant ID should be at least 8 alphanumeric characters." }
+        }
+        # Add support for sprint tenants
+        if ($tenantID -like "*sprint*") {
+            # Sprint tenant
+            $tenantURL = "$cleanTenantID.sprint.dynatracelabs.com"
+        }
+        else {
+            # Assumne live tenant
+            $tenantURL = "$cleanTenantID.live.dynatrace.com"
         }
         # Get Token
         While (-not $cleanToken) {
@@ -1265,13 +1270,13 @@ function Set-DTConfig() {
             Authorization  = "Api-Token $token"
         }
         $data = @{
-            scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload")
+            scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload", "logs.ingest")
             name                = "SCW Token"
             personalAccessToken = $false
         }
         $body = $data | ConvertTo-Json
         Try {
-            $response = Invoke-RestMethod -Method Post -Uri "https://$cleanTenantID.live.dynatrace.com/api/v2/apiTokens" -Headers $headers -Body $body
+            $response = Invoke-RestMethod -Method Post -Uri "https://$tenantURL/api/v2/apiTokens" -Headers $headers -Body $body
         }
         Catch {
             # The noise, ma'am.  Suppress the noise.
@@ -1282,14 +1287,14 @@ function Set-DTConfig() {
             # API Token has to be base64. #PropsDaveThomas<3
             $k8stoken = $response.token
             $base64Token = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($k8stoken))
-            Set-Prefs -k tenantID -v $cleanTenantID
+            Set-Prefs -k tenantID -v $tenantURL
             Set-Prefs -k writeToken -v $token
             Set-Prefs -k k8stoken -v $k8stoken
             Set-Prefs -k base64Token -v $base64Token
-            Add-DynakubeYaml -t $base64Token -u "https://$cleanTenantID.live.dynatrace.com/api" -c "k8s$($choices.callProperties.userid)"
+            Add-DynakubeYaml -t $base64Token -u "https://$tenantURL/api" -c "k8s$($choices.callProperties.userid)"
         }
         else {
-            write-host "Failed to connect to $cleanTenantID"
+            write-host "Failed to connect to $tenantURL"
             Clear-Variable cleanTenantID
             Clear-Variable cleanToken
             Set-Prefs -k tenantID
@@ -1374,73 +1379,134 @@ function Add-Dynatrace {
     Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
     Add-CommonSteps
 }
+function Get-DTconnected {
+    # Check if Dynatrace token and url are valid
+    if ($config.tenantID -AND $config.k8stoken) {
+        $url = $config.tenantID
+        $token = $config.k8stoken
+        $headers = @{
+            accept         = "application/json; charset=utf-8"
+            "Content-Type" = "application/json; charset=utf-8"
+            Authorization  = "Api-Token $token"
+        }
+        # $data = @{
+        #     scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload")
+        #     name                = "SCW Token"
+        #     personalAccessToken = $false
+        # }
+        $body = $data | ConvertTo-Json
+        Try {
+            $response = Invoke-RestMethod -Method Get -Uri "https://$url/api/v1/config/clusterversion" -Headers $headers -Body $body
+        }
+        Catch {
+            # The noise, ma'am.  Suppress the noise.
+            write-host "Error Code: " $_.Exception.Response.StatusCode.value__
+            Write-Host "Description:" $_.Exception.Response.StatusDescription
+        }
+        if ($response.version) {
+            return $true
+        }
+        else {
+            # We had a token but it didn't work.  Let calling function clean up.
+            return $false
+        }
+        
+    }
+    else {
+        return $false
+    }
+}
 
 # Application Functions
 function Add-CommonSteps() {
     # Get namespaces so we know what's installed or not
     $existingNamespaces = (kubectl get ns -o json 2>$null | Convertfrom-Json).items.metadata.name
-    # Option to download yaml files with current status
-    [System.Collections.ArrayList]$yamlReady = @()
-    foreach ($yaml in $yamlList) {
-        [uri]$uri = $yaml
-        $yamlName = $uri.Segments[-1]
-        $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
-        if (test-path $yamlName) {
-            $newYaml = New-Object PSCustomObject -Property @{
-                Option    = $yamlReady.count + 1
-                name      = $yamlName
-                namespace = $yamlNameSpace
-            }
-            [void]$yamlReady.add($newYaml)
+    # Check for valid Dynatrace connection
+    $DTconnected = Get-DTconnected
+    if ($DTconnected) {
+        # Determine appropriate Dynatrace option
+        if ($existingNamespaces.contains("dynatrace")) {
+            #1 Dynatrace installed.  Add status and removal options
+            Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+            Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
         }
-    }
-    if ($yamlReady.count -eq 0) {
-        $downloadType = "<not done>"
-    }
-    else {
-        $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
-    }
-    Add-Choice -k "DLAPPS" -d "Download demo apps yaml files" -f Get-Apps -c $downloadType
-    # Determine appropriate Dynatrace option
-    if ($existingNamespaces.contains("dynatrace")) {
-        #1 Dynatrace installed.  Add status and removal options
-        Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
-        Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "tenant: $($config.tenantID)"
-    }
-    elseif (test-path dynakube.yaml) {
-        #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
-        $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
-        # Dynakube file found. Provide install option
-        Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "YAML Date: $fileTimeStamp" -function Add-Dynatrace
-    }
-    else {
-        #3 Nothing done for dynatrace yet.  Add option to download YAML
-        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
-    }
-    # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
-    foreach ($app in $yamlReady) {
-        # check if this app is deployed. Use name of yaml file as namespace (dbic.yaml should have dbic namespace)
-        $ns = $app.namespace
-        if ($existingNamespaces.contains($ns)) {
-            # Namespace exists- add status option
-            Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
-            # add restart option
-            Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -c  $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
-            # add remove option
-            Add-Choice -k "DEL$ns" -d "$ns : Remove Pods"  -f "Remove-NameSpace -n $ns"
+        elseif (test-path dynakube.yaml) {
+            #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
+            # $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
+            # Dynakube file found. Provide install option
+            Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "Target DT tenant: $($config.tenantID)" -function Add-Dynatrace
         }
         else {
-            # Yaml is available but not yet applied.  Add option to apply it
-            Add-Choice -k "INST$ns" -d "$ns : Deploy App" -f "Add-App -y $($app.name) -n $ns"        
+            #3 Nothing done for dynatrace yet.  Add option to download YAML
+            Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
+        }
+    }
+    else {
+        # Make sure all Dynatrace dependent items clear
+        if ($existingNamespaces.contains("dynatrace")) {
+            Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
+        }
+        # Yaml files depend on URLs/tokens, remove them
+        foreach ($yaml in $yamlList) {
+            [uri]$uri = $yaml
+            $yamlName = $uri.Segments[-1]
+            if (test-path $yamlName) { remove-item $yamlName }
+        }
+        if (test-path dynakube.yaml) { Remove-item dynakube.yaml }
+        # Add first Dynatrace option
+        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
+    }
+    # If Dynatrace is running, we're able to download yaml and adjust as needed
+    if ($DTconnected -and $existingNamespaces.contains("dynatrace")) {
+        [System.Collections.ArrayList]$yamlReady = @()
+        foreach ($yaml in $yamlList) {
+            [uri]$uri = $yaml
+            $yamlName = $uri.Segments[-1]
+            $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
+            if (test-path $yamlName) {
+                $newYaml = New-Object PSCustomObject -Property @{
+                    Option    = $yamlReady.count + 1
+                    name      = $yamlName
+                    namespace = $yamlNameSpace
+                }
+                [void]$yamlReady.add($newYaml)
+            }
+        }
+        if ($yamlReady.count -eq 0) {
+            $downloadType = "<not done>"
+        }
+        else {
+            $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
+        }
+        Add-Choice -k "DLAPPS" -d "Download demo apps yaml files" -f Get-Apps -c $downloadType
+        # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
+        foreach ($app in $yamlReady) {
+            # check if this app is deployed. Use name of yaml file as namespace (dbic.yaml should have dbic namespace)
+            $ns = $app.namespace
+            if ($existingNamespaces.contains($ns)) {
+                # Namespace exists- add status option
+                Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
+                # add restart option
+                Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -c  $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
+                # add remove option
+                Add-Choice -k "DEL$ns" -d "$ns : Remove Pods"  -f "Remove-NameSpace -n $ns"
+            }
+            else {
+                # Yaml is available but not yet applied.  Add option to apply it
+                Add-Choice -k "INST$ns" -d "$ns : Deploy App" -f "Add-App -y $($app.name) -n $ns"        
+            }
         }
     }
 }
 function Get-Apps() {
     foreach ($yaml in $yamlList) {
         [uri]$uri = $yaml
-        #$yamlName = $uri.Segments[-1]
+        $yamlName = $uri.Segments[-1]
         #$yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
-        Invoke-WebRequest -Uri $uri.OriginalString -OutFile $uri.Segments[-1] | Out-Host
+        Invoke-WebRequest -Uri $uri.OriginalString -OutFile $yamlName | Out-Host
+        ((Get-Content -path $yamlName -Raw) -replace '<dynatraceURL>', $config.tenantID) | Set-Content -Path $yamlName
+        ((Get-Content -path $yamlName -Raw) -replace '<dynatraceToken>', $config.k8stoken) | Set-Content -Path $yamlName
+
     }
     Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
