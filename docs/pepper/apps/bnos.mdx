@@ -1,0 +1,52 @@
+---
+sidebar_position: 2
+pagination_prev:
+pagination_next:
+title: "Bobbleneers"
+---
+
+The Bobbleneers demo generates logs for a ficticious online store selling Bobbleheads. To meet the demands of ultra-fast shipping, the company has just unveiled "LightningBobble" shipping. They are guaranteeing delivery to your door in a flash... but everything isn't working out as planned....
+
+Each log has an `event` timestamp of when events occur & a matching orderid.
+
+The logs include:
+
+- Order Service: customer & bobblehead ordered
+- Distribution Service: warehouse that received the order for shipping. Now powered by LightningBobble!
+- Shipping Service: each warehouse records when orders are shipped and delivered.
+- Review Service: each customer leaves a rating from 1 to 5 stars & review of their experience.
+
+## Bobbleneers and Dynatrace
+
+Bobbleneers built and deployed LightningBobble (tm) to provide ultra-fast shipping of their high quality bobble heads. To encourage use of the service, Bobbleneers is offering a money-back guarantee on fast shipping. Following implementation, Bobbleneers expected record profits and consistently positive feedback- but instead get many shipping refund requests for slow delivery. Even worse, negative reviews are starting to impact new sales.
+
+Bobbleneers implemented Dynatrace on their Ordering system. Dynatrace clearly showed that the Order UI is working perfectly and all orders are submitted successfully.
+
+With the power of logs on Grail, Bobbleneers intends to gain visibility into their shipping workflow, fix the problem, and restore Bobbleneers' public image.
+
+## Use Case 1
+
+Since all orders are picked up for distribution, Bobbleneer support focuses on shipping and delivery. They combine those log events to find where shipments are slow.
+
+```bash
+fetch logs, from: -60m
+| filter servicename == "shipping"
+| fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
+| fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
+| summarize shipTime = first(shipTime), deliverTime= first(deliverTime), by: orderid
+| fieldsAdd transitTime = (deliverTime-shipTime)/(1000000000.0)/60/60
+```
+
+But all shipments are delivered very quickly. Bobbleneers sets up an ongoing Grail search to keep an eye on each distribution center.
+
+```bash
+fetch logs, from: -2m
+| filter servicename == "shipping"
+| fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
+| fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
+| summarize shipTime = first(shipTime), deliverTime= first(deliverTime), warehouse = first(warehouse), by: orderid
+| fieldsAdd transitTime = toLong((deliverTime-shipTime)/(1000000000.0)/60/60)
+| summarize DeliveryTime = round(avg(transitTime),decimals:1), by: warehouse
+```
+
+### Find the average
