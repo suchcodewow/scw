@@ -5,15 +5,34 @@ pagination_next:
 title: "Bobbleneers"
 ---
 
-The Bobbleneers demo generates logs for a ficticious online store selling Bobbleheads. To meet the modern demands of ultra-fast shipping, the company has developed and unveiled "LightningBobble" replacing their old weekly batch shipment system. They are guaranteeing delivery to your door in a flash... but everything isn't working out as planned....
+:::info tl;dr
 
-## Bobbleneers and Dynatrace
+- Bobbleneers is THE premier website to buy bobbleheads of famous Dynatrace Solutions Engineers
+- They replaced aging batch warehouse distribution system with LightningBobble(tm) for ultra-fast delivery
+- Negative reviews for slow shipping starting to impact new sales
+- Support is getting pressure to find answers fast
+- Pulling together logs from various services is manual process  
+  [->](/docs/pepper/apps/bnos#services-involved)
+
+:::
+
+## Case Study
+
+Bobbleneers is THE premier online hotspot to buy bobbleheads of famous Dynatrace Solutions Engineers.
+
+They report excellent earnings every year thanks to constant innovation and maintaining high production standards.
+
+This year, Bobbleneers leadership decided to improve their aging shipment service. To meet the modern demands of ultra-fast shipping, the company has developed and **unveiled "LightningBobble" replacing their old weekly batch shipment system**.
+
+They are guaranteeing delivery to your door in a flash... but **everything isn't working out as planned**....
 
 ![bobblerick](/img/bobblerick.jpg)
 
+## Bobbleneers and Dynatrace
+
 Bobbleneers built and deployed LightningBobble (tm) to provide ultra-fast shipping of their high quality bobble heads. To encourage use of the service, Bobbleneers offers money-back guarantees on shipping.
 
-Following implementation, Bobbleneers expected record profits and consistently positive feedback- but instead get many shipping refund requests for slow delivery. Even worse, negative reviews impact new sales.
+Following implementation, Bobbleneers expected record profits and consistently positive feedback- **but instead get many shipping refund requests for slow delivery**. Even worse, **negative reviews impact new sales**.
 
 To make things even more infuriating, the team must wait 2 weeks for reviews and manually lookup orders. It seems like there is a big spike of bad reviews for orders placed midweek, but the team isn't sure they have enough data to confirm.
 
@@ -21,13 +40,26 @@ Knowing their software system must work well, Bobbleneers implemented Dynatrace 
 
 With the power of logs on Grail, Bobbleneers intends to gain visibility into their shipping workflow, fix the problem, and restore Bobbleneers' public image.
 
-### Service Diagram
+### Services involved
 
 ![svc](/img/bobbleneers.png)
 
-## Use Case 1: Shipping/Delivery
+## Scenario 1
 
-Since all orders are picked up for distribution, Bobbleneer support focused on shipping and delivery. With Grail they can combine these log events and easily calcuate shipping times.
+### Shipment to Delivery
+
+:::info tl;dr
+
+- Bobbleneers support started with the delivery process.
+- They used Grail to quickly pull disparate shipping and delivery logs together into usable data.
+- Then used the data to calculate transit times from separate shipping and delivery logs.
+- But... once on delivery trucks, shipments were great. The delivery team was going an awesome job.
+- There's more work to do. But the team starts building a dashboard to always have these new insights available.  
+  [->](/docs/pepper/apps/bnos#scenario-2)
+
+:::
+
+Since all orders are picked up for distribution, Bobbleneer support started with shipping and delivery. **With Grail they combined logs to easily calculate shipping times**.
 
 ```bash
 fetch logs, from: -60m
@@ -36,9 +68,16 @@ fetch logs, from: -60m
 | fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
 | summarize shipTime = first(shipTime), deliverTime= first(deliverTime), by: orderid
 | fieldsAdd transitTime = (deliverTime-shipTime)/(1000000000.0)/60/60
+| fields orderid, shipTime, deliverTime, transitTime
 ```
 
-But this shows all shipments are delivered very quickly. Bobbleneers set up a query to keep an eye on shipping from each distribution center.
+Nearly all orders are taking less than 24 hours. Shipment managers are doing a great job.
+
+![shipments](/img/transit.jpg)
+
+### Shipment times by warehouse
+
+Discovering the value of combining data this way, the Bobbleneer team saves a rolling weekly view to a dashboard.
 
 ```bash
 fetch logs, from: -60m
@@ -48,17 +87,30 @@ fetch logs, from: -60m
 | summarize shipTime = first(shipTime), deliverTime= first(deliverTime), warehouse = first(warehouse), by: orderid
 | fieldsAdd transitTime = toLong((deliverTime-shipTime)/(1000000000.0)/60/60)
 | summarize DeliveryTime = round(avg(transitTime),decimals:1), shipments = count(), by: warehouse
+| fields warehouse, DeliveryTime, shipments
 ```
 
-## Use Case 2: Full Observability
+![weekly](/img/weeklywarehouse.jpg)
 
-Realizing it's not a simple logistics problem, the Bobbleneers support team worked with the development team to track the entire order business process.
+## Scenario 2
 
-They expanded visibility to include:
+:::info tl;dr
 
-- entire process time from customer perspective
-- ratings from customers
-- split by warehouse
+- With pressure mounting, the support team capitalized on Grail's ability to process enormous unindexed datasets.
+- They calculated each step of the process from logs across each service and easily split the result by warehouse.
+- They were even able to incorporate reviews from the business success team's system into the same view.
+- With Grail, the problem area surfaced immediately and was confirmed by related low ratings.  
+  [->](/docs/pepper/apps/bnos#scenario-3)
+
+:::
+
+### Full Process Observability
+
+Realizing it's not a simple logistics problem, the Bobbleneers support team worked with developers to **track the entire business process**. They expanded visibility to include:
+
+- start to finish timeframe from customer perspective
+- customer ratings provided by the business success team
+- continued warehouse visibility
 
 ```bash
 fetch logs, from: -60m
@@ -74,23 +126,77 @@ fetch logs, from: -60m
 | fieldsAdd distributionTime = toLong((shipTime-orderTime)/(1000000000.0)/60/60)
 | fieldsAdd transitTime = toLong((deliverTime-shipTime)/(1000000000.0)/60/60)
 // Combine data by warehouse and calculate averages
-| summarize shipHours = round(avg(transitTime),decimals:1),rating = round(avg(rating),decimals:1),totalHours = round(avg(totalTime)),distHours = round(avg(distributionTime)),  by: warehouse
+| summarize shipHours = round(avg(transitTime)),rating = round(avg(rating)),totalHours = round(avg(totalTime)),distHours = round(avg(distributionTime)),  by: warehouse
 // Organize fields logically
-| fields warehouse, distHours, shipHours,totalHours, rating
+| fields warehouse, totalHours,distHours, shipHours, rating
 ```
 
-They immediately discovered anything shipping from Nevada had terrible processing times! It's confirmed with the review averages when products ship from there.
+The results provided by Grail were instant:
+
+- Anything shipped from **Nevada had terrible processing times**! _red box_
+- The **ratings confirm** Nevada distribution is the problem source. _yellow box_
+
+![nevada](/img/nevadaratings.jpg)
 
 But why? LightningBobble triggers on every order & the team knows every order is sent. There must be a distribution issue specifically in the Nevada warehouse.
 
-## Use Case 3: Root Cause
+## Scenario 3
 
-Armed with the knowledge they are looking for:
+:::info tl;dr
+
+- Armed with the knowledge they need to focus on the distribution service and only for Nevada shipments, the team can get a few order examples.
+- With the examples in hand, they can use an adhoc Grail search to easily "trace" every instance of that order id across all systems.
+
+:::
+
+### Zeroing in
+
+Finally, the team combined what they learned to find bad orders coming out of Nevada.
+
+```bash
+fetch logs, from: -5d
+| filter company == "Bobbleneers"
+| fieldsAdd dayofWeek = formatTimestamp(toTimestamp(event), format: "E")
+| summarize dayofWeek=first(dayofWeek), warehouse = first(warehouse), rating = first(rating), by: orderid
+| filter rating == "1" and warehouse == "Nevada" and dayofWeek == "Tue"
+| limit 5
+```
+
+### _shocked realization_
+
+They traced an order.
+
+```bash
+fetch logs, from: -5d
+| filter company == "Bobbleneers" and orderid == "012a1fbe-381f-442c-b658-9ac2dcc244ea"
+| fields orderid,servicename, rating, review,status,content,loglevel
+```
+
+Root cause is immediately obvious!
+
+- The new **BobbleLightning service fails with a "ZipCode required" error**! (red box)
+- Not only that, but **no one turned off the old batch order distribution system**. It only runs on Monday night but eventually picked up the failed orders and sent them to shipping.
+
+![rootcause](/img/bobblerootcause.jpg)
+
+Once developers saw the issue, they quickly updated BobbleLightning to version 1.3 in Nevada. Then the support team retired the batch system.
+
+## Getting Proactive
+
+The Bobbleneers team saved the day with Grail. But they wanted to make sure to have great visibility going forward.
+
+Building on their dashboard widget for shipping, the team added a query to watch
+
+## Bonus scenarios
+
+### Confirm mid-week spikes
+
+Armed with the knowledge that they need to focus on:
 
 - orders with bad reviews
-- shipping out of Nevada
+- orders shipped from Nevada warehouse
 
-the team used Grail to confirm that bad reviews are worse mid-week.
+the team used Grail to confirm bad reviews spike up mid-week.
 
 ```bash
 fetch logs, from: -1d
