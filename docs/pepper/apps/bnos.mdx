@@ -5,28 +5,29 @@ pagination_next:
 title: "Bobbleneers"
 ---
 
-The Bobbleneers demo generates logs for a ficticious online store selling Bobbleheads. To meet the demands of ultra-fast shipping, the company has just unveiled "LightningBobble" shipping. They are guaranteeing delivery to your door in a flash... but everything isn't working out as planned....
-
-Each log has an `event` timestamp of when events occur & a matching orderid.
-
-The logs include:
-
-- Order Service: customer & bobblehead ordered
-- Distribution Service: warehouse that received the order for shipping. Now powered by LightningBobble!
-- Shipping Service: each warehouse records when orders are shipped and delivered.
-- Review Service: each customer leaves a rating from 1 to 5 stars & review of their experience.
+The Bobbleneers demo generates logs for a ficticious online store selling Bobbleheads. To meet the modern demands of ultra-fast shipping, the company has developed and unveiled "LightningBobble" replacing their old weekly batch shipment system. They are guaranteeing delivery to your door in a flash... but everything isn't working out as planned....
 
 ## Bobbleneers and Dynatrace
 
-Bobbleneers built and deployed LightningBobble (tm) to provide ultra-fast shipping of their high quality bobble heads. To encourage use of the service, Bobbleneers is offering a money-back guarantee on fast shipping. Following implementation, Bobbleneers expected record profits and consistently positive feedback- but instead get many shipping refund requests for slow delivery. Even worse, negative reviews are starting to impact new sales.
+![bobblerick](/img/bobblerick.jpg)
 
-Bobbleneers implemented Dynatrace on their Ordering system. Dynatrace clearly showed that the Order UI is working perfectly and all orders are submitted successfully.
+Bobbleneers built and deployed LightningBobble (tm) to provide ultra-fast shipping of their high quality bobble heads. To encourage use of the service, Bobbleneers offers money-back guarantees on shipping.
+
+Following implementation, Bobbleneers expected record profits and consistently positive feedback- but instead get many shipping refund requests for slow delivery. Even worse, negative reviews impact new sales.
+
+To make things even more infuriating, the team must wait 2 weeks for reviews and manually lookup orders. It seems like there is a big spike of bad reviews for orders placed midweek, but the team isn't sure they have enough data to confirm.
+
+Knowing their software system must work well, Bobbleneers implemented Dynatrace on their Ordering system. Dynatrace quickly and clearly showed that the Order UI is working perfectly and all orders are submitted successfully.
 
 With the power of logs on Grail, Bobbleneers intends to gain visibility into their shipping workflow, fix the problem, and restore Bobbleneers' public image.
 
-## Use Case 1
+### Service Diagram
 
-Since all orders are picked up for distribution, Bobbleneer support focuses on shipping and delivery. They combine those log events to find where shipments are slow.
+![svc](/img/bobbleneers.png)
+
+## Use Case 1: Shipping/Delivery
+
+Since all orders are picked up for distribution, Bobbleneer support focused on shipping and delivery. With Grail they can combine these log events and easily calcuate shipping times.
 
 ```bash
 fetch logs, from: -60m
@@ -37,16 +38,66 @@ fetch logs, from: -60m
 | fieldsAdd transitTime = (deliverTime-shipTime)/(1000000000.0)/60/60
 ```
 
-But all shipments are delivered very quickly. Bobbleneers sets up an ongoing Grail search to keep an eye on each distribution center.
+But this shows all shipments are delivered very quickly. Bobbleneers set up a query to keep an eye on shipping from each distribution center.
 
 ```bash
-fetch logs, from: -2m
+fetch logs, from: -60m
 | filter servicename == "shipping"
 | fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
 | fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
 | summarize shipTime = first(shipTime), deliverTime= first(deliverTime), warehouse = first(warehouse), by: orderid
 | fieldsAdd transitTime = toLong((deliverTime-shipTime)/(1000000000.0)/60/60)
-| summarize DeliveryTime = round(avg(transitTime),decimals:1), by: warehouse
+| summarize DeliveryTime = round(avg(transitTime),decimals:1), shipments = count(), by: warehouse
 ```
 
-### Find the average
+## Use Case 2: Full Observability
+
+Realizing it's not a simple logistics problem, the Bobbleneers support team worked with the development team to track the entire order business process.
+
+They expanded visibility to include:
+
+- entire process time from customer perspective
+- ratings from customers
+- split by warehouse
+
+```bash
+fetch logs, from: -60m
+| filter company == "Bobbleneers"
+// Pull out event times for key services
+| fieldsAdd orderTime = if(serviceevent =="orderreceived", toTimestamp(event))
+| fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
+| fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
+// Combine different logs into single records
+| summarize rating = toLong(first(rating)),orderTime = first(orderTime), shipTime = first(shipTime), deliverTime= first(deliverTime), warehouse = first(warehouse), by: orderid
+// Calculate timeframes in hours for each step of process
+| fieldsAdd totalTime = toLong((deliverTime-orderTime)/(1000000000.0)/60/60)
+| fieldsAdd distributionTime = toLong((shipTime-orderTime)/(1000000000.0)/60/60)
+| fieldsAdd transitTime = toLong((deliverTime-shipTime)/(1000000000.0)/60/60)
+// Combine data by warehouse and calculate averages
+| summarize shipHours = round(avg(transitTime),decimals:1),rating = round(avg(rating),decimals:1),totalHours = round(avg(totalTime)),distHours = round(avg(distributionTime)),  by: warehouse
+// Organize fields logically
+| fields warehouse, distHours, shipHours,totalHours, rating
+```
+
+They immediately discovered anything shipping from Nevada had terrible processing times! It's confirmed with the review averages when products ship from there.
+
+But why? LightningBobble triggers on every order & the team knows every order is sent. There must be a distribution issue specifically in the Nevada warehouse.
+
+## Use Case 3: Root Cause
+
+Armed with the knowledge they are looking for:
+
+- orders with bad reviews
+- shipping out of Nevada
+
+the team used Grail to confirm that bad reviews are worse mid-week.
+
+```bash
+fetch logs, from: -1d
+| filter company == "Bobbleneers" and serviceevent == "reviewreceived" and rating == "1"
+| fieldsAdd dayofWeek = formatTimestamp(toTimestamp(event), format: "E")
+| summarize BadReviews = count(), by:dayofWeek
+| sort BadReviews desc
+```
+
+![reviews](/img/reviewsbyday.jpg)
