@@ -169,7 +169,7 @@ They traced an order.
 ```bash
 fetch logs, from: -5d
 | filter company == "Bobbleneers" and orderid == "012a1fbe-381f-442c-b658-9ac2dcc244ea"
-| fields orderid,servicename, rating, review,status,content,loglevel
+| fields servicename, rating, review,status,content,serviceversion
 ```
 
 Root cause is immediately obvious!
