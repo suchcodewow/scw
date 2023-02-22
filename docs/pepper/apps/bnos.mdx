@@ -16,6 +16,10 @@ title: "Bobbleneers - Team 9"
 
 :::
 
+### Pepper
+
+[Pepper](/docs/pepper) is a great way to deploy this application on a kubernetes cluster in the cloud of your choice.
+
 ## Case Study
 
 Bobbleneers is THE premier online hotspot to buy bobbleheads of famous Dynatrace Solutions Engineers.
@@ -208,3 +212,28 @@ fetch logs, from: -1d
 ```
 
 ![reviews](/img/reviewsbyday.jpg)
+
+## Deployment
+
+[Pepper](/docs/pepper) is a great way to deploy this application on a kubernetes cluster in the cloud of your choice.
+
+It can be done manually with the yaml file below.
+
+Download the yaml.
+
+```bash
+curl https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml > ~/dbic.yaml
+```
+
+Edit the yaml file and replace:
+
+- <tenantURL> with your tenant link i.e. `123abcd.live.dynatrace.com`
+- <tenantToken> with a token that has the  `logs.ingest` permissions
+
+Apply.
+
+```bash
+kubectl apply -f ~/dbic.yaml
+```
+
+Once deployed, the load generator will immediately start creating traffic. On default cloud kubernetes installations, you can login to the application as well.
