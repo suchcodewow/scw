@@ -2,7 +2,7 @@
 sidebar_position: 2
 pagination_prev:
 pagination_next:
-title: "Bobbleneers - Team 9"
+title: "Bobbleneers"
 ---
 
 :::info tl;dr
@@ -66,7 +66,7 @@ With the power of logs on Grail, Bobbleneers intends to gain visibility into the
 
 Since all orders are picked up for distribution, Bobbleneer support started with shipping and delivery. **With Grail they combined logs to easily calculate shipping times**.
 
-```bash
+```js
 fetch logs, from: -60m
 | filter servicename == "shipping"
 | fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
@@ -84,7 +84,7 @@ Nearly all orders are taking less than 24 hours. Shipment managers are doing a g
 
 Discovering the value of combining data this way, the Bobbleneer team saves a rolling weekly view to a dashboard.
 
-```bash
+```js
 fetch logs, from: -60m
 | filter servicename == "shipping"
 | fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
@@ -117,7 +117,7 @@ Realizing it's not a simple logistics problem, the Bobbleneers support team work
 - customer ratings provided by the business success team
 - continued warehouse visibility
 
-```bash
+```js
 fetch logs, from: -60m
 | filter company == "Bobbleneers"
 // Pull out event times for key services
@@ -158,7 +158,7 @@ But why? LightningBobble triggers on every order & the team knows every order is
 
 Finally, the team combined what they learned to find bad orders coming out of Nevada.
 
-```bash
+```js
 fetch logs, from: -5d
 | filter company == "Bobbleneers"
 | fieldsAdd dayofWeek = formatTimestamp(toTimestamp(event), format: "E")
@@ -171,7 +171,7 @@ fetch logs, from: -5d
 
 They traced an order.
 
-```bash
+```js
 fetch logs, from: -5d
 | filter company == "Bobbleneers" and orderid == "012a1fbe-381f-442c-b658-9ac2dcc244ea"
 | fields servicename, rating, review,status,content,serviceversion
@@ -203,7 +203,7 @@ Armed with the knowledge that they need to focus on:
 
 the team used Grail to confirm bad reviews spike up mid-week.
 
-```bash
+```js
 fetch logs, from: -1d
 | filter company == "Bobbleneers" and serviceevent == "reviewreceived" and rating == "1"
 | fieldsAdd dayofWeek = formatTimestamp(toTimestamp(event), format: "E")
@@ -227,8 +227,8 @@ curl https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml > 
 
 Edit the yaml file and replace (remove brackets too):
 
-- tenantURL with your tenant link i.e. `123abcd.live.dynatrace.com`
-- tenantToken with a token that has the `logs.ingest` permissions
+- `<tenantURL>` with your tenant link i.e. `123abcd.live.dynatrace.com`
+- `<tenantToken>` with a token that has the `logs.ingest` permissions
 
 Apply.
 
