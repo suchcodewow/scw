@@ -66,7 +66,7 @@ fetch logs, from: -60m
 | filter servicename == "shipping"
 | fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
 | fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
-| summarize shipTime = first(shipTime), deliverTime= first(deliverTime), by: orderid
+| summarize shipTime = takeFirst(shipTime), deliverTime= takeFirst(deliverTime), by: orderid
 | fieldsAdd transitTime = (deliverTime-shipTime)/(1000000000.0)/60/60
 | fields orderid, shipTime, deliverTime, transitTime
 ```
@@ -84,7 +84,7 @@ fetch logs, from: -60m
 | filter servicename == "shipping"
 | fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
 | fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
-| summarize shipTime = first(shipTime), deliverTime= first(deliverTime), warehouse = first(warehouse), by: orderid
+| summarize shipTime = takeFirst(shipTime), deliverTime= takeFirst(deliverTime), warehouse = takeFirst(warehouse), by: orderid
 | fieldsAdd transitTime = toLong((deliverTime-shipTime)/(1000000000.0)/60/60)
 | summarize DeliveryTime = round(avg(transitTime),decimals:1), shipments = count(), by: warehouse
 | fields warehouse, DeliveryTime, shipments
@@ -120,7 +120,7 @@ fetch logs, from: -60m
 | fieldsAdd shipTime = if(serviceevent == "shipped", toTimestamp(event))
 | fieldsAdd deliverTime = if(serviceevent == "delivered", toTimestamp(event))
 // Combine different logs into single records
-| summarize rating = toLong(first(rating)),orderTime = first(orderTime), shipTime = first(shipTime), deliverTime= first(deliverTime), warehouse = first(warehouse), by: orderid
+| summarize rating = toLong(takeFirst(rating)),orderTime = takeFirst(orderTime), shipTime = takeFirst(shipTime), deliverTime= takeFirst(deliverTime), warehouse = takeFirst(warehouse), by: orderid
 // Calculate timeframes in hours for each step of process
 | fieldsAdd totalTime = toLong((deliverTime-orderTime)/(1000000000.0)/60/60)
 | fieldsAdd distributionTime = toLong((shipTime-orderTime)/(1000000000.0)/60/60)
@@ -157,7 +157,7 @@ Finally, the team combined what they learned to find bad orders coming out of Ne
 fetch logs, from: -5d
 | filter company == "Bobbleneers"
 | fieldsAdd dayofWeek = formatTimestamp(toTimestamp(event), format: "E")
-| summarize dayofWeek=first(dayofWeek), warehouse = first(warehouse), rating = first(rating), by: orderid
+| summarize dayofWeek=takeFirst(dayofWeek), warehouse = takeFirst(warehouse), rating = takeFirst(rating), by: orderid
 | filter rating == "1" and warehouse == "Nevada" and dayofWeek == "Tue"
 | limit 5
 ```
