@@ -843,10 +843,11 @@ function Add-AWSSteps() {
         if ($network) {
             # use specific Cloudformation stack
             set-prefs -k AWScfstack -v $network
+            $targetComponents = $targetComponents + 4
         }
         else {
             set-prefs -k AWScfstack -v "scw-AWSstack"
-            $targetComponents = $targetComponents + 4
+            
 
         }
         $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
