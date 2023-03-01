@@ -9,7 +9,7 @@
       "type": "PowerShell",
       "request": "launch",
       "script": "${file}",
-      "args": ["-c", "-l", "-v", "-n scw-AWSstack"]
+      "args": ["-c", "-l", "-v"]
     }
   ]
 }

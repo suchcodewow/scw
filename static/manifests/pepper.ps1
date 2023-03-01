@@ -904,7 +904,7 @@ function Add-AWSSteps() {
         }
         elseif ($componentsReady -eq 0) {
             # No components yet.  Add option to create
-            Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents"
+            Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents" -c "$componentsReady/$targetComponents deployed" 
         }
         else {
             # Some components installed.  Offer removal option
