@@ -5,7 +5,7 @@ param (
     [switch] $cloudCommands, # enable to show commands
     [switch] $logReset, # enable to reset log between runs
     [int] $users, # Users to create, switches to multiuser mode
-    [string] $network, # Allows multiple attendees to use the same CloudFormation VPC for faster deployment
+    [string] $network, # Specify cloudformation stack in AWS (vs using group 'scw-AWSStack')
     [switch] $aws, # use aws
     [switch] $azure, # use azure
     [switch] $gcp # use gcp
@@ -841,11 +841,11 @@ function Add-AWSSteps() {
         # Components: Cloudformation, vpc, subnets, and security group
         
         if ($network) {
-            # use group Cloudformation VPC
+            # use specific Cloudformation stack
             set-prefs -k AWScfstack -v $network
         }
         else {
-            set-prefs -k AWScfstack -v "scw-AWSstack-$userid"
+            set-prefs -k AWScfstack -v "scw-AWSstack"
             $targetComponents = $targetComponents + 4
 
         }
@@ -853,7 +853,7 @@ function Add-AWSSteps() {
         if ($cfstackExists.Stacks) {
             Send-Update -c "Cloudformation: exists" -t 1
             Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
-            if (-not $network) { $componentsReady++ }
+            if ($network) { $componentsReady++ }
             # Get Outputs needed for cluster creation
             $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
             $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
@@ -862,7 +862,7 @@ function Add-AWSSteps() {
             if ($cfSecurityGroup) {
                 Send-Update -t 1 -c "CF Security Group: exists"
                 Set-Prefs -k AWSsecurityGroup -v $cfSecurityGroup
-                if (-not $network) { $componentsReady++ }
+                if ($network) { $componentsReady++ }
             }
             else {
                 Send-Update -c "CF Security Group: not found"
@@ -872,7 +872,7 @@ function Add-AWSSteps() {
             if ($cfSubnets) {
                 Send-Update -t 1 -c "CF Subnets: exists"
                 Set-Prefs -k AWSsubnets -v $cfSubnets
-                if (-not $network) { $componentsReady++ }
+                if ($network) { $componentsReady++ }
             }
             else {
                 Send-Update -t 1 -c "CF Subnets: not found"
@@ -882,7 +882,7 @@ function Add-AWSSteps() {
             if ($cfVpicId) {
                 Send-Update -t 1 -c "CF VPC Id: exists"
                 Set-Prefs -k AWSvpcId -v $cfVpicId
-                if (-not $network) { $componentsReady++ }
+                if ($network) { $componentsReady++ }
             }
             else {
                 Send-Update -t 1 -c "CF VPC ID: not found"
@@ -972,7 +972,7 @@ function Add-AWSComponents {
         Send-Update -c "Attach CNI Policy" -r "aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName" -t 1
     }
     # Create VPC with Cloudformation
-    if (-not  $network) {
+    if ($network) {
         Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
     }
     # Wait for creation
@@ -1061,7 +1061,7 @@ function Remove-AWSComponents {
         Send-Update -t 1 -c "Delete Role" -r "aws iam delete-role --region $AWSregion --role-name $awsNodeRoleName"
         Set-Prefs @Params -k "AWSnodeRoleArn"
     }
-    if ($AWScfstackArn -and -not $network) {
+    if ($AWScfstackArn -and $network) {
         Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
         Do {
             $cfstackExists = Send-Update -e -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $AWSregion --stack-name $AWScfstack --query Stacks[*].StackStatus --output text"
