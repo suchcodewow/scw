@@ -260,24 +260,24 @@ $users | Foreach-Object -Parallel {
     aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName
     #Add Cloudformation
 
-    # Collect Results
-    $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
-    $AWSclusterRoleArn = $roleExists.Role.Arn
-    $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
-    $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
-    # Create EKS Cluster
-    aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
-    While ($clusterExists.cluster.status -ne "ACTIVE") {
-        $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
-        write-host "$user $($clusterExists.cluster.status)"
-        Start-Sleep -s 15
-    }
-    # # Create NodeGroup
-    $subnets = $AWSsubnets.replace(",", " ")
-    invoke-expression "aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --subnets $subnets --scaling-config minSize=1,maxSize=1,desiredSize=1 --instance-types t3.xlarge"
-    While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
-        $nodeGroupExists = aws eks describe-nodegroup  --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --output json | ConvertFrom-Json
-        write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
-        Start-Sleep -s 15
-    }
+    # # Collect Results
+    # $roleExists = aws iam get-role --role-name $AWSroleName --output json | Convertfrom-Json
+    # $AWSclusterRoleArn = $roleExists.Role.Arn
+    # $nodeRoleExists = aws iam get-role --role-name $AWSnodeRoleName --output json | Convertfrom-Json
+    # $AWSnodeRoleArn = $nodeRoleExists.Role.Arn
+    # # Create EKS Cluster
+    # aws eks create-cluster --name $AWScluster --role-arn $AWSclusterRoleArn --resources-vpc-config "subnetIds=$AWSsubnets,securityGroupIds=$AWSsecurityGroup"
+    # While ($clusterExists.cluster.status -ne "ACTIVE") {
+    #     $clusterExists = aws eks describe-cluster  --name $AWScluster --output json | ConvertFrom-Json
+    #     write-host "$user $($clusterExists.cluster.status)"
+    #     Start-Sleep -s 15
+    # }
+    # # # Create NodeGroup
+    # $subnets = $AWSsubnets.replace(",", " ")
+    # invoke-expression "aws eks create-nodegroup --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --node-role $AWSnodeRoleArn --subnets $subnets --scaling-config minSize=1,maxSize=1,desiredSize=1 --instance-types t3.xlarge"
+    # While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
+    #     $nodeGroupExists = aws eks describe-nodegroup  --cluster-name $AWScluster --nodegroup-name $AWSnodegroup --output json | ConvertFrom-Json
+    #     write-host "$user nodegroup $($nodeGroupExists.nodegroup.status)"
+    #     Start-Sleep -s 15
+    # }
 } -ThrottleLimit 10

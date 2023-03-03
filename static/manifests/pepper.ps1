@@ -235,7 +235,7 @@ function Get-Joke {
         "What did Blackbeard say when he turned 80?; Aye, Matey!",
         "What's the best part about living in Switzerland?;I don't know- but the flag's a big plus!",
         "What do you call a bear in a bar?;Lost!",
-        "I can cut a piece of in half just by looking at it.;You might not believe me, but I saw it with my own eyes.",
+        "I can cut a piece of wood in half just by looking at it.;You might not believe me, but I saw it with my own eyes.",
         "A limbo champion walks into a bar.;He loses.",
         "What's the leading cause of dry skin?;Towels.",
         "When does a joke become a Dad joke?;When it becomes apparent.")
@@ -1542,7 +1542,7 @@ function Add-App {
         [string] $namespace #namespace to confirm
     )
     Send-Update -c "Adding deployment" -t 1 -r "kubectl apply -f $yaml"
-    Send-Update -c "Waiting 10s for namespace [$namespace] to activate" -a -t 1
+    Send-Update -c "Waiting 10s for namespace [$namespace] to activate:" -a -t 1
     $counter = 0
     While ($namespaceState -ne "Active") {
         if ($counter -ge 20) {
