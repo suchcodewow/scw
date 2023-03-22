@@ -1332,7 +1332,7 @@ metadata:
     feature.dynatrace.com/automatic-kubernetes-api-monitoring: "true"
 spec:
   apiUrl: $url
-  skipCertCheck: false
+  skipCertCheck: true
   oneAgent:
     classicFullStack:
       tolerations:
@@ -1344,7 +1344,7 @@ spec:
           operator: Exists
       env:
         - name: ONEAGENT_ENABLE_VOLUME_STORAGE
-          value: "false"
+          value: "true"
   activeGate:
     capabilities:
       - routing
