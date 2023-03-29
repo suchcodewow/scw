@@ -592,15 +592,18 @@ function Set-Provider() {
         "Azure" {
             # Set the Azure subscription
             Send-Update -t 1 -c "Azure: Set Subscription" -r "az account set --subscription $($providerSelected.identifier)"
+            Set-Prefs -k "Provider" -v "AZ"
             Add-AzureSteps 
         }
         "AWS" {
             Send-Update -t 1 -c "AWS: Set region"
+            Set-Prefs -k "Provider" -v "AWS"
             Add-AWSSteps 
         }
         "GCP" { 
             # set the GCP Project
             Send-Update -OutputSuppression -t 1 -c "GCP: Set Project" -r "gcloud config set account '$($providerSelected.identifier)' --no-user-output-enabled"
+            Set-Prefs -k "Provider" -v "GCP"
             Add-GCPSteps 
         }
     }
@@ -1293,6 +1296,7 @@ function Set-DTConfig() {
             Set-Prefs -k k8stoken -v $k8stoken
             Set-Prefs -k base64Token -v $base64Token
             Add-DynakubeYaml -t $base64Token -u "https://$tenantURL/api" -c "k8s$($choices.callProperties.userid)"
+
         }
         else {
             write-host "Failed to connect to $tenantURL"
@@ -1311,7 +1315,12 @@ function Add-DynakubeYaml {
         [string] $url, # URL To Dynatrace tenant
         [string] $clusterName # Name of cluster in Dynatrace
     )
-    
+    if ($config.Provider -eq "GCP") {
+        $storage = "true"
+    }
+    else {
+        $storage = "false"
+    }
     $dynaKubeContent = 
     @"
 apiVersion: v1
@@ -1344,7 +1353,7 @@ spec:
           operator: Exists
       env:
         - name: ONEAGENT_ENABLE_VOLUME_STORAGE
-          value: "true"
+          value: "$storage"
   activeGate:
     capabilities:
       - routing
@@ -1358,6 +1367,7 @@ spec:
         memory: 1.5Gi
 "@
     $dynaKubeContent | out-File -FilePath dynakube.yaml
+
 }
 function Add-Dynatrace {
     Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl create ns dynatrace"
