@@ -207,7 +207,7 @@ if ($userCount) {
     for (($i = 1); $i -le $userCount; $i++) {
         $user = Get-UserName
         write-host "adding $user"
-        Add-Content attendees.txt $(Get-UserName)
+        Add-Content attendees.txt $($user)
 
     }
 }
@@ -221,6 +221,10 @@ $users | Foreach-Object -Parallel {
     $password = "1Dynatrace#"
     $userObject = az ad user create --display-name $user --password $password --force-change-password-next-sign-in false --user-principal-name "$user@suchcodewow.io" | ConvertFrom-Json
     az ad group member add --group "Attendees" --member-id $($userObject.id)
-
+    az group create --name "scw-group-$user" --location eastus2 -o none
+    az aks create -g "scw-group-$user" -n "scw-AKS-$user" --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
    
 } -ThrottleLimit 10
+
+# az group create --name scw-group-broadbadge --location eastus2 -o none
+# az aks create -g scw-group-broadbadge -n scw-AKS-broadbadge --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
