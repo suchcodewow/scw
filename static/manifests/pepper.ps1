@@ -186,6 +186,7 @@ function Add-Choice() {
         [object] $parameters # parameters needed in the function
     )
     # If this key exists, delete it and anything that followed
+    Send-Update -c "Add choice: $key" -t 0
     $keyOption = $choices | Where-Object { $_.key -eq $key } | select-object -expandProperty Option -first 1
     if ($keyOption) {
         $staleOptions = $choices | Where-Object { $_.Option -ge $keyOption }
@@ -1431,15 +1432,16 @@ function Get-DTconnected {
 # Application Functions
 function Add-CommonSteps() {
     # Get namespaces so we know what's installed or not
-    $existingNamespaces = (kubectl get ns -o json 2>$null | Convertfrom-Json).items.metadata.name
+    $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl get ns -o json  | Convertfrom-Json).items.metadata.name"
+    Send-Update -c "Namespaces: $existingNamespaces" -t 0
     # Check for valid Dynatrace connection
     $DTconnected = Get-DTconnected
     if ($DTconnected) {
         # Determine appropriate Dynatrace option
         if ($existingNamespaces.contains("dynatrace")) {
             #1 Dynatrace installed.  Add status and removal options
-            Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
             Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
+            Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
         }
         elseif (test-path dynakube.yaml) {
             #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
