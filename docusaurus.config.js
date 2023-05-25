@@ -62,51 +62,18 @@ const config = {
           src: "img/wow.png",
         },
         items: [
-          { type: "doc", label: "Pepper", docId: "pepper/index" },
           {
-            type: "dropdown",
-            label: "Tutorials",
+            type: "doc",
+            label: "Workshops",
             position: "left",
-            items: [
-              { type: "doc", docId: "FullStack/index", label: "Full Stack: Front to Back" },
-              {
-                type: "doc",
-                docId: "intro",
-                label: "Welcome",
-              },
-              {
-                type: "doc",
-                docId: "k8s/index",
-                label: "Modular: Kubernetes",
-              },
-              {
-                type: "doc",
-                docId: "accelerator-azure/index",
-                label: "Accelerator: Azure",
-              },
-              {
-                type: "doc",
-                docId: "aws/index",
-                label: "AWS",
-              },
-            ],
+            docId: "intro",
           },
+          { type: "doc", label: "Applications", docId: "apps/index" },
           {
-            type: "dropdown",
+            type: "doc",
+            docId: "scripts/index",
             label: "Helpers",
             position: "left",
-            items: [
-              {
-                type: "doc",
-                docId: "scripts/index",
-                label: "Welcome",
-              },
-              {
-                type: "doc",
-                docId: "scripts/webapp",
-                label: "Azure Web Apps",
-              },
-            ],
           },
           {
             href: "https://github.com/suchcodewow/scw",

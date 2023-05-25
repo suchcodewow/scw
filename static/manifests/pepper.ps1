@@ -1275,7 +1275,7 @@ function Set-DTConfig() {
             Authorization  = "Api-Token $token"
         }
         $data = @{
-            scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload", "logs.ingest")
+            scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload", "logs.ingest", "openTelemetryTrace.ingest")
             name                = "SCW Token"
             personalAccessToken = $false
         }
