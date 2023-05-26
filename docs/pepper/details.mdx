@@ -17,6 +17,17 @@ In summary, Pepper will:
 - Assist with the deployment of [Dynatrace Observability Platform](http://www.dynatrace.com)
 - Deploy, remove, and display status of sample applications
 
+## About the assistant
+
+The assistant is written in powershell. The main reasons for this are:
+
+- It is well supported natively on all 3 cloud platforms & kept up to date.
+- Versus bash, the other built in option, it offers real arraylist support and native json parsing.
+
+It is purposefully written as a single script to allow a quick download vs cloning a repo. However, the file is fully commented and if using vscode, there are instructions at the top for folding the various functions into neat one-liners making the file simple to navigate.
+
+You can run this assistant either in the cloud shell or a local terminal with the cli tools available for your cloud vendor. Please check out the cloud vendor specific notes below if relevant.
+
 ### Startup
 
 When started, Pepper will check for access to AWS, Azure, or GCLOUD (possibly multiple when running in a local terminal). It will add viable environments to the providers list.

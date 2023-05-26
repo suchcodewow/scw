@@ -1,11 +1,52 @@
 ---
-sidebar_position: 4
+sidebar_position: 1
 pagination_prev:
 pagination_next:
-title: "Demo Applications"
+title: Pepper
 ---
 
-## Overview
+See the list on left for all applications.
 
-The applications listed here are built to help with different use cases. Check out the [Tutorials](/docs/intro) section for using these in instructor-led or self-run workshops.
-The demo applications can be used for several different workshop scenarios.
+## About
+
+Pepper quickly deploys kubernetes and real-world sample applications on your choice of cloud.  
+Pepper shows every step along with the exact command it runs on your behalf.  
+You'll get a useful kubernetes installation very quickly while seeing how to do it yourself.
+
+## Prerequisites
+
+You'll need the ability to use the cloud shell of your chosen cloud provider or be able to connect with a local terminal.
+
+### AWS
+
+- You'll need access to an AWS region where you are able to create an EKS clusters.
+- If using your terminal to connect you'll need an IAM token and secret.
+
+### Azure
+
+- You will need to be able to create a resource group and an AKS cluster.
+
+### GCLOUD
+
+- You will need access to an account with an existing project.
+- You'll need the ability to create a GKE cluster within that project.
+
+## Usage
+
+Download:
+
+```bash
+curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1
+```
+
+Run:
+
+```bash
+pwsh ~/pepper.ps1 -c
+```
+
+Supported options:
+
+- `-c` Show cloud commands. Command history logged to **pepper.ps1.log** file for reference.
+- `-v` Show trivial/verbose commands. Chatty, but good feedback when modifying Pepper.
+- `-h` Shows all options.
