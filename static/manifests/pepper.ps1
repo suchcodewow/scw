@@ -1192,6 +1192,7 @@ function Remove-GCPCluster {
     # Delete the GKE Cluster
     Send-Update -c "Deleting GKE cluster can take up to 10 minutes" -t 1
     Send-Update -c "Delete GKE cluster" -t 1 -r "gcloud container clusters delete --zone $($config.gcpzone) $($config.gcpclustername)"
+    Add-GCPSteps
 }
 
 # Kubernetes Functions
