@@ -533,7 +533,7 @@ function Get-Providers() {
             }
         }
         else { Send-Update -c "NA " -t 1 -a }
-    }4
+    }
     # GCP
     if ($useGCP) {
         Send-Update -c "GCP:" -t 1 -a
