@@ -5,7 +5,7 @@ param (
     [switch] $cloudCommands, # enable to show commands
     [switch] $logReset, # enable to reset log between runs
     [int] $users, # Users to create, switches to multiuser mode
-    [string] $network, # Specify cloudformation stack in AWS (vs using group 'scw-AWSStack')
+    [string] $network, # Specify cloudformation stack in AWS (vs default group 'scw-AWSStack')
     [switch] $aws, # use aws
     [switch] $azure, # use azure
     [switch] $gcp # use gcp
@@ -533,23 +533,26 @@ function Get-Providers() {
             }
         }
         else { Send-Update -c "NA " -t 1 -a }
-    }
+    }4
     # GCP
     if ($useGCP) {
         Send-Update -c "GCP:" -t 1 -a
         if (get-command 'gcloud' -ea SilentlyContinue) {
             $accounts = gcloud auth list --format="json" | ConvertFrom-Json 
+            if ($accounts.count -gt 0) {
+                foreach ($i in $accounts) {
+                    $Params = @{}
+                    if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
+                    Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "").ToLower()
+                }
+                Send-Update -c "$($accounts.count) " -a -t 1
+            }
+            else {
+                # Total for AWS is just 1 or 0 for now so use this toggle
+                Send-Update -c "0 " -a -t 1
+            }
         }
         else { Send-Update -content "NA " -t 1 -a }
-        if ($accounts.count -gt 0) {
-            foreach ($i in $accounts) {
-                $Params = @{}
-                if ($i.status -eq "ACTIVE") { $Params['d'] = $true } 
-                Add-Provider @Params -p "GCP" -n "account: $($i.account)" -i $i.account -u (($i.account).split("@")[0]).replace(".", "").ToLower()
-            }
-            Send-Update -c "$($accounts.count) " -a -t 1
-        }
-        
         
     }
     # Done getting options
@@ -803,168 +806,155 @@ function Add-AWSEverything() {
 
 # AWS Functions
 function Add-AWSSteps() {
-    if ($($config.UserCount)) {
-        # Parallel Processing is a bit limited.  Using this cludgy process for now.
-        Add-AWSEverything
+    # Add all components for AWS EKS
+    $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    $userid = $userProperties.userid
+    # Save region to use in commands
+    Set-Prefs -k AWSregion -v $($userProperties.id)
+    # Counter to determine how many AWS components are ready.  AWS is really annoying.
+    $componentsReady = 0
+    $targetComponents = 6
+    # Use specified network name for CloudFormation- otherwise use default single stack for whole classroom.
+    if ($network) { $stackId = $network } else { $stackId = "workshop" }
+    # # use specific Cloudformation stack
+    # Send-Update -t 1 "Overriding CloudFormation Stack with: $network"
+    # set-prefs -k AWScfstack -v $network
+    
+    # Component: AWS cluster role
+    #$targetComponents++
+    Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
+    $roleExists = Send-Update -t 1 -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --output json" -a | Convertfrom-Json
+    if ($roleExists) {
+        Send-Update -c "AWS cluster role: exists" -t 1
+        Set-Prefs -k AWSclusterRoleArn -v $($roleExists.Role.Arn)
+        $componentsReady++
     }
     else {
-        # Regular single user session
-        $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
-        $userid = $userProperties.userid
-        # Save region to use in commands
-        Set-Prefs -k AWSregion -v $($userProperties.id)
-        # Counter to determine how many AWS components are ready.  AWS is really annoying.
-        $componentsReady = 0
-        $targetComponents = 0
-        # Component: AWS cluster role
-        $targetComponents++
-        Set-Prefs -k AWSroleName -v "scw-awsrole-$userid"
-        $roleExists = Send-Update -t 1 -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --output json" -a | Convertfrom-Json
-        if ($roleExists) {
-            Send-Update -c "AWS cluster role: exists" -t 1
-            Set-Prefs -k AWSclusterRoleArn -v $($roleExists.Role.Arn)
-            $componentsReady++
-        }
-        else {
-            Send-Update -c "AWS cluster role: not found" -t 1
-            Set-Prefs -k AWSclusterRoleArn
-        }
-        # Component: AWS node role
-        $targetComponents++
-        set-Prefs -k AWSnodeRoleName -v "scw-awsngrole-$userid"
-        $nodeRoleExists = Send-Update -t 1 -e -c "Checking for AWS Component: node role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSnodeRoleName) --output json" -a | Convertfrom-Json
-        if ($nodeRoleExists) {
-            Send-Update -c "AWS node role: exists" -t 1
-            Set-Prefs -k AWSnodeRoleArn -v $($nodeRoleExists.Role.Arn)
-            $componentsReady++
-        }
-        else {
-            Send-Update -c "AWS node role: not found" -t 1
-            Set-Prefs -k AWSnodeRoleArn
-        }
-        # Components: Cloudformation, vpc, subnets, and security group
-        
-        if ($network) {
-            # use specific Cloudformation stack
-            set-prefs -k AWScfstack -v $network
-            $targetComponents = $targetComponents + 4
-        }
-        else {
-            set-prefs -k AWScfstack -v "scw-AWSstack"
-            
+        Send-Update -c "AWS cluster role: not found" -t 1
+        Set-Prefs -k AWSclusterRoleArn
+    }
 
-        }
-        $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
-        if ($cfstackExists.Stacks) {
-            Send-Update -c "Cloudformation: exists" -t 1
-            Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
-            if ($network) { $componentsReady++ }
-            # Get Outputs needed for cluster creation
-            $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
-            $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
-            $cfVpicId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
-            # Component: SecurityGroup
-            if ($cfSecurityGroup) {
-                Send-Update -t 1 -c "CF Security Group: exists"
-                Set-Prefs -k AWSsecurityGroup -v $cfSecurityGroup
-                if ($network) { $componentsReady++ }
-            }
-            else {
-                Send-Update -c "CF Security Group: not found"
-                Set-Prefs -k AWSsecurityGroup 
-            }
-            # Component: Subnets
-            if ($cfSubnets) {
-                Send-Update -t 1 -c "CF Subnets: exists"
-                Set-Prefs -k AWSsubnets -v $cfSubnets
-                if ($network) { $componentsReady++ }
-            }
-            else {
-                Send-Update -t 1 -c "CF Subnets: not found"
-                Set-Prefs -k AWSsubnets
-            }
-            # Component: VPC
-            if ($cfVpicId) {
-                Send-Update -t 1 -c "CF VPC Id: exists"
-                Set-Prefs -k AWSvpcId -v $cfVpicId
-                if ($network) { $componentsReady++ }
-            }
-            else {
-                Send-Update -t 1 -c "CF VPC ID: not found"
-                Set-Prefs -k AWSvpcId
-            }
+    # Component: AWS node role
+    #$targetComponents++
+    set-Prefs -k AWSnodeRoleName -v "scw-awsngrole-$stackId"
+    $nodeRoleExists = Send-Update -t 1 -e -c "Checking for AWS Component: node role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSnodeRoleName) --output json" -a | Convertfrom-Json
+    if ($nodeRoleExists) {
+        Send-Update -c "AWS node role: exists" -t 1
+        Set-Prefs -k AWSnodeRoleArn -v $($nodeRoleExists.Role.Arn)
+        $componentsReady++
+    }
+    else {
+        Send-Update -c "AWS node role: not found" -t 1
+        Set-Prefs -k AWSnodeRoleArn
+    }
+
+    # Components: Cloudformation, vpc, subnets, and security group
+    set-prefs -k AWScfstack -v "scw-AWSstack-$stackId" 
+    $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
+    if ($cfstackExists.Stacks) {
+        $componentsReady++
+        Send-Update -c "Cloudformation: exists" -t 1
+        Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
+        
+        # Get Outputs needed for cluster creation
+        $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
+        $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
+        $cfVpicId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
+        # Component: SecurityGroup
+        if ($cfSecurityGroup) {
+            Send-Update -t 1 -c "CF Security Group: exists"
+            Set-Prefs -k AWSsecurityGroup -v $cfSecurityGroup
+            $componentsReady++ 
         }
         else {
-            Send-Update -c "Cloudformation: not found" -t 1
-            Set-Prefs -k AWScfstackArn
-            Set-Prefs -k AWSsecurityGroup
+            Send-Update -c "CF Security Group: not found"
+            Set-Prefs -k AWSsecurityGroup 
+        }
+        # Component: Subnets
+        if ($cfSubnets) {
+            Send-Update -t 1 -c "CF Subnets: exists"
+            Set-Prefs -k AWSsubnets -v $cfSubnets
+            $componentsReady++ 
+        }
+        else {
+            Send-Update -t 1 -c "CF Subnets: not found"
             Set-Prefs -k AWSsubnets
+        }
+        # Component: VPC
+        if ($cfVpicId) {
+            Send-Update -t 1 -c "CF VPC Id: exists"
+            Set-Prefs -k AWSvpcId -v $cfVpicId
+            $componentsReady++ 
+        }
+        else {
+            Send-Update -t 1 -c "CF VPC ID: not found"
             Set-Prefs -k AWSvpcId
         }
-        # Add component choices
+    }
+    else {
+        Send-Update -c "Cloudformation: not found" -t 1
+        Set-Prefs -k AWScfstackArn
+        Set-Prefs -k AWSsecurityGroup
+        Set-Prefs -k AWSsubnets
+        Set-Prefs -k AWSvpcId
+    }
+    # Add component choices
+    if ($componentsReady -eq $targetComponents) {
+        # Need to confirm total components and if enough, provide remove components option and create cluster option
+        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
+    }
+    elseif ($componentsReady -eq 0) {
+        # No components yet.  Add option to create
+        Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents" -c "$componentsReady/$targetComponents deployed" 
+    }
+    else {
+        # Some components installed- offer removal option
+        Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
+    }
+    # Check for existing cluster.
+    Set-Prefs -k AWScluster -v "scw-AWS-$userid"
+    Set-Prefs -k AWSnodegroup -v "scw-AWSNG-$userid"
+    $clusterExists = Send-Update -t 1 -a -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
+    if ($clusterExists) {
+        if ($clusterExists.cluster.status -eq "CREATING") { Add-AWSCluster }
+        Send-Update -c "AWS Cluster: exists" -t 1
+        Set-Prefs -k AWSclusterArn -v $($clusterExists.cluster.arn)
+        Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $($config.AWScluster) -f "Remove-AWSCluster"
+        Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $($config.AWScluster)" -t 1 -o
         if ($componentsReady -eq $targetComponents) {
-            # Need to confirm total components and if enough, provide remove components option and create cluster option
-            Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
+            # Cluster is ready and all components ready
+            Add-CommonSteps
         }
-        elseif ($componentsReady -eq 0) {
-            # No components yet.  Add option to create
-            Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents" -c "$componentsReady/$targetComponents deployed" 
-        }
-        else {
-            # Some components installed.  Offer removal option
-            Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
-        }
-        # Check for existing cluster.
-        Set-Prefs -k AWScluster -v "scw-AWS-$userid"
-        Set-Prefs -k AWSnodegroup -v "scw-AWSNG-$userid"
-        $clusterExists = Send-Update -t 1 -a -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --name $($config.AWScluster) --output json" | ConvertFrom-Json
-        if ($clusterExists) {
-            if ($clusterExists.cluster.status -eq "CREATING") { Add-AWSCluster }
-            Send-Update -c "AWS Cluster: exists" -t 1
-            Set-Prefs -k AWSclusterArn -v $($clusterExists.cluster.arn)
-            Add-Choice -k "AWSEKS" -d "Remove EKS Cluster" -c $($config.AWScluster) -f "Remove-AWSCluster"
-            Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $($config.AWScluster)" -t 1 -o
-            if ($componentsReady -eq $targetComponents) {
-                # Cluster is ready and all components ready
-                Add-CommonSteps
-            }
-        }
-        else {
-            Send-Update -c "AWS Cluster: not found" -t 1
-            if ($componentsReady -eq $targetComponents) {
-                # Add cluster deployment option if all components are ready
-                Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster"
-            }
+    }
+    else {
+        Send-Update -c "AWS Cluster: not found" -t 1
+        if ($componentsReady -eq $targetComponents) {
+            # Add cluster deployment option if all components are ready
+            Add-Choice -k "AWSEKS" -d "Required: Deploy EKS Cluster" -f "Add-AWSCluster"
         }
     }
 }
+
 function Add-AWSComponents {
-    param (
-        [string] $userID # override user in multi-deploy scenarios
-    )
-    if ($userID) {
-        #Override main user settings with sub-user list
-        $awsRegion = $($config.Users.$userID.AWSregion)
-        $awsRoleName = $($config.Users.$userID.AWSroleName)
-        $awsNodeRoleName = $($config.Users.$userID.AWSnodeRoleName)
-        $awsCFStack = $($config.USers.$userID.AWScfstack)
-    }
-    else {
-        $awsRegion = $($config.AWSregion)
-        $awsRoleName = $($config.AWSroleName)
-        $awsNodeRoleName = $($config.AWSnodeRoleName)
-        $awsCFStack = $($config.AWScfstack)
-    }
+
+    $awsRegion = $($config.AWSregion)
+    $awsRoleName = $($config.AWSroleName)
+    $awsNodeRoleName = $($config.AWSnodeRoleName)
+    $awsCFStack = $($config.AWScfstack)
+
     # Create the cluster ARN role and add the policy
-    if ($IsWindows) {
-        # Build a multi-cloud/multi-OS script they said.  It will be FUN, they said...
-        $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
-        $ec2policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
-    }
-    else {
-        $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
-        $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
-    }
+    #if (-not $IsWindows) {
+    # Build a multi-cloud/multi-OS script they said.  It will be FUN, they said...
+    # This is now working on Windows- wtf. :*(
+    # Send-Update -t 0 -c "Using Windows Json format"
+    # $ekspolicy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"eks.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    # $ec2policy = '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":[\"ec2.amazonaws.com\"]},\"Action\":\"sts:AssumeRole\"}]}'
+    # }
+    # else {
+    #     Send-Update -t 0 -c "Using Linux/Unix/Mac Json format"
+    $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+    $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+    # }
     $iamClusterRole = Send-Update -t 1 -c "Create Cluster Role" -r "aws iam create-role --region $awsRegion --role-name $awsRoleName --assume-role-policy-document '$ekspolicy'" | Convertfrom-Json
     if ($iamClusterRole.Role.Arn) {
         Send-Update -t 1 -c "Attach Cluster Policy" -r "aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName"
@@ -977,11 +967,11 @@ function Add-AWSComponents {
         Send-Update -c "Attach CNI Policy" -r "aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy --role-name $awsNodeRoleName" -t 1
     }
     # Create VPC with Cloudformation
-    if ($network) {
-        Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
-    }
+    #if ($network) {
+    #Send-Update -t 1 -c "Using pre-built network $awsCFStack"
+    Send-Update -t 1 -c "Create VPC with Cloudformation" -o -r "aws cloudformation create-stack --region $awsRegion --stack-name $awsCFStack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml"
+    #}
     # Wait for creation
-    #$cfstackReady = "CREATE_COMPLETE"
     While ($cfstackReady -ne "CREATE_COMPLETE") {
         $cfstackReady = Send-Update -a -t 1 -c "Check for 'CREATE_COMPLETE'" -r "aws cloudformation describe-stacks --region $awsRegion --stack-name $awsCFStack --query Stacks[*].StackStatus --output text"
         Send-Update -t 1 -c $cfstackReady
@@ -1066,13 +1056,14 @@ function Remove-AWSComponents {
         Send-Update -t 1 -c "Delete Role" -r "aws iam delete-role --region $AWSregion --role-name $awsNodeRoleName"
         Set-Prefs @Params -k "AWSnodeRoleArn"
     }
-    if ($AWScfstackArn -and $network) {
-        Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
-        Do {
-            $cfstackExists = Send-Update -e -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $AWSregion --stack-name $AWScfstack --query Stacks[*].StackStatus --output text"
-            Send-Update -c $cfstackExists -t 1
-            Start-Sleep -s 5
-        } While ($cfstackExists)
+    if ($AWScfstackArn) {
+        Send-Update -t 1 -c "Leaving CloudFormation: $($config.AWScfstack) for others in class.  It's safe to delete in cloud console if you are running this stand alone."
+        # Send-Update -c "Remove cloudformation stack" -t 1 -r "aws cloudformation delete-stack --region $AWSregion --stack-name $AWScfstack"
+        # Do {
+        #     $cfstackExists = Send-Update -e -c "Check cloudformation stack" -t 1 -r "aws cloudformation describe-stacks --region $AWSregion --stack-name $AWScfstack --query Stacks[*].StackStatus --output text"
+        #     Send-Update -c $cfstackExists -t 1
+        #     Start-Sleep -s 5
+        # } While ($cfstackExists)
     }
     Add-AWSSteps
 }
