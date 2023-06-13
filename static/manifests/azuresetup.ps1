@@ -202,27 +202,29 @@ function Get-UserName {
 
 Write-Host "Running attendee setup"
 # Multiuser: User Create
+$users = New-Object System.Collections.Generic.List[System.Object]
 if ($userCount) {
     # Create Users
     for (($i = 1); $i -le $userCount; $i++) {
         $user = Get-UserName
-        write-host "adding $user"
-        Add-Content attendees.txt $($user)
+        write-host "generated user: $user"
+        $users.Add($user)
 
     }
 }
 
 # Kick off process for all users
-$users = Get-Content attendees.txt
-write-host $users.count
+# $users = Get-Content attendees.txt
+# write-host $users.count
 $users | Foreach-Object -Parallel {
     # Every parallel process runs in a separate shell, so defining everything in-line for now.
     $user = $_
     $password = "1Dynatrace#"
     $userObject = az ad user create --display-name $user --password $password --force-change-password-next-sign-in false --user-principal-name "$user@suchcodewow.io" | ConvertFrom-Json
     az ad group member add --group "Attendees" --member-id $($userObject.id)
-    az group create --name "scw-group-$user" --location eastus2 -o none
-    az aks create -g "scw-group-$user" -n "scw-AKS-$user" --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
+    # az group create --name "scw-group-$user" --location eastus2 -o none
+    # az aks create -g "scw-group-$user" -n "scw-AKS-$user" --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
+    write-host "$user@suchcodewow.io"
    
 } -ThrottleLimit 10
 
