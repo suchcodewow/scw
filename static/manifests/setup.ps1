@@ -1,6 +1,8 @@
-$userCount = Read-Host -Prompt "How many users to create?"
-$regions = @("us-east-2", "us-east-1", "us-west-1", "us-west-2")
+# $userCount = Read-Host -Prompt "How many users to create?"
+$regions = @("us-east-2", "us-east-1", "us-west-1", "us-west-2", "ca-central-1")
+[System.Collections.ArrayList]$script:users = @()
 
+$userCount = 10
 function Get-UserName {
     $Prefix = @(
         "abundant",
@@ -199,13 +201,35 @@ function Get-UserName {
     )      
     return "$(Get-Random -inputObject $Prefix)$(Get-Random -inputObject $Name)"
 }
-
 for (($i = 1); $i -le $userCount; $i++) {
     write-host $i
-    $user = Get-UserName
-    $region = $regions[$([math]::Floor(($i - 1) / 2))]
-    write-host "generated user: $user region: $region"
-    aws iam create-user --user-name $user --region $region
-    aws iam create-login-profile --user-name $user --password 1Dynatrace#
-    aws iam add-user-to-group --group-name Attendees --user-name $user
+    Do {
+        $user = New-Object PSCustomObject -Property @{
+            userName = Get-UserName
+            #userName = "bob"
+        }
+        
+        write-host "came up with $user"
+        # Start-Sleep -s 1
+
+    } While ($users | Where-Object userName -ne $user.userName)
+    [void]$users.add($user)
 }
+$users
+
+# for (($i = 1); $i -le $userCount; $i++) {
+#     # write-host $i
+#     Do {
+#         $user = Get-UserName
+#         write-host $user
+#         Start-Sleep -s 1
+#     } Until ()
+    
+#     $region = $regions[$([math]::Floor(($i - 1) / 2))]
+#     write-host "generated user: $user region: $region"
+# aws iam create-user --user-name $user --region $region
+# aws iam create-login-profile --user-name $user --password 1Dynatrace#
+# aws iam add-user-to-group --group-name Attendees --user-name $user
+# }
+
+
