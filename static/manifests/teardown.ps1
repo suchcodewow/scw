@@ -1,5 +1,5 @@
 # ADD LOAD BALANCER REMOVALS
-
+$regions = @("us-east-2", "us-east-1", "us-west-1", "us-west-2", "ca-central-1")
 $clusters = aws eks list-clusters --output json --query clusters | ConvertFrom-Json
 write-host "Removing $($clusters.count) clusters"
 $clusters | ForEach-Object -Parallel {
@@ -38,20 +38,20 @@ $clusters | ForEach-Object -Parallel {
 #         #write-host "Ignore Role: $role"
 #     }
 # }
-# $users = aws iam get-group --group-name attendees --query Users[*].UserName | convertfrom-Json
-# write-host "Removing $($users.count) users"
-# $users | Foreach-Object -ThrottleLimit 10 -Parallel {
-#     $user = $_
-#     if ($user -eq "shyplane" -or $user -eq "consoleadmin") {
-#         #write-host "Ignore User: $user"
-#     }
-#     else {
-#         $groups = aws iam list-groups-for-user --user-name consoleadmin --query Groups[*].GroupName | Convertfrom-Json
-#         foreach ($group in $groups) {
-#             aws iam remove-user-from-group --group-name $group --user-name $user
-#         }
-#         aws iam delete-login-profile --user-name $user
-#         aws iam delete-user --user-name $user
-#         write-host "deleted User: $user"
-#     }
-# }
+$users = aws iam get-group --group-name attendees --query Users[*].UserName | convertfrom-Json
+write-host "Removing $($users.count) users"
+$users | Foreach-Object -ThrottleLimit 10 -Parallel {
+    $user = $_
+    if ( $user -eq "consoleadmin") {
+        #write-host "Ignore User: $user"
+    }
+    else {
+        $groups = aws iam list-groups-for-user --user-name consoleadmin --query Groups[*].GroupName | Convertfrom-Json
+        foreach ($group in $groups) {
+            aws iam remove-user-from-group --group-name $group --user-name $user
+        }
+        aws iam delete-login-profile --user-name $user
+        aws iam delete-user --user-name $user
+        write-host "deleted User: $user"5
+    }
+}
