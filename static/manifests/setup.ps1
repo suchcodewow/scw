@@ -1,9 +1,8 @@
 # $userCount = Read-Host -Prompt "How many users to create?"
+$userCount = 50
 $regions = @("us-east-2", "us-east-1", "us-west-1", "us-west-2", "ca-central-1")
 $awsUsersPerRegion = 10
 [System.Collections.ArrayList]$script:users = @()
-
-$userCount = 50
 function Get-UserName {
     $Prefix = @(
         "abundant",
@@ -224,7 +223,7 @@ $users | ForEach-Object {
     if ($userData) {
         $users | where-object { $_.userName -eq $user } | ForEach-Object { $_.Arn = $userData.user.Arn }
     }
-    aws iam create-login-profile --user-name $user --password 1Dynatrace 1>$null
+    aws iam create-login-profile --user-name $user --password 1Dynatrace## 1>$null
     aws iam add-user-to-group --group-name Attendees --user-name $user 1>$null
     $securityKey = aws iam create-access-key --user-name $user | Convertfrom-Json
     if ($securityKey) {
