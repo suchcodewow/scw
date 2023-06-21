@@ -21,25 +21,12 @@ As developers:
 
 ## Enable the service
 
-First check the feature flag status:
+Your DynaBank account is authorized to deploy new software features!
 
-1. Obtain the application URL either from Pepper, or be running
+1. Open the Operations panel of DynaBankInsuraCart.
+   ![operations](/img/operationsmenu.png)
 
-```bash
-kubectl get svc -n dbic
-```
+2. Enable the Fraud Detection service.
+   ![fraud service](/img/enablefraud.png)
 
-2. Paste the URL into your browser while changing the ending to look like:
-
-```bash
-/api/api/features
-```
-
-3. Confirm the current status for all flags is "false".
-4. Enable the feature flag with the enable endpoint:
-
-```bash
-/api/api/features/enable/fraud_service
-```
-
-5. To confirm everything is working, go into banking, transfer & pay, and confirm at $5 payment works.
+3. Take a well deserved week long vacation!
