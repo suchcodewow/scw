@@ -1,9 +1,9 @@
 # $userCount = Read-Host -Prompt "How many users to create?"
 $regions = @("us-east-2", "us-east-1", "us-west-1", "us-west-2", "ca-central-1")
-$awsUsersPerRegion = 4
+$awsUsersPerRegion = 10
 [System.Collections.ArrayList]$script:users = @()
 
-$userCount = 0
+$userCount = 50
 function Get-UserName {
     $Prefix = @(
         "abundant",
@@ -206,13 +206,13 @@ for (($i = 1); $i -le $userCount; $i++) {
     $region = $regions[$([math]::Floor(($i - 1) / $awsUsersPerRegion))]
     Do {
         $user = New-Object PSCustomObject -Property @{
-            userName       = Get-UserName
-            region         = $region
-            Arn            = ""
-            CloudFormation = ""
-
+            userName    = Get-UserName
+            region      = $region
+            Arn         = "-"
+            AccessId    = "-"
+            AccessToken = "-"
         }
-    } Until (($users | where-object { $_.userName -eq $user.userNam }).count -eq 0)
+    } Until (($users | where-object { $_.userName -eq $user.userName }).count -eq 0)
     [void]$users.add($user)
 }
 write-host -NoNewline "Creating user accounts "
@@ -226,10 +226,16 @@ $users | ForEach-Object {
     }
     aws iam create-login-profile --user-name $user --password 1Dynatrace 1>$null
     aws iam add-user-to-group --group-name Attendees --user-name $user 1>$null
+    $securityKey = aws iam create-access-key --user-name $user | Convertfrom-Json
+    if ($securityKey) {
+        $users | where-object { $_.userName -eq $user } | ForEach-Object { $_.AccessId = $securityKey.AccessKey.AccessKeyId }
+        $users | where-object { $_.userName -eq $user } | ForEach-Object { $_.AccessToken = $securityKey.AccessKey.SecretAccessKey }
+    }
     write-host -NoNewline "$counter "
     $counter++
 }
 write-host "done"
+$users | select-object userName, region, AccessId, AccessToken | Export-csv users.csv -useQuotes AsNeeded
 # write-host "Creating any required Cloud Formation"
 $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
 $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
@@ -241,17 +247,19 @@ $regions | select-object | ForEach-Object {
 
     #AWSStack
     $AWScfstack = "scw-AWSstack-$stackId" 
-    aws cloudformation create-stack --region $awsRegion --stack-name $AWScfstack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
-    
+    aws cloudformation create-stack --region $awsRegion --stack-name $AWScfstack --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml 1>$null
+
     #EKS Roles
-    $AWSroleName = "scw-awsrole-$stackId"
-    "aws iam create-role --region $awsRegion --role-name $awsRoleName --assume-role-policy-document '$ekspolicy'"
-    aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName
-    $AWSnodeRoleName = "scw-awsngrole-$stackId"
-    "aws iam create-role --region $awsRegion --role-name $awsNodeRoleName --assume-role-policy-document '$ec2policy'"
-    aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy 
-    aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly 
-    aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+    $awsRoleName = "scw-awsrole-$stackId"
+    write-host "creating awsRoleName: $awsRoleName"
+    aws iam create-role --region $awsRegion --role-name $awsRoleName --assume-role-policy-document "$ekspolicy" 1>$null
+    aws iam attach-role-policy --region $awsRegion --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy --role-name $awsRoleName 1>$null
+    $awsNodeRoleName = "scw-awsngrole-$stackId"
+    write-host "creating awsNodeRoleName: $awsNodeRoleName"
+    aws iam create-role --region $awsRegion --role-name $awsNodeRoleName --assume-role-policy-document "$ec2policy" 1>$null
+    aws iam attach-role-policy --region $awsRegion --role-name $awsNodeRoleName --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy  1>$null
+    aws iam attach-role-policy --region $awsRegion --role-name $awsNodeRoleName --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly  1>$null
+    aws iam attach-role-policy --region $awsRegion --role-name $awsNodeRoleName --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy 1>$null
 
     # $iamClusterRole = Send-Update -t 1 -c "Create Cluster Role" -r "aws iam create-role --region $awsRegion --role-name $awsRoleName --assume-role-policy-document '$ekspolicy'" | Convertfrom-Json
     # if ($iamClusterRole.Role.Arn) {
@@ -295,5 +303,3 @@ $regions | select-object | ForEach-Object {
 # # aws iam create-login-profile --user-name $user --password 1Dynatrace#
 # # aws iam add-user-to-group --group-name Attendees --user-name $user
 # # }
-
-

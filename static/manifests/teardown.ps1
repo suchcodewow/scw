@@ -50,8 +50,12 @@ $users | Foreach-Object -ThrottleLimit 10 -Parallel {
         foreach ($group in $groups) {
             aws iam remove-user-from-group --group-name $group --user-name $user
         }
+        $keys = aws iam list-access-keys --user-name $user | ConvertFrom-Json
+        foreach ($key in $keys) {
+            aws iam delete-access-key --user-name $user --access-key-id $key.AccessKeyMetadata.AccessKeyId
+        }
         aws iam delete-login-profile --user-name $user
         aws iam delete-user --user-name $user
-        write-host "deleted User: $user"5
+        write-host "deleted User: $user"
     }
 }
