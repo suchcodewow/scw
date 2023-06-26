@@ -1,5 +1,4 @@
-# $userCount = Read-Host -Prompt "How many users to create?"
-$userCount = 50
+$userCount = Read-Host -Prompt "How many users to create?"
 $regions = @("us-east-2", "us-east-1", "us-west-1", "us-west-2", "ca-central-1")
 $awsUsersPerRegion = 10
 [System.Collections.ArrayList]$script:users = @()
