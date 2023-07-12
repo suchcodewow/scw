@@ -1144,7 +1144,7 @@ function Set-DTConfig() {
                 Set-Prefs -k writeToken -v $cleanToken
             }
             else {
-                write-host "Tokens start with 'dt0c01' and are at least 80 characters."
+                write-host "Tokens start with 'dt0' and are at least 80 characters."
             }
     
         }
