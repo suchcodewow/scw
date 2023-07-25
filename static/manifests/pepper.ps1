@@ -510,11 +510,13 @@ function Get-Providers() {
                 if ($arnCheck) {
                     $awsSignedIn = $arnCheck.split("/")[1]
                 }
-                # Old Method with Email- switched to ARN
-                # (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
-                # if ($Matches.count -eq 3) {
-                #     $awsSignedIn = "$($Matches[1])$($Matches[2])"
-                # }
+                if ($awsSignedIn -eq "dtRoleAdvancedUser") {
+                    # if on Dynatrace account, sub in name instead of dtRoleAdvancedUser
+                    (aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon).UserId -match "-(.+)\.(.+)@" 1>$null
+                    if ($Matches.count -eq 3) {
+                        $awsSignedIn = "$($Matches[1])$($Matches[2])"
+                    }
+                }
                 else {
                     # No Email- try alternate method to get a unique identifier
                     $awsSts = aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon
