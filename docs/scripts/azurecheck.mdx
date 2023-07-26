@@ -3,15 +3,15 @@ pagination_prev:
 pagination_next:
 ---
 
-# Azure API Tester
+# Azure API Check
 
 ## Purpose
 
-The script below provides better visibility for troubleshooting Azure connections with a simple script outside of the Dynatrace UI.
+The script below tests the connection to the Azure API from your Dynatrace Active Gate (Windows or Linux). It isolates problems with both network (firewall) and credential issues.
 
 ## Usage
 
-Download the script below, paste in your details, and run.
+Download the script and run on your Active Gate. Powershell is required for Windows.
 
 Possible outcomes:
 
@@ -19,26 +19,32 @@ Possible outcomes:
 - Credentials Authenticated, but FAILED to retrieve subscriptions: The account successfully authenticated, but doesn't have permissions to any subscriptions
 - Successfully Connected and retrieved subscriptions: Credentials worked and retrieved at least 1 subscription. These account details should work in Dynatrace!
 
-## Download
+## Download and Run
+
+### Windows: Option 1
+
+Open terminal and download with:
+
+```bash
+pwsh -c invoke-webrequest -Uri https://www.suchcodewow.io/manifests/azurecheck.ps1 -OutFile azurecheck.ps1
+```
+
+Run the file with:
+
+```bash
+pwsh azurecheck.ps1
+```
+
+### Windows: Option 2
 
 [Direct Download](/manifests/azurecheck.ps1)
 
-## Modify
+Open a terminal prompt and run `azurecheck.ps1`.
 
-Update the values within the script for your tenant:
+### Linux
 
-```powershell
-$tenantId = "YOUR_TENANT_ID"
-$applicationId = "YOUR_APP_ID"
-$secret = "SECRET_VALUE"
+Download the script with:
+
+```bash
+curl https://www.suchcodewow.io/manifests/azurecheck.sh > ~/azurecheck.sh
 ```
-
-If connecting to an Azure Gov tenant, update `$isAzureGov = $false` to:
-
-```powershell
-$isAzureGov = $true
-```
-
-## Run the script
-
-Execute the script and wait for results.

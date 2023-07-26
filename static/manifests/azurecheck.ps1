@@ -51,38 +51,8 @@ function Send-Update {
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
-    # Do the things for the command line switched selected
-    # if ($help) { Get-Help }
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
-    # if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
-    # if ($logReset) { $script:retainLog = $false } else { $script:retainLog = $true }
-    # if ($aws) { $script:useAWS = $true }
-    # if ($azure -eq $true) { $script:useAzure = $true }
-    # if ($gcp) { $script:useGCP = $true }
-    # If no cloud selected, use all
-    # if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { $script:useAWS = $true; $script:useAzure = $true; $script:useGCP = $true }
-    # # Set Script level variables and housekeeping stuffs
-    # [System.Collections.ArrayList]$script:providerList = @()
-    # [System.Collections.ArrayList]$script:choices = @()
-    # $script:currentLogEntry = $null
-    # # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
-    # $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml",
-    #     "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos.yaml" )
     $script:ProgressPreference = "SilentlyContinue"
-    # if ($scriptPath) {
-    #     $script:configFile = "$($scriptPath).conf"
-    #     Send-Update -t 0 -c "Config: $configFile"
-    # }
-    # if ($outputLevel -eq 0) {
-    #     $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties")
-    #     $script:providerColumns = @("option", "provider", "name", "identifier", "userid", "default")
-    # }
-    # else {
-    #     $script:choiceColumns = @("Option", "description", "current")
-    #     $script:providerColumns = @("option", "provider", "name")
-    # }
-    # Load preferences/settings.  Access with $config variable anywhere.  Set-Prefs automatically updates $config variable and saves to file
-    # Set with Set-Prefs function
     if ($scriptPath) {
         $script:configFile = "$scriptPath.conf"
         if (Test-Path $configFile) {
@@ -98,7 +68,6 @@ function Get-Prefs($scriptPath) {
             }
         }
     }
-    # Set-Prefs -k UserCount -v $users
     write-host
 
 }
@@ -166,25 +135,27 @@ function Set-Prefs {
 }
 function Get-Result {
 
-    if ($isAzureGov) {
+    if ($config.isAzureGov -eq "y") {
+        Send-Update -c "Using GOV Azure" -t 0
         $adEndpoint = 'https://login.microsoftonline.us'
         $managementEndpoint = 'https://management.core.usgovcloudapi.net/'
         $resourceEndpoint = 'management.usgovcloudapi.net'
     }
     else {
+        Send-Update -c "Using Commercial Azure" -t 0
         $adEndpoint = 'https://login.microsoftonline.com'
         $managementEndpoint = 'https://management.core.windows.net/'
         $resourceEndpoint = 'management.azure.com'
     }
 
     $param = @{
-        Uri    = "$adEndpoint/$tenantId/oauth2/token?api-version=2020-06-01";
+        Uri    = "$adEndpoint/$($config.tenantId)/oauth2/token?api-version=2020-06-01";
         Method = 'Post';
         Body   = @{
             grant_type    = 'client_credentials';
             resource      = $managementEndpoint;
-            client_id     = $applicationId;
-            client_secret = $secret
+            client_id     = $($config.appId);
+            client_secret = $($config.secretValue);
         }
     }
 
@@ -250,16 +221,8 @@ function Get-Answer {
 # Main
 Get-Prefs($Myinvocation.MyCommand.Source)
 Get-Answer -p "Directory (Tenant) Id" -v tenantId
-# if ($config.tenantId) {
-#     $tenantId = $config.tenantId
-#     $tenantIdDefault = " [<enter> to use '$($config.tenantId.substring($config.tenantId.length - 6))']" 
-# }
-# $tenantIdresponse = read-host -Prompt "Directory (Tenant) ID$($tenantIdDefault) "
-# if ($tenantIdresponse)
-# if ($tenantId) { set-Prefs -k tenantId -v $tenantId } else { exit }
-# $applicationId = read-host -Prompt "Application (Client) ID: "
-# if ($applicationId) { set-Prefs -k applicationId -v $applicationId } else { exit }
-# $secret = read-host -Prompt "Secret Value (NOT Secret ID!): "
-# if ($secret) { set-Prefs -k secret -v $secret } else { exit }
-# $isAzureGov = read-host -Prompt "Is your tenant Azure Gov? (y for yes, leave blank for no): "
+Get-Answer -p "Application (client) ID" -v appId
+Get-Answer -p "Secret Value (NOT the ID!)" -v secretValue
+Get-Answer -p "Connect to Azure GOV? (y for yes, n for no)" -v isAzureGov
+Get-Result
 write-host "Exiting.  Remember to delete .conf file if done!"
