@@ -1,68 +1,265 @@
+# VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions. Check '.vscode/launch.json' for any current parameters
+param (
+    [switch] $help, # show other command options and exit
+    [switch] $verbose # default output level is 1 (info/errors), use -v for level 0 (debug/info/errors)
+)
+
 #Dynatrace Azure Check Utility
 
-# Replace values with your tenant, appId, and secret VALUE (not secret ID)
-
-$tenantId = "YOUR_TENANT_ID"
-$applicationId = "YOUR_APP_ID"
-$secret = "SECRET_VALUE"
-
-# Switch this to $true if using Azure Gov
-
-$isAzureGov = $false
-
-# Do not modify below
-
-if ($isAzureGov) {
-    $adEndpoint = 'https://login.microsoftonline.us'
-    $managementEndpoint = 'https://management.core.usgovcloudapi.net/'
-    $resourceEndpoint = 'management.usgovcloudapi.net'
+# Functions
+function Send-Update {
+    # Handle output to screen & log, execute commands to cloud systems and return results
+    param(
+        [string] $content, # Message content to log/write to screen
+        [int] $type, # [0/1/2] log levels respectively: debug/info/errors, info/errors, errors
+        [string] $run, # Run a command and return result
+        [switch] $append, # [$true/false] skip the newline (next entry will be on same line)
+        [switch] $ErrorSuppression, # use this switch to suppress error output (useful for extraneous warnings)
+        [switch] $OutputSuppression # use to suppress normal output
+    )
+    $Params = @{}
+    if ($run) {
+        $Params['ForegroundColor'] = "Magenta"; $start = "[>]"
+    }
+    else {
+        Switch ($type) {
+            0 { $Params['ForegroundColor'] = "DarkBlue"; $start = "[.]" }
+            1 { $Params['ForegroundColor'] = "DarkGreen"; $start = "[-]" }
+            2 { $Params['ForegroundColor'] = "DarkRed"; $start = "[X]" }
+            default { $Params['ForegroundColor'] = "Gray"; $start = "" }
+        }
+    }
+    # Format the command to show on screen if user wants to see it
+    if ($run -and $showCommands) { $showcmd = " [ $run ] " }
+    if ($currentLogEntry) { $screenOutput = "$content$showcmd" } else { $screenOutput = "   $start $content$showcmd" }
+    if ($append) { $Params['NoNewLine'] = $true; $script:currentLogEntry = "$script:currentLogEntry $content$showcmd"; }
+    if (-not $append) {
+        #This is the last item in-line.  Write it out if log exists
+        if ($logFile) {
+            "$(get-date -format "yyyy-MM-dd HH:mm:ss"): $currentLogEntry $content$showcmd" | out-file $logFile -Append
+        }
+        #Reset inline recording
+        $script:currentLogEntry = $null
+    }
+    # output if user wants to see this level of content
+    if ($type -ge $outputLevel) {
+        write-host @Params $screenOutput
+    }
+    if ($run -and $ErrorSuppression -and $OutputSuppression) { return invoke-expression $run 2>$null 1>$null }
+    if ($run -and $ErrorSuppression) { return invoke-expression $run 2>$null }
+    if ($run -and $OutputSuppression) { return invoke-expression $run 1>$null }
+    if ($run) { return invoke-expression $run }
 }
-else {
-    $adEndpoint = 'https://login.microsoftonline.com'
-    $managementEndpoint = 'https://management.core.windows.net/'
-    $resourceEndpoint = 'management.azure.com'
-}
+function Get-Prefs($scriptPath) {
+    # Do the things for the command line switched selected
+    # if ($help) { Get-Help }
+    if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
+    # if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
+    # if ($logReset) { $script:retainLog = $false } else { $script:retainLog = $true }
+    # if ($aws) { $script:useAWS = $true }
+    # if ($azure -eq $true) { $script:useAzure = $true }
+    # if ($gcp) { $script:useGCP = $true }
+    # If no cloud selected, use all
+    # if ((-not $useAWS) -and (-not $useAzure) -and (-not $useGCP)) { $script:useAWS = $true; $script:useAzure = $true; $script:useGCP = $true }
+    # # Set Script level variables and housekeeping stuffs
+    # [System.Collections.ArrayList]$script:providerList = @()
+    # [System.Collections.ArrayList]$script:choices = @()
+    # $script:currentLogEntry = $null
+    # # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
+    # $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml",
+    #     "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos.yaml" )
+    $script:ProgressPreference = "SilentlyContinue"
+    # if ($scriptPath) {
+    #     $script:configFile = "$($scriptPath).conf"
+    #     Send-Update -t 0 -c "Config: $configFile"
+    # }
+    # if ($outputLevel -eq 0) {
+    #     $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties")
+    #     $script:providerColumns = @("option", "provider", "name", "identifier", "userid", "default")
+    # }
+    # else {
+    #     $script:choiceColumns = @("Option", "description", "current")
+    #     $script:providerColumns = @("option", "provider", "name")
+    # }
+    # Load preferences/settings.  Access with $config variable anywhere.  Set-Prefs automatically updates $config variable and saves to file
+    # Set with Set-Prefs function
+    if ($scriptPath) {
+        $script:configFile = "$scriptPath.conf"
+        if (Test-Path $configFile) {
+            Send-Update -c "Reading config $script:configfile" -t 0
+            $script:config = Get-Content $configFile -Raw | ConvertFrom-Json -AsHashtable
+        }
+        else {
+            $script:config = @{}
+            $config["schemaVersion"] = "2.0"
+            if ($MyInvocation.MyCommand.Name) {
+                $config | ConvertTo-Json | Out-File $configFile
+                Send-Update -c "CREATED config" -t 0
+            }
+        }
+    }
+    # Set-Prefs -k UserCount -v $users
+    write-host
 
-$param = @{
-    Uri    = "$adEndpoint/$tenantId/oauth2/token?api-version=2020-06-01";
-    Method = 'Post';
-    Body   = @{
-        grant_type    = 'client_credentials';
-        resource      = $managementEndpoint;
-        client_id     = $applicationId;
-        client_secret = $secret
+}
+function Set-Prefs {
+    param(
+        $u, # Add this value to a user's settings (mostly for mult-user setup sweetness)
+        $k, # key
+        $v # value
+    )
+    if ($u) {
+        # Focus on user subkey
+        if ($k) {
+            # Create User nested hashtable if needed
+            if (-not $config.Users.$u) { $config.Users.$u = @{} }
+            if ($v) {
+                # Update User Value
+                Send-Update -c "Updating $u user key: $k -> $v" -t 0
+                $config.Users.$u[$k] = $v 
+            }
+            else {
+                if ($k -and $config.Users.$u.containsKey($k)) {
+                    # Attempt to delete the user's key
+                    Send-Update -c "Deleting $u user key: $k" -t 0
+                    $config.Users.$u.remove($k)
+                }
+                else {
+                    Send-Update -c "$u Key didn't exist: $k" -t 0
+                }
+            }
+        }
+        else {
+            if ($config.Users.$u) {
+                # Attempt to remove the entire user
+                Send-Update -c "Removing $u user" -t 0
+                $config.Users.remove($u)
+            }
+            else {
+                Send-Update -c "User $u didn't exists" -t 0
+            }
+        }
+    }
+    else {
+        # Update at main schema level
+        if ($v) {
+            Send-Update -c "Updating key: $k -> $v" -t 0
+            $config[$k] = $v 
+        }
+        else {
+            if ($k -and $config.containsKey($k)
+            ) {
+                Send-Update -c "Deleting config key: $k" -t 0
+                $config.remove($k)
+            }
+            else {
+                Send-Update -c "Key didn't exist: $k" -t 0
+            }
+        }     
+    }
+    if ($MyInvocation.MyCommand.Name) {
+        $config | ConvertTo-Json | Out-File $configFile
+    }
+    else {
+        Send-Update -c "No command name, skipping write" -t 0
     }
 }
+function Get-Result {
 
-$result = Invoke-RestMethod @param
-$token = $result.access_token
+    if ($isAzureGov) {
+        $adEndpoint = 'https://login.microsoftonline.us'
+        $managementEndpoint = 'https://management.core.usgovcloudapi.net/'
+        $resourceEndpoint = 'management.usgovcloudapi.net'
+    }
+    else {
+        $adEndpoint = 'https://login.microsoftonline.com'
+        $managementEndpoint = 'https://management.core.windows.net/'
+        $resourceEndpoint = 'management.azure.com'
+    }
 
-if ($token) {
-    # List subscriptions
-    $param_subList = @{
-        Uri         = "https://$resourceEndpoint/subscriptions?api-version=2020-01-01"
-        ContentType = 'application/json'
-        Method      = 'GET'
-        headers     = @{
-            authorization = "Bearer $token"
-            host          = $resourceEndpoint
+    $param = @{
+        Uri    = "$adEndpoint/$tenantId/oauth2/token?api-version=2020-06-01";
+        Method = 'Post';
+        Body   = @{
+            grant_type    = 'client_credentials';
+            resource      = $managementEndpoint;
+            client_id     = $applicationId;
+            client_secret = $secret
         }
     }
 
-    $response = Invoke-RestMethod @param_subList
-    if ($response.value.count -gt 0) {
-        $response.value
-        write-host "Successfully connected and retrieved subscriptions."
+    $result = Invoke-RestMethod @param
+    $token = $result.access_token
+
+    if ($token) {
+        # List subscriptions
+        $param_subList = @{
+            Uri         = "https://$resourceEndpoint/subscriptions?api-version=2020-01-01"
+            ContentType = 'application/json'
+            Method      = 'GET'
+            headers     = @{
+                authorization = "Bearer $token"
+                host          = $resourceEndpoint
+            }
+        }
+
+        $response = Invoke-RestMethod @param_subList
+        if ($response.value.count -gt 0) {
+            $response.value
+            write-host "Successfully connected and retrieved subscriptions."
+        }
+        else {
+            write-host ""
+            write-host "Credentials authenticated, but FAILED to retrieve subscriptions."
+            write-host ""
+        }
+
     }
     else {
         write-host ""
-        write-host "Credentials authenticated, but FAILED to retrieve subscriptions."
+        write-host "FAILED to authenticate. See Error above."
         write-host ""
     }
+}
+function Get-Answer {
+    param(
+        $prompt, #what to ask
+        $variable #variable name to update
+    )
+    $trimVariableTo = 8
+    if ($config[$variable]) {
+        # variable exists, offer it as default
+        $defaultResponse = $config[$variable]
+        if ($defaultResponse.length -gt $trimVariableTo) {
+            # trim variable to limit
+            $defaultResponse = "$($defaultResponse.substring(0,$trimVariableTo-2)).."
+        }
+        $defaultResponsePrompt = " [<enter> to use: '$defaultResponse']"
+    }
+    $response = read-host -prompt "$prompt$defaultResponsePrompt"
+    if (-not $response ) {
+        # No response - abort if no existing value
+        if (-not $config[$variable]) { exit }
+        
+    }
+    else {
+        set-Prefs -k $variable -v $response
+    }
+}
 
-}
-else {
-    write-host ""
-    write-host "FAILED to authenticate. See Error above."
-    write-host ""
-}
+# Main
+Get-Prefs($Myinvocation.MyCommand.Source)
+Get-Answer -p "Directory (Tenant) Id" -v tenantId
+# if ($config.tenantId) {
+#     $tenantId = $config.tenantId
+#     $tenantIdDefault = " [<enter> to use '$($config.tenantId.substring($config.tenantId.length - 6))']" 
+# }
+# $tenantIdresponse = read-host -Prompt "Directory (Tenant) ID$($tenantIdDefault) "
+# if ($tenantIdresponse)
+# if ($tenantId) { set-Prefs -k tenantId -v $tenantId } else { exit }
+# $applicationId = read-host -Prompt "Application (Client) ID: "
+# if ($applicationId) { set-Prefs -k applicationId -v $applicationId } else { exit }
+# $secret = read-host -Prompt "Secret Value (NOT Secret ID!): "
+# if ($secret) { set-Prefs -k secret -v $secret } else { exit }
+# $isAzureGov = read-host -Prompt "Is your tenant Azure Gov? (y for yes, leave blank for no): "
+write-host "Exiting.  Remember to delete .conf file if done!"
