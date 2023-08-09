@@ -56,6 +56,22 @@ result=$(curl --write-out '%{http_code}' -X POST -d "${param}" "${adEndpoint}/${
 access_token=$(echo $result | grep -oP '"access_token":"(.*?)"' | sed 's/"//g')
 if [ ! -z "$access_token" ]; then
     echo "Successfully retrieved an access token!"
+    # List subscriptions
+    # paramSubList = @{
+    #     Uri         = "https://$resourceEndpoint/subscriptions?api-version=2020-01-01"
+    #     ContentType = 'application/json'
+    #     Method      = 'GET'
+    #     headers     = @{
+    #         authorization = "Bearer $token"
+    #         host          = $resourceEndpoint
+    #     }
+    # }
+    subscriptresult=$(curl -X GET -H "host: ${resourceEndpoint}" -H "authorization: Bearer ${access_token:13}" -H "ContentType: application/json" "https://${resourceEndpoint}/subscriptions?api-version=2020-01-01")
+    echo $subscriptresult
+    # $response = Invoke-RestMethod @param_subList
+    # if ($response.value.count -gt 0) {
+    #     $response.value
+    #     write-host "Successfully connected and retrieved subscriptions."
 else
     echo "Failed to authenticate."
 fi
