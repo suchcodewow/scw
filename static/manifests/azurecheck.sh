@@ -52,7 +52,7 @@ fi
 # param="{\"grant_type\":\"client_credentials\",\"resource\":\"$managementEndpoint\",\"client_id\":\"${appId}\",\"client_secret\":\"${secretValue}\"}"
 param="grant_type=client_credentials&resource=${managementEndpoint}&client_id=${appId}&client_secret=${secretValue}"
 # echo $param
-result=$(curl --write-out '%{http_code}' -X POST -d "${param}" "${adEndpoint}/${tenantId}/oauth2/token?api-version=2020-06-01")
+result=$(curl -s --write-out '%{http_code}' -X POST -d "${param}" "${adEndpoint}/${tenantId}/oauth2/token?api-version=2020-06-01")
 access_token=$(echo $result | grep -oP '"access_token":"(.*?)"' | sed 's/"//g')
 if [ ! -z "$access_token" ]; then
     echo "Successfully retrieved an access token!"
@@ -74,28 +74,15 @@ if [ ! -z "$access_token" ]; then
     #     write-host "Successfully connected and retrieved subscriptions."
 else
     echo "Failed to authenticate."
+    exit
 fi
-
-# echo $result
-# token=$(echo "$result" | jq -r '.access_token')
-
-# if [ ! -z "$token" ]; then
-#     # List subscriptions
-#     param_subList="{\"api-version\":\"2020-01-01\"}"
-
-#     response=$(curl -X GET -H "Authorization: Bearer $token" -H "Content-Type: application/json" -H "Host: $resourceEndpoint" "$resourceEndpoint/subscriptions?$param_subList")
-
-#     subscription_count=$(echo "$response" | jq '.value | length')
-#     if [ "$subscription_count" -gt 0 ]; then
-#         echo "$response" | jq '.value'
-#         echo "Successfully connected and retrieved subscriptions."
-#     else
-#         echo ""
-#         echo "Credentials authenticated, but FAILED to retrieve subscriptions."
-#         echo ""
-#     fi
-# else
-#     echo ""
-#     echo "FAILED to authenticate. See Error above."
-#     echo ""
-# fi
+clean_token=$(echo ${access_token:13})
+param_subList="{\"api-version\":\"2020-01-01\"}"
+sublist=$(curl -s -X GET -H "Authorization: Bearer ${clean_token}" -H "host: ${resourceEndpoint}" "https://${resourceEndpoint}/subscriptions?api-version=2020-01-01")
+subscriptions=$(echo $sublist | grep -oP '"id":"(.*?)"' | sed 's/"//g')
+if [ ! -z "$subscriptions" ]; then
+    echo "And has access to at least one subscription"
+    echo $subscriptions
+else
+    echo "The app registration doesn't seem to have access to any subscriptions?"
+fi
