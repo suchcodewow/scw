@@ -517,13 +517,13 @@ function Get-Providers() {
                         $awsSignedIn = "$($Matches[1])$($Matches[2])"
                     }
                 }
-                else {
-                    # No Email- try alternate method to get a unique identifier
-                    $awsSts = aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon
-                    if ($awsSts) {
-                        $awsSignedIn = $awsSts.UserId.subString(0, 6)
-                    }
-                }
+                # else {
+                #     # No Email- try alternate method to get a unique identifier
+                #     $awsSts = aws sts get-caller-identity --output json 2>$null | Convertfrom-JSon
+                #     if ($awsSts) {
+                #         $awsSignedIn = $awsSts.UserId.subString(0, 6)
+                #     }
+                # }
             }
             if ($awsSignedIn) {
                 Add-Provider -d -p "AWS" -n "$awsRegion/$($awsSignedIn.ToLower())" -i $awsRegion -u $($awsSignedIn.ToLower())
