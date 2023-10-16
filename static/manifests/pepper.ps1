@@ -619,6 +619,7 @@ function Set-Provider() {
 function Add-AzureSteps() {
     # Get Azure specific properties from current choice
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    Set-Prefs -k "textUserId" -v $($userProperties.userid)
     #Resource Group Check
     $targetGroup = "scw-group-$($userProperties.userid)"; $SubId = $userProperties.id
     $groupExists = Send-Update -t 1 -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup --subscription $SubId" -append
@@ -633,13 +634,15 @@ function Add-AzureSteps() {
     }
     #AKS Cluster Check
     $targetCluster = "scw-AKS-$($userProperties.userid)"
-    $aksExists = Send-Update -t 1 -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query id" -append
+    $aksExists = Send-Update -t 1 -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query '{id:id, location:location}'" -append
     if ($aksExists) {
         send-Update -content "yes" -type 1
         Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
         #Add-Choice -k "AZCRED" -d "Refresh k8s credential" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
         #Refresh cluster credentials
         Get-AKSCluster -g $targetGroup -c $targetCluster
+        #Record the region for Azure DNS k8s annotation later
+        Set-Prefs -k "K8sregion" -v ($aksExists | ConvertFrom-Json).location
         #We have a cluster so add common things to do with it
         Add-CommonSteps
     }
@@ -1400,7 +1403,7 @@ function Get-Apps() {
         Invoke-WebRequest -Uri $uri.OriginalString -OutFile $yamlName | Out-Host
         ((Get-Content -path $yamlName -Raw) -replace '<dynatraceURL>', $config.tenantID) | Set-Content -Path $yamlName
         ((Get-Content -path $yamlName -Raw) -replace '<dynatraceToken>', $config.k8stoken) | Set-Content -Path $yamlName
-
+        ((Get-Content -path $yamlName -Raw) -replace 'dnsplaceholder', "scw$($config.textUserId)") | Set-Content -Path $yamlName
     }
     Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
@@ -1414,15 +1417,21 @@ function Get-AppUrls {
     $services = (kubectl get svc -n $namespace -ojson | Convertfrom-Json).items
     #Get any external ingress for this app
     foreach ($service in $services) {
+        write-host $service.status
         if ($service.status.loadBalancer.ingress.count -gt 0) {
-            if (-not $returnList) { $returnList = "URLS:" }
+            if (-not $returnList) { $returnList = "" }
             # Azure was using IP address.  Switched to hostname for default AWS
             if ($service.status.loadBalancer.ingress[0].hostname) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
             }
+            if ($namespace -eq "dbic" -and $config.Provider -eq "AZ") {
+                $returnList = "http://scw$($config.textUserId).$($config.K8sregion).cloudapp.azure.com"
+            }
             if ($service.status.loadBalancer.ingress[0].ip) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
             }
+
+            
         }
     }
     #Return list
