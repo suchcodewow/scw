@@ -918,7 +918,7 @@ function Remove-AWSComponents {
     $AWSclusterRoleArn = $config.AWSclusterRoleArn
     $awsRoleName = $config.AWSroleName
     $awsNodeRoleName = $config.AWSnodeRoleName
-    $awsCFStack = $config.AWScfstack
+    # $awsCFStack = $config.AWScfstack
     $AWScfstackArn = $config.AWScfstackArn
     $AWSNodeRoleArn = $config.AWSnodeRoleArn
 
