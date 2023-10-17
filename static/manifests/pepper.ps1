@@ -1417,7 +1417,6 @@ function Get-AppUrls {
     $services = (kubectl get svc -n $namespace -ojson | Convertfrom-Json).items
     #Get any external ingress for this app
     foreach ($service in $services) {
-        write-host $service.status
         if ($service.status.loadBalancer.ingress.count -gt 0) {
             if (-not $returnList) { $returnList = "" }
             # Azure was using IP address.  Switched to hostname for default AWS
