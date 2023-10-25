@@ -19,8 +19,8 @@ function Send-Update {
         [int] $type, # [0/1/2] log levels respectively: debug/info/errors, info/errors, errors
         [string] $run, # Run a command and return result
         [switch] $append, # [$true/false] skip the newline (next entry will be on same line)
-        [switch] $ErrorSuppression, # use this switch to suppress error output (useful for extraneous warnings)
-        [switch] $OutputSuppression # use to suppress normal output
+        [switch] $errorSuppression, # use this switch to suppress error output (useful for extraneous warnings)
+        [switch] $outputSuppression # use to suppress normal output
     )
     $Params = @{}
     if ($run) {
@@ -50,9 +50,9 @@ function Send-Update {
     if ($type -ge $outputLevel) {
         write-host @Params $screenOutput
     }
-    if ($run -and $ErrorSuppression -and $OutputSuppression) { return invoke-expression $run 2>$null 1>$null }
-    if ($run -and $ErrorSuppression) { return invoke-expression $run 2>$null }
-    if ($run -and $OutputSuppression) { return invoke-expression $run 1>$null }
+    if ($run -and $errorSuppression -and $outputSuppression) { return invoke-expression $run 2>$null 1>$null }
+    if ($run -and $errorSuppression) { return invoke-expression $run 2>$null }
+    if ($run -and $outputSuppression) { return invoke-expression $run 1>$null }
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
@@ -676,7 +676,7 @@ function Add-AKSCluster() {
         [string] $g, #resource group
         [string] $c #cluster name
     )
-    Send-Update -s -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
+    Send-Update -o -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
     Get-AKSCluster -g $g -c $c
     Add-AzureSteps
     Add-CommonSteps
@@ -1417,7 +1417,6 @@ function Get-AppUrls {
     $services = (kubectl get svc -n $namespace -ojson | Convertfrom-Json).items
     #Get any external ingress for this app
     foreach ($service in $services) {
-        write-host $service.status
         if ($service.status.loadBalancer.ingress.count -gt 0) {
             if (-not $returnList) { $returnList = "" }
             # Azure was using IP address.  Switched to hostname for default AWS
