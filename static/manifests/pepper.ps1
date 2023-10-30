@@ -27,7 +27,7 @@ function Send-Update {
     if ($run) {
         $Params['ForegroundColor'] = "Magenta"; $start = "[>]"
     }
-    else {
+    else { 
         Switch ($type) {
             0 { $Params['ForegroundColor'] = "DarkBlue"; $start = "[.]" }
             1 { $Params['ForegroundColor'] = "DarkGreen"; $start = "[-]" }
