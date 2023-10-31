@@ -1156,7 +1156,7 @@ function Remove-AWSCluster {
 }
 
 # GCP MU Functions
-function Add-AzureMultiUser() {
+function Add-GCPMultiUser() {
     # Create user accounts
     while (-not $addUserCount) {
         $addUserResponse = read-host -prompt "How many attendee accounts to generate? <enter> to cancel"
@@ -1186,24 +1186,15 @@ function Add-AzureMultiUser() {
         # Create User
         Do {
             $newUserName = Get-UserName
-            $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
-        } Until ($user)
-        Send-Update -t 0 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
+            # $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
+        } Until ($newUserName)
+        write-host $newUserName
+        # Send-Update -t 0 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
 
     }
-    Add-AzureMultiUserSteps
-    # $users | Foreach-Object -Parallel {
-    #     # Every parallel process runs in a separate shell, so defining everything in-line for now.
-    #     $password = "1Dynatrace##"
-    #     $userObject = az ad user create --display-name $user --password $password --force-change-password-next-sign-in false --user-principal-name "$user@suchcodewow.io" | ConvertFrom-Json
-    #     az ad group member add --group "Attendees" --member-id $($userObject.id)
-    #     # az group create --name "scw-group-$user" --location eastus2 -o none
-    #     # az aks create -g "scw-group-$user" -n "scw-AKS-$user" --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
-    #     write-host "$user@suchcodewow.io"
-       
-    # } -ThrottleLimit 10
-}
+    Add-GCPMultiUserSteps
 
+}
 function Get-GCPMultiUser() {
     $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
     write-host "`rPasswords for accounts is: 1Dynatrace##"
@@ -1250,7 +1241,55 @@ function Remove-GCPMultiUser() {
     }
     Add-GCPMultiUserSteps
 }
+function Add-GCPMultiUserCluster() {
+    $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json 
+    $possibleRegions = Send-Update -t 1 -c "Pull valid US Regions" -r "gcloud compute zones list --filter='name ~ us-.*' --sort-by name --format=json" | Convertfrom-Json
+    $usedRegions = Send-Update -t 1 -c "Get all existing clusters" -r "gcloud container clusters list --format=json" | Convertfrom-Json
+    $targetRegions = @()
+    $clusterNames = @()
+    foreach ($region in $possibleRegions) {
+        if ($usedRegions.location -notcontains $region.name) {
+            $targetRegions += $region.name
 
+        }
+    }
+    foreach ($user in $existingUsers) {
+    
+        $clusterName = (($user.preferredMemberKey.id).split("@")[0]).replace(".", "").ToLower()
+        $clusterNames += "scw-gke-$clusterName"
+
+    }
+    [System.Collections.ArrayList]$clustersToCreate = @()
+    $i = 0
+    foreach ($cluster in $clusterNames) {
+        $clusterExists = gcloud container clusters list --filter="name=$cluster" --format=json | Convertfrom-Json
+        if ($clusterExists) {
+            Send-Update -t 1 -c "$cluster already exists.  Skipping"
+        }
+        else {
+            $newCluster = New-Object PSCustomObject -Property @{
+                cluster = $cluster
+                region  = $targetRegions[$i]
+
+            }
+            [void]$clustersToCreate.add($newCluster)
+            $i++
+        }
+    }
+    # Save functions to string to use in parallel processing
+    $GetUsernameDef = ${function:Get-UserName}.ToString()
+    $SendUpdateDef = ${function:Send-Update}.ToString()
+    # Create clusters
+    $clustersToCreate | ForEach-Object -Parallel {
+        # Import functions and variables from main script
+        if ($using:showCommands) { $script:showCommands = $true }
+        $script:outputLevel = $using:outputLevel
+        ${function:Get-UserName} = $using:GetUsernameDef
+        ${function:Send-Update} = $using:SendUpdateDef
+        $clusterToCreate = $_
+        Send-Update -t 1 -c "Creating $($clusterToCreate.cluster)" -r "gcloud container clusters create -m e2-standard-4 --num-nodes=1 --zone=$($clusterToCreate.region) $($clusterToCreate.cluster) --user-output-enabled=false"
+    } -ThrottleLimit 10
+}
 function Add-GCPMultiUserSteps() {
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
@@ -1265,29 +1304,9 @@ function Add-GCPMultiUserSteps() {
         # End here, no existing users
         return
     }
-
-    # Create clusters
-    $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
- 
-    #   Save functions to string to use in parallel processing
-    $GetUsernameDef = ${function:Get-UserName}.ToString()
-    $SendUpdateDef = ${function:Send-Update}.ToString()
-    1..1 | ForEach-Object -Parallel {
-        # Import functions and variables from main script
-        if ($using:showCommands) { $script:showCommands = $true }
-        $script:outputLevel = $using:outputLevel
-        ${function:Get-UserName} = $using:GetUsernameDef
-        ${function:Send-Update} = $using:SendUpdateDef
-        $item = $_
-        $dict = $using:parallelResults
-
-        # Create Clusters
-        $ClusterName = "gke-cluster-$item"
-        write-host "Generating cluster $ClusterName"
-        gcloud container clusters create -m e2-standard-4 --num-nodes=1 --zone=us-east4 $clusterName
-
-    }
+    Add-Choice -k "GCPMCC" -d "Generate Kubernetes Clusters" -f Add-GCPMultiUserCluster -c "[NEEDS COUNT]"
 }
+
 # GCP Functions
 function Add-GCPSteps() {
     # Add GCP specific steps
