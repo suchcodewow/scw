@@ -616,7 +616,7 @@ function Set-Provider() {
 }
 
 # Azure MU Functions
-function add-AzureMultiUser() {
+function Add-AzureMultiUser() {
     # Create user accounts
 
     while (-not $addUserCount) {
@@ -668,7 +668,7 @@ function add-AzureMultiUser() {
 }
 function Get-AzureMultiUser() {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    write-host "`rPasswords for accounts is: 1Dyntrace##"
+    write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.userPrincipalName
 
@@ -1156,27 +1156,73 @@ function Remove-AWSCluster {
 }
 
 # GCP MU Functions
-function add-GCPMultiUserSteps() {
-    # User Options
-    $existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Current users: $($existingUsers.count)"
- 
-    #existingUsers fields: displayName, id, userPrincipalName
-    if ($existingUsers.count -gt 0) {
-        Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
-        Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
-    }
-    else {
-        # End here, no existing users
-        return
-    }
+function Add-AzureMultiUser() {
+    # Create user accounts
+    while (-not $addUserCount) {
+        $addUserResponse = read-host -prompt "How many attendee accounts to generate? <enter> to cancel"
+        if (-not($addUserResponse)) {
+            return
+        }
+        try {
+            $addUserCount = [convert]::ToInt32($addUserResponse)
 
-    # Check status for users
-    $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
- 
-    #   Save functions to string to use in parallel processing
+        }
+        catch {
+            write-host "`r`nPositives integers only"
+            
+        }
+    }
+    # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
+
+    # Create user accounts
+    1..$addUserCount | ForEach-Object -Parallel {
+        # Import functions and variables from main script
+        if ($using:showCommands) { $script:showCommands = $true }
+        $script:outputLevel = $using:outputLevel
+        ${function:Get-UserName} = $using:GetUsernameDef
+        ${function:Send-Update} = $using:SendUpdateDef
+        # Create User
+        Do {
+            $newUserName = Get-UserName
+            $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
+        } Until ($user)
+        Send-Update -t 0 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
+
+    }
+    Add-AzureMultiUserSteps
+    # $users | Foreach-Object -Parallel {
+    #     # Every parallel process runs in a separate shell, so defining everything in-line for now.
+    #     $password = "1Dynatrace##"
+    #     $userObject = az ad user create --display-name $user --password $password --force-change-password-next-sign-in false --user-principal-name "$user@suchcodewow.io" | ConvertFrom-Json
+    #     az ad group member add --group "Attendees" --member-id $($userObject.id)
+    #     # az group create --name "scw-group-$user" --location eastus2 -o none
+    #     # az aks create -g "scw-group-$user" -n "scw-AKS-$user" --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
+    #     write-host "$user@suchcodewow.io"
+       
+    # } -ThrottleLimit 10
+}
+
+function Get-GCPMultiUser() {
+    $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
+    write-host "`rPasswords for accounts is: 1Dynatrace##"
+    write-host ""
+    $existingUsers.preferredMemberKey.id
+
+}
+function Remove-GCPMultiUser() {
+    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
+    foreach ($user in $existingUsers) {
+        if ($user.userPrincipalName -contains "@suchcodewow.io") {
+            Send-Update -t 0 -
+        }
+    }
+    # Save functions to string to use in parallel processing
+    $GetUsernameDef = ${function:Get-UserName}.ToString()
+    $SendUpdateDef = ${function:Send-Update}.ToString()
+    
+    # Remove user accounts and all related content
     $existingUsers | ForEach-Object -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
@@ -1184,32 +1230,64 @@ function add-GCPMultiUserSteps() {
         ${function:Get-UserName} = $using:GetUsernameDef
         ${function:Send-Update} = $using:SendUpdateDef
         $user = $_
-        $dict = $using:parallelResults
-
-        # Check for resource group
-        $targetGroup = "scw-group-$($user.DisplayName)"
-        $targetCluster = "scw-AKS-$($userProperties.userid)"
-        $groupExists = Send-Update -t 0 -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup"
-        if ($groupExists -eq "true") { $groupName = $true } else { $groupname = $false }
-        $result = New-Object PSCustomObject -Property @{
-            userName      = $user.DisplayName
-            targetGroup   = $targetGroup
-            targetCluster = $targetCluster
-            groupExists   = $groupName
-            clusterExists = $false
-
+        # Delete  AKS if it exists
+        # Delete Resource group if it exists
+        # Delete User
+  
+        if ($user.userPrincipalName -like "*@suchcodewow.io") {
+            Send-Update -t 1 -c "Removing $($user.userPrincipalName) and all related items" -r "az ad user delete --id $($user.id)"
+            # Confirm Delete
+            Do {
+                Start-sleep -s 2
+                $userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
+            } until (-not $userExists)
         }
-        $dict.add($result)
+        else {
+            Send-Update -t 2 -c "The user principal $($user.userPrincipalName) didn't mactch @suchcodewow.io. Skipping!"
+        }
+
+
     }
-    $hasResourceGroup = $parallelResults | where-object { $_.groupExists }
-    if ($parallelResults.count - $hasResourceGroup.count -ne 0) {
-        $resourceGroups = $parallelResults | where-object { -not $_.groupExists } | select-object -ExpandProperty targetGroup
-        $resourceGroups.count
-        Add-Choice -k "AZMCRG" -d "Create Resource Groups" -c "$($hasResourceGRoup.count)/$($parallelResults.count) created" -f "Add-AzureMultiUserRG -resourceGroups $resourceGroups"
-        return
-    }
+    Add-GCPMultiUserSteps
 }
 
+function Add-GCPMultiUserSteps() {
+    # User Options
+    $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
+    Add-Choice -k "GCPMCU" -d "Create Attendee Accounts" -f Add-GCPMultiUser  -c "Current users: $($existingUsers.count)"
+ 
+    #existingUsers fields: displayName, id, userPrincipalName
+    if ($existingUsers.count -gt 0) {
+        Add-Choice -k "GCPMDL" -d "  List current Attendee Accounts" -f Get-GCPMultiUser 
+        Add-Choice -k "GCPMDU" -d "  Remove Attendee Accounts" -f Remove-GCPMultiUser
+    }
+    else {
+        # End here, no existing users
+        return
+    }
+
+    # Create clusters
+    $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
+ 
+    #   Save functions to string to use in parallel processing
+    $GetUsernameDef = ${function:Get-UserName}.ToString()
+    $SendUpdateDef = ${function:Send-Update}.ToString()
+    1..1 | ForEach-Object -Parallel {
+        # Import functions and variables from main script
+        if ($using:showCommands) { $script:showCommands = $true }
+        $script:outputLevel = $using:outputLevel
+        ${function:Get-UserName} = $using:GetUsernameDef
+        ${function:Send-Update} = $using:SendUpdateDef
+        $item = $_
+        $dict = $using:parallelResults
+
+        # Create Clusters
+        $ClusterName = "gke-cluster-$item"
+        write-host "Generating cluster $ClusterName"
+        gcloud container clusters create -m e2-standard-4 --num-nodes=1 --zone=us-east4 $clusterName
+
+    }
+}
 # GCP Functions
 function Add-GCPSteps() {
     # Add GCP specific steps
