@@ -1465,8 +1465,11 @@ function Set-DTConfig() {
                 # Add-CommonSteps
                 return
             }
+            write-host "tenantID pulled was $tenantID"
+            write-host $Matches
+            write-host "Matches above"
             if ($Matches) { Clear-Variable Matches }
-            $tenantID -match '\w{ 8 }' | Out-Null
+            $tenantID -match '\w{8}' | Out-Null
             if ($Matches) { $cleanTenantID = $Matches[0] }
             else { write-host "Tenant ID should be at least 8 alphanumeric characters." }
         }
