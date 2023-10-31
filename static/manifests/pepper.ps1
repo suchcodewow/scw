@@ -1411,7 +1411,7 @@ function Add-GCPCluster {
 }
 function get-GCPCluster {
     # Load the kubectl credentials
-    $env:USE_GKE_GCLOUD_AUTH_PLUGIN = True
+    # $env:USE_GKE_GCLOUD_AUTH_PLUGIN = True
     Send-Update -c "Get cluster creds" -t 1 -r "gcloud container clusters get-credentials  --zone $($config.gcpzone) $($config.gcpclustername)"
 }
 function Remove-GCPCluster {
