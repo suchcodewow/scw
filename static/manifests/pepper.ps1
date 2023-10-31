@@ -1486,7 +1486,7 @@ function Set-DTConfig() {
                 return
             }
             if ($Matches) { Clear-Variable Matches }
-            $token -match '^dt0c01.{ 80 }' | Out-Null
+            $token -match '^dt0c01.{80}' | Out-Null
             if ($Matches) {
                 $cleanToken = $Matches[0]
                 Set-Prefs -k writeToken -v $cleanToken
