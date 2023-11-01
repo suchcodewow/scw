@@ -17,20 +17,6 @@ You'll get a useful kubernetes installation very quickly while seeing how to do 
 
 You'll need the ability to use the cloud shell of your chosen cloud provider or be able to connect with a local terminal.
 
-### AWS
-
-- You'll need access to an AWS region where you are able to create an EKS clusters.
-- If using your terminal to connect you'll need an IAM token and secret.
-
-### Azure
-
-- You will need to be able to create a resource group and an AKS cluster.
-
-### GCLOUD
-
-- You will need access to an account with an existing project.
-- You'll need the ability to create a GKE cluster within that project.
-
 ## Usage
 
 Run:
@@ -44,3 +30,22 @@ Supported options:
 - `-c` Show cloud commands. Command history logged to **pepper.ps1.log** file for reference.
 - `-v` Show trivial/verbose commands. Chatty, but good feedback when modifying Pepper.
 - `-h` Shows all options.
+
+### AWS
+
+- You'll need access to an AWS region where you are able to create an EKS clusters.
+- If using your terminal to connect you'll need an IAM token and secret.
+
+### Azure
+
+- You will need to be able to create a resource group and an AKS cluster.
+
+### GCLOUD
+
+- You will need access to an account with an existing project.
+- You'll need the ability to create a GKE cluster within that project.
+- If you are using your local terminal on Windows or Mac, you'll need to install this plugin as administrator:
+
+```bash
+gcloud components install gke-gcloud-auth-plugin
+```
