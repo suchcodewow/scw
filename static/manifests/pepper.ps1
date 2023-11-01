@@ -1247,18 +1247,21 @@ function Add-GCPMultiUserCluster() {
     $usedRegions = Send-Update -t 1 -c "Get all existing clusters" -r "gcloud container clusters list --format=json" | Convertfrom-Json
     $targetRegions = @()
     $clusterNames = @()
+    write-host "possible regions"
     foreach ($region in $possibleRegions) {
         if ($usedRegions.location -notcontains $region.name) {
             $targetRegions += $region.name
 
         }
     }
+    write-host "existingUsers"
     foreach ($user in $existingUsers) {
         $clusterName = (($user.preferredMemberKey.id).split("@")[0]).replace(".", "").ToLower()
         $clusterNames += "scw-gke-$clusterName"
     }
     [System.Collections.ArrayList]$clustersToCreate = @()
     $i = 0
+    write-host "cluster names"
     foreach ($cluster in $clusterNames) {
         $clusterExists = gcloud container clusters list --filter="name=$cluster" --format=json | Convertfrom-Json
         if ($clusterExists) {
@@ -1271,7 +1274,6 @@ function Add-GCPMultiUserCluster() {
 
             }
             [void]$clustersToCreate.add($newCluster)
-            $i++
         }
     }
     # Save functions to string to use in parallel processing
@@ -1289,7 +1291,7 @@ function Add-GCPMultiUserCluster() {
     } -ThrottleLimit 10
 }
 function Remove-GCPMultiUserCluster() {
-    $items = Send-Update -t 1 -c "Get all clusters" -r "gcloud container clusters list --format=json --user-output-enabled=false" | Convertfrom-Json
+    $items = Send-Update -t 1 -c "Get all clusters" -r "gcloud container clusters list --format=json" | Convertfrom-Json
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
@@ -1457,7 +1459,7 @@ function Set-DTConfig() {
     While (-not $k8sToken) {
         # Get Tenant ID
         While (-not $cleantenantID) {
-            $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel: "
+            $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel"
             if (-not $tenantID) {
                 # Set-Prefs -k tenantID
                 # Set-Prefs -k writeToken
@@ -1481,7 +1483,7 @@ function Set-DTConfig() {
         }
         # Get Token
         While (-not $cleanToken) {
-            $token = read-Host -Prompt "Token with 'Write API token' permission <enter> to cancel: "
+            $token = read-Host -Prompt "Token with 'Write API token' permission <enter> to cancel"
             if (-not $token) {
                 return
             }
