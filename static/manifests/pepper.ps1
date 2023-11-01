@@ -1251,7 +1251,6 @@ function Add-GCPMultiUserCluster() {
     foreach ($region in $possibleRegions) {
         if ($usedRegions.location -notcontains $region.name) {
             $targetRegions += $region.name
-
         }
     }
     write-host "existingUsers"
@@ -1274,6 +1273,7 @@ function Add-GCPMultiUserCluster() {
 
             }
             [void]$clustersToCreate.add($newCluster)
+            i++
         }
     }
     # Save functions to string to use in parallel processing
