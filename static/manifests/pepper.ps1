@@ -1247,33 +1247,34 @@ function Add-GCPMultiUserCluster() {
     $usedRegions = Send-Update -t 1 -c "Get all existing clusters" -r "gcloud container clusters list --format=json" | Convertfrom-Json
     $targetRegions = @()
     $clusterNames = @()
-    write-host "possible regions"
+    write-host "Getting region list"
     foreach ($region in $possibleRegions) {
         if ($usedRegions.location -notcontains $region.name) {
             $targetRegions += $region.name
         }
     }
-    write-host "existingUsers"
+    write-host "Getting existing existing users"
     foreach ($user in $existingUsers) {
         $clusterName = (($user.preferredMemberKey.id).split("@")[0]).replace(".", "").ToLower()
         $clusterNames += "scw-gke-$clusterName"
     }
     [System.Collections.ArrayList]$clustersToCreate = @()
     $i = 0
-    write-host "cluster names"
+    write-host "cluster assignments:"
     foreach ($cluster in $clusterNames) {
-        $clusterExists = gcloud container clusters list --filter="name=$cluster" --format=json | Convertfrom-Json
-        if ($clusterExists) {
+        # $clusterExists = gcloud container clusters list --filter="name=$cluster" --format=json | Convertfrom-Json
+        if ($usedRegions.name -contains $cluster) {
             Send-Update -t 1 -c "$cluster already exists.  Skipping"
         }
         else {
+            Send-Update -t 1 -c "$cluster -> $($targetRegions[$i])"
             $newCluster = New-Object PSCustomObject -Property @{
                 cluster = $cluster
                 region  = $targetRegions[$i]
 
             }
             [void]$clustersToCreate.add($newCluster)
-            i++
+            $i++
         }
     }
     # Save functions to string to use in parallel processing
