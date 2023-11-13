@@ -713,16 +713,48 @@ function Remove-AzureMultiUser() {
     Add-AzureMultiUserSteps
 }
 function Add-AzureMultiUserRG() {
-    param (
-        [array]$resourceGroups
-    )
-
     write-host "starting"
-    write-host $resourceGroups.count
-    $needsResourceGroup = $parallelResults | where-object { $_.resourceGroup -eq $false }
-    write-host $needsResourceGroup
+    write-host $resourceGroups
+    # $needsResourceGroup = $parallelResults | where-object { $_.resourceGroup -eq $false }
+    # write-host $needsResourceGroup
+}
+function Get-AzureMultiUserRegion() {
+    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
+        $counter++
+        New-object PSCustomObject -Property @{Option = $counter; id = $i.id; name = $i.name }
+    }
+    $locationChoices | sort-object -property Option | format-table -Property Option, name | Out-Host
+    while (-not $locationId) {
+        $locationSelected = read-host -prompt "Which region for your resource group? <enter> to cancel"
+        if (-not $locationSelected) { return }
+        $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
+        if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    Set-Prefs -k muAzureRegion -v $locationId
+    # Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
+    Add-AzureMultiUserSteps
+}
+function Set-AzureMultiUserCreateCluster() {
+    if (-not $muCreateClusters) {
+        write-host "setting to true"
+        $script:muCreateClusters = $true
+    }
+    else {
+        $script:muCreateClusters = $false
+    }
+    Add-AzureMultiUserSteps
 }
 function Add-AzureMultiUserSteps() {
+    if (-not (test-path variable:muCreateClusters)) {
+        $script:muCreateClusters = $true
+    }
+    # Region Selected
+    Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
+    if (-not $config.muAzureRegion) {
+        return
+    }
+    Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Current users: $($existingUsers.count)"
@@ -752,11 +784,15 @@ function Add-AzureMultiUserSteps() {
         $user = $_
         $dict = $using:parallelResults
 
-        # Check for resource group
+        # Create resource group  if needed
         $targetGroup = "scw-group-$($user.DisplayName)"
         $targetCluster = "scw-AKS-$($userProperties.userid)"
         $groupExists = Send-Update -t 0 -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup"
-        if ($groupExists -eq "true") { $groupName = $true } else { $groupname = $false }
+        if (-not $groupExists -eq "true") {
+            Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $($config.muAzureRegion) -o none"
+        }
+
+        # Check for AKS cluster
         $result = New-Object PSCustomObject -Property @{
             userName      = $user.DisplayName
             targetGroup   = $targetGroup
@@ -767,13 +803,13 @@ function Add-AzureMultiUserSteps() {
         }
         $dict.add($result)
     }
-    $hasResourceGroup = $parallelResults | where-object { $_.groupExists }
-    if ($parallelResults.count - $hasResourceGroup.count -ne 0) {
-        $resourceGroups = $parallelResults | where-object { -not $_.groupExists } | select-object -ExpandProperty targetGroup
-        $resourceGroups.count
-        Add-Choice -k "AZMCRG" -d "Create Resource Groups" -c "$($hasResourceGRoup.count)/$($parallelResults.count) created" -f "Add-AzureMultiUserRG -resourceGroups $resourceGroups"
-        return
-    }
+    # $hasResourceGroup = $parallelResults | where-object { $_.groupExists }
+    # if ($parallelResults.count - $hasResourceGroup.count -ne 0) {
+    #     $script:resourceGroups = $parallelResults | where-object { -not $_.groupExists } | select-object -ExpandProperty targetGroup
+    #     write-host $resourceGroups.count
+    #     Add-Choice -k "AZMCRG" -d "Create Resource Groups" -c "$($hasResourceGRoup.count)/$($parallelResults.count) created" -f "Add-AzureMultiUserRG"
+    #     return
+    # }
 }
 
 # Azure Functions
