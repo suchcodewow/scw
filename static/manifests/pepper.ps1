@@ -1043,7 +1043,7 @@ function Add-AWSComponents {
 }
 function Add-AWSCluster {
     # Create cluster-  wait for 'active' state
-    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $($config.AWSregion) --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSsubnets), securityGroupIds=$($config.AWSsecurityGroup)"
+    Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $($config.AWSregion) --name $($config.AWScluster) --role-arn $($config.AWSclusterRoleArn) --resources-vpc-config subnetIds=$($config.AWSsubnets),securityGroupIds=$($config.AWSsecurityGroup)"
     $counter = 0
     While ($clusterExists.cluster.status -ne "ACTIVE") {
         $clusterExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --region $($config.AWSregion) --name $($config.AWScluster) --output json" | ConvertFrom-Json
@@ -1063,7 +1063,7 @@ function Add-AWSCluster {
         Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
-    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1, maxSize=1, desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
