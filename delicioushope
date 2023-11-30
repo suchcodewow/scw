@@ -1,0 +1,29 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJYWxDOU9HTk8vdkV3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TXpFeE16QXdOalEwTURoYUZ3MHpNekV4TWpjd05qUTVNRGhhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUUROc0M0b1ZoaHd3eHpDRkJITkdkbS92TFBuZWVKNmZWNjBSK0RIT2VLeDV4c04vSUNic0FaeDN3bXgKRHNYeDVvZG5KU1liRWtPclBBS3l4MGFpZ2xNTHZEZXQ1VVV2M3JIMzJKd3BZcmVuS01iSWZ2emJBYy9WRWw0TQpMNHZ4QStubElpYlNlR1pidmh0bjJLZk9TMmlJeERmY25xYU5lMWlxUjBDNXBQbER4QzY4QlBtM3BoL0JVa3BCCk9ZQkNrR3hhdmo2VE0wekZMbXh3SnNWaC80MjJMU1ZKMVJMVjZ5WDVVZzN2RUlySDZLLzdvOW9sUlM5RlpGQ0sKVzlVYTlJNjhreS8yWGEyRW5uSEZpeFpLaUtnVnR1dkhYdkdyQ1dXZy9vQXZxbzNJcjR5eXR5NzExSlo1Z3kwcQpheWxJTk5iMWFIc2RLT3JNOTZTKzErcTY4M0huQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJSdUJiRnpUc1Vabmg1MUx3S1JVK1JaczhLZ0ZUQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQ1NwT2xkT1FiRApLc29lWmMwQVJsVFJUOWIzcG9EM3NGdmRqazZ5cUJNeXU0S2JOZWxNbVRRSXdsZkxpZjY0TmhxZHVraGpzVTByCklHcE93ZmU0enMrKzU2MzlrcjVaQ2RGMjZxbTRYNEVJSUJmaXhvYXhZWmlIaHVtdXdWdFZ0YnVYNDFwa3FnR0QKdFdiRmEwZk5pbzhGZ3JvVFVOZlpqTzVtZWRFTE1LK3BoRHBsMUwwYnBwbzRVdUdGSjNSOWR4dmthczliK2dzdApETmdubFVOK1F4aGc0bFVzL2picHRmSVcyV2JtNTF1REQ2azVUQStYZUs4NG94bytMRm0rbW1adVpZd1l3RmQ1CmN3aTQzRXlxT0NQUEo3V2N5M1E3aGluTVZpencwN2hJU1UyQjFYN2dzVjVIc0tiR2N1d1FaTDY5a1FiMU1NNnMKVDlkTUtnenJLVmlOCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    server: https://3B149985FE9C2580508E3E1EB1B84198.gr7.us-east-2.eks.amazonaws.com
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-delicioushope
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-delicioushope
+    user: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-delicioushope
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-delicioushope
+current-context: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-delicioushope
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-delicioushope
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - --region
+      - us-east-2
+      - eks
+      - get-token
+      - --cluster-name
+      - scw-AWS-delicioushope
+      - --output
+      - json
+      command: aws

@@ -1,0 +1,29 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJUG5LejdCd282S1F3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TXpFeE16QXdOalEwTURCYUZ3MHpNekV4TWpjd05qUTVNREJhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURsOFJCak5NL0tXeXRCZm5WZ1FWVXVOZ3ZOUDY3Q0Zvb0p3N2FyVmxucDF1ZWxYNG1FdDV4SUhieGQKVHExWmtTaXVPM3JRYlMybEhZbklqTCtPTS81aFZYWEJxQkVDR1R0WXpwY2pMNDl3Q2hhSUZyWmZWSXRFSnNYagphY3NVNmsrRE1tZGRvNjE2UEltRVFvcmorazcra0FDaVZWTjZEN3dzRXh0ckJJTXpzYnNtMWVtYVNxaFdXOWJPCk4zV2swSkVMMVRrZE9DYW05QjVuczAwcCthRk85Qlk4SnBOcmNjSTh6bkZhd1VXcHNyNVlTSWdURXhaSS90bEYKVW1OWWxPcElVYTRLdVQyY05BdHFmckUrYkdIejBEWmY1N2lTc3hIZUVTWkdQa1dReThCbGtxdS9rVVBTUmdobgpSWjNUS3NFOWREaC9HbXlPcnFZM1FrOHE1QXRQQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJTYXZCSXdTRDI2N0loTzh5MXFFNUhpT0NQRWlEQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQVJyd05iaUdybwpxTkNITW9VWExzcGtOb0ZmZHBkeS9NSGxoM3pETExNdnVjWUNpM2lrcjVmMFFvbnZITzhzV1craW9oKzZMeWZtCm1BZmNUdzg2c3VuNzhjV1VaZFJIVzRQV292SmhSS3U5aFg3SHFRRndFdVJsZWZxNXQ1a3k0MlhTMm9rTVloZS8KU2lMVDUwcktUWkxNbGlodEJnTHFyRnByWEFLTFN2NnBjcTRhcVNBdittNWpBZ0FubFhKYi9seXpBUG12UkIrMQo0VlNVQlVwMTQ3WjBmWEo4b1A2V2pyR3dyc25hWXY5RHZBemJIQWEwZHNYOTJ3QTBJTWdBYkVLRUc3amFLNklIClg2ZldmTkJ3V0FRSGlNUDdLL0V1VWlzcjJuRTFIMitNeVBMdjEyc0E3cmhSY3NwV0FyaTVOZ2htT1BGbFhONTUKZXpSYi9SMHk4M01xCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    server: https://D17574671A2C4BA397F0DBB3A19B1B78.gr7.us-east-2.eks.amazonaws.com
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hugecow
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hugecow
+    user: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hugecow
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hugecow
+current-context: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hugecow
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hugecow
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - --region
+      - us-east-2
+      - eks
+      - get-token
+      - --cluster-name
+      - scw-AWS-hugecow
+      - --output
+      - json
+      command: aws

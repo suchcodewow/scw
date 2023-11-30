@@ -1,0 +1,29 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJZm01dXovMGd3T1l3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TXpFeE16QXdOalF6TkROYUZ3MHpNekV4TWpjd05qUTRORE5hTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUURGdklIR3kzQisvdGpFYU84d1VJN1prUUZxcGdOaFdRbzRPS0NsY1NkVk02ZnBTYVVFdkNKbnY3bmEKeHRiWXBUS1FCeTdubjU0N0o3ZWhSSnl2SHBlcmhCR3ptZ003RmVtTTZPVE1ud1V4VWNod08zcmNsbVptbU81Zgp5dDAxaHF0Ym04NCtTeW5kLzFvZkM0cFNsZmlZZW9kbW1mUXYzRDRDdkN4djBzTFhTVGNmZVQyU3B5cWxhMkw4CnNkUUpjRnFPeHVsaEp3OHVCV0VhWXJGYkh3YVg4V1pYRVBsckYrd0gyeC90SDFhNjE3U0hsb2h1eThFTnpQanIKaXMrTU9BSGZwVGdWV3pjYzhta2lINExGaW9GMFNyU3hlUDVSbEtaTzhQMjhJNSt1cnJmMjJoUGJQNU5RWjJFZwpFdEF3R21MaWpkcmw1QjdZTFNUUDJ4ejJrVitsQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJTbWh2Ym1uamxDR3A0bWx3b2tyWWRXZDBPaWtqQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQXMyRFY4bHdLSAp2blVVeFcrdDBnclVYWGtNbVhmRE1HL0FDUXhUNjB6WFZnbkFWdzRSN09mVFpwck5YKzNlN0lMYTBQV0RqbWN3Ck5ISnVZTi8rbExFMVZVN213bVU0Ni8wbThyTFJsN2lVT3h3cXJ5Vm9GQ3pJUDhHRGRyb2ZXdkFMSEUwYVlIUVYKNi9jdnh0YnJXUmFKMTMxTTBBT0pIMTRmcGdxa0daTk9TbDMrMUF4WnMvcmJPUVdzSVRhQnNEYjg3dWZ0a050WApiNXZ6cm5vcXlCTGQ3c3RuSTVWeEN4dGVrbmlqZGVnaWNMT0dPa1ZOYzR0QkVjSEtXQStaZVQvRktFZUZsZU80CkhHQ2hweEllaVJxNis1bmFUaVV3QmhZdGh4U1hKalI3SExYOHJEQ3pFU052c1A1UDhqTEovR2xkMjlZVkx0bkQKL2FyZStjV25yVTNLCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    server: https://AFFA66FA08D1A0726EAB74D057DA09E0.gr7.us-east-2.eks.amazonaws.com
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hotcrate
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hotcrate
+    user: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hotcrate
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hotcrate
+current-context: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hotcrate
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-hotcrate
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - --region
+      - us-east-2
+      - eks
+      - get-token
+      - --cluster-name
+      - scw-AWS-hotcrate
+      - --output
+      - json
+      command: aws

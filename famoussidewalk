@@ -1,0 +1,29 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJWkVEQnZIMHFjb0V3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TXpFeE16QXdOalEwTVRGYUZ3MHpNekV4TWpjd05qUTVNVEZhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUUR6T2lGN0gwZVdiTlZYT1lLNCtFYStFWHNnaXNaUTZOQTZCYlUxcWJncXpJYmNXUitMUDkvZzUzRmgKcGJYdjVBUDlFV1hZZHpTdERKYVBDa2x0dVI1a1Q0bkxhS1dxTnRMY05WN0lpRktNc1l2RzdPK3I2MmZoZFdMRgo2YUJ6MFBEWVozcExtR0ZKaTBSVXBFZDF0a1hyNlI4bXFaTGY5RDhPZVFxTm5FbEZJcDNiQWQvWWRpZDArNk9OCldXeUUxSk5mUkczQjZDZ2ExMkNucUlZZExKOEJNeGFQQXZ3b1BPc2I1LzVtQWcxZlFsU2hKdmFrNVBmWWdkbTQKY1NJVHAxMTJPYlo5Z3FodUJhYXNFN20vUzc3YkRPdHpoMnBWOGtRRmFtczBhUDBadjE5VmQ1V0FmWEVyK1hnawpCSEF2dytESEVxL2x4S1ZHNSt1K281YWp6MHhKQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJRaU9kcE5mRXZxLytSQU5UNCtBRHRKM3Y4WlN6QVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQUNrd1pYejRrNgp5cVRrR3o2cXhwajRmb0wyYTFxUkRUSTRPS09WVStFSk1ZU1RnREVTMGtTVmd3Vzh6enJQa0RZN0x3ZzhjZWMvCktGV3dnMVhhVnVhdTIwM21aQTdlR1MyVUNyVDMrTU5uU0JZZDRMbGZ0Mk5sdHRXa1l5cmUwV1c0TXVNSGVPd2IKY004cURnRURnRGozUWpDYXQ4ME1yU1h1MlVuenhiazVYelFIS2FwZUxoWld0VStqU0dySS90WjBQNXc0Z0RCTgpCYUsycFZQTnZCVTF6OVNEY1E1T1hic2V2Y1F2aThOQUtFWnlyamZYcmVURkVBQ05scDM3M2hXaTZRUDdrcWNrCnlkMGNCNThGZm54c1RmOERMSXZyNHNkcXZManpkcVZFeVZoOUQ4clcwY2YyMUJEVXpMZm5RQzRCb2xWWlFiN2wKNWRnaEJFbzdCNFVECi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    server: https://2D20031A633A3BD633210AD1F0788C8C.gr7.us-east-2.eks.amazonaws.com
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-famoussidewalk
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-famoussidewalk
+    user: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-famoussidewalk
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-famoussidewalk
+current-context: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-famoussidewalk
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-famoussidewalk
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - --region
+      - us-east-2
+      - eks
+      - get-token
+      - --cluster-name
+      - scw-AWS-famoussidewalk
+      - --output
+      - json
+      command: aws

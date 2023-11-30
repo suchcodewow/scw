@@ -907,9 +907,9 @@ function Get-AKSCluster() {
 
 # AWS MU Functions
 function Add-AWSMultiUserSteps() {
-    if (-not (test-path variable:muCreateClusters)) {
-        $script:muCreateClusters = $true
-    }
+    # if (-not (test-path variable:muCreateClusters)) {
+    #     $script:muCreateClusters = $true
+    # }
     # Setup Variables
     if ($network) { $stackId = $network } else { $stackId = $config.AWSregion.replace("-", '') }
     Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
@@ -920,14 +920,7 @@ function Add-AWSMultiUserSteps() {
     $awsNodeRoleName = $($config.AWSnodeRoleName)
     $awsCFStack = $($config.AWScfstack)
     Add-Choice -k "AWSMCT" -d "[toggle] Auto-create EKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AWSMultiUserCreateCluster
-    # Add/Remove/List Attendees
     $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
-    $attendeeCount = $existingUsers.Users.count - 1
-    Add-Choice -k "AWSMCU" -d "Create Attendee Accounts" -f Add-AWSMultiUser  -c "Current users: $attendeeCount"
-    if ($attendeeCount -eq 0) { return }
-    # We have attendees.  Provide Options to manage
-    Add-Choice -k "AWSMDL" -d "  List current Attendee Accounts" -f Get-AWSMultiUser
-    Add-Choice -k "AWSMDU" -d "  Remove Attendee Accounts" -f Remove-AWSMultiUser
     # Create: cluster role
     $ekspolicy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["eks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
     $ec2policy = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
@@ -970,7 +963,6 @@ function Add-AWSMultiUserSteps() {
     $cfVpicId = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "VpcId" } | Select-Object -ExpandProperty OutputValue
     # Check status for users
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
-    
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
@@ -989,91 +981,135 @@ function Add-AWSMultiUserSteps() {
         ${function:Send-Update} = $using:SendUpdateDef
         $user = $_
         $dict = $using:parallelResults
-        $env:KUBECONFIG = $user.Username
-
-        # Check for AKS cluster
-        $targetCluster = "scw-AWS-$($user.Username)"
-        $targetNodeGroup = "scw-AWSNG-$($user.Username)"
-        $clusterExists = Send-Update -t 1 -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
-        if (!$clusterExists -and $muCreateClusters -and $user.Username -eq "lumpycow") {
-            # Create cluster-  wait for 'active' state
-            Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $awsRegion --name $targetCluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$cfSubnets,securityGroupIds=$cfSecurityGroup"
-            While ($clusterExists.cluster.status -ne "ACTIVE") {
-                $clusterExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
-                Send-Update -t 1 -c "$($clusterExists.cluster.status)"
-                Start-Sleep -s 10
-            }
-            # Create nodegroup- wait for 'active' state
-            Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --node-role $AWSnodeRoleArn --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($cfSubnets.replace(',', ' ')) --instance-types t3.xlarge"
-            While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
-                $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --output json" | ConvertFrom-Json
-                Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
-                Start-Sleep -s 10
-            }
-            # Get Credentials
-            Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $targetCluster" -t 1 -o
-            # Add user principal the hard way.  Because AWS lives to make you sad.
-            $map = Send-Update -c "Export configmap" -t 1 -r "kubectl get configmap aws-auth -n kube-system -o json" | Convertfrom-Json
-            $adduser = "- groups:`n  - system:masters`n  rolearn: $($user.Arn)`n  username: $($user.Username)`n"
-            $map.data.mapRoles = $map.data.mapRoles + $adduser
-            $map | convertto-json | kubectl replace -f -
+        # Get user details
+        $tags = Send-Update -c "Get user tags" -r "aws iam list-user-tags --user-name $($user.Username)" | Convertfrom-json
+        foreach ($tag in $tags.Tags) {
+            if ($tag.Key -eq "type") { $userType = $tag.Value }
         }
-        $result = New-Object PSCustomObject -Property @{
-            userName      = $user.Username
-            targetGroup   = $targetGroup
-            targetCluster = $targetCluster
-            groupExists   = $groupName
-            clusterExists = $clusterExists
+        if (!$userType) { $userType = "ignore" }
+        # Check for AKS clusters
+        if ($userType -eq "normal" -or $userType -eq "DoNotDelete") {
+            $targetCluster = "scw-AWS-$($user.Username)"
+            $targetNodeGroup = "scw-AWSNG-$($user.Username)"
+            $clusterExists = Send-Update -t 1 -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
+            if (!$clusterExists -and $muCreateClusters) {
+                # Create cluster-  wait for 'active' state
+                Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $awsRegion --name $targetCluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$cfSubnets,securityGroupIds=$cfSecurityGroup"
+                While ($clusterExists.cluster.status -ne "ACTIVE") {
+                    $clusterExists = Send-Update -t 1 -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
+                    # Send-Update -t 1 -c "$($clusterExists.cluster.status)"
+                    Start-Sleep -s 10
+                }
+                # Create nodegroup- wait for 'active' state
+                Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --node-role $AWSnodeRoleArn --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($cfSubnets.replace(',', ' ')) --instance-types t3.xlarge"
+                While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
+                    $nodeGroupExists = Send-Update -t 1 -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --output json" | ConvertFrom-Json
+                    # Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
+                    Start-Sleep -s 10
+                }
+                # Get Credentials
+                Send-Update -c "Updating Cluster Credentials" -r "aws eks update-kubeconfig --name $targetCluster --kubeconfig $($user.Username)" -t 1 -o
+                # Add user principal the hard way.  Because AWS lives to make you sad.
+                $map = Send-Update -c "Export configmap" -t 1 -r "kubectl get configmap aws-auth -n kube-system -o json --kubeconfig $($user.Username)" | Convertfrom-Json
+                $adduser = "- groups:`n  - system:masters`n  rolearn: $($user.Arn)`n  username: $($user.Username)`n"
+                $map.data.mapRoles = $map.data.mapRoles + $adduser
+                $map | convertto-json | kubectl --kubeconfig $($user.Username) replace -f -
+            }
+            if ($clusterExists) { $clusterCreated = $true } else { $clusterCreated = $false }
+            $result = New-Object PSCustomObject -Property @{
+                userName        = $user.Username
+                userType        = $userType
+                targetCluster   = $targetCluster
+                targetNodeGroup = $targetNodeGroup
+                clusterExists   = $clusterCreated
+                awsRegion       = $awsRegion
 
+            }
+            $dict.add($result)
         }
-        $dict.add($result)
+    } -ThrottleLimit 8
+    $global:muUsers = $parallelResults
+    # Now that we have list of everyone, offer options to adjust
+    # $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
+    # $attendeeCount = $existingUsers.Users.count - 1
+    Add-Choice -k "AWSMCU" -d "Create Attendee Accounts" -f Add-AWSMultiUser  -c "Current users: $($muUsers.count)"
+    if ($muUsers.count -eq 0) { return }
+    # We have attendees.  Provide Options to manage
+    Add-Choice -k "AWSMDL" -d "  List current Attendee Accounts" -f Get-AWSMultiUser
+    Add-Choice -k "AWSMDU" -d "  Remove Attendee Accounts" -f Remove-AWSMultiUser
+    $doNotDeleteUsers = $muUsers | where-object { $_.userType -eq "DoNotDelete" }
+    Add-Choice -k "AWSMUL" -d "  View/Change DoNotDelete users" -f Set-AWSMultiUserDoNotDelete -c "Currently: $($doNotDeleteUsers.count)"
+
+}
+function Set-AWSMultiUserDoNotDelete() {
+    # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $counter = 0; $userChoices = Foreach ($i in $muUsers) {
+        $counter++
+        New-object PSCustomObject -Property @{Option = $counter; userName = $i.userName; userType = $i.userType }
     }
+    $userChoices | sort-object -property Option | format-table -Property Option, userName, userType | Out-Host
+    while (-not $userId) {
+        $userSelected = read-host -prompt "Which user to change?"
+        if (-not $userSelected) { return }
+        $userId = $userChoices | Where-Object -FilterScript { $_.Option -eq $userSelected } | Select-Object -first 1
+        if (-not $userId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    if ($userId.userType -eq "normal") {
+        Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=DoNotDelete"
+    }
+    else {
+        Send-Update -t 1 -c "Removing DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=normal"
+
+    }
+    Add-AWSMultiUserSteps
 }
 function Get-AWSMultiUser() {
-    $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
+    # $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
+    write-host ""
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
-    $existingUsers.Users.UserName
+    $muUsers | Format-table -Property userName, userType, clusterExists
+    write-host ""
+    $muUsers | Format-table -Property userName
 
 }
 function Remove-AWSMultiUser() {
-    $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
-    # foreach ($user in $existingUsers.Users) {
-    #     if ($user.userPrincipalName -contains "@suchcodewow.io") {
-    #         Send-Update -t 0 -
-    #     }
-    # }
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-    
+    $normalUsers = $muUsers | where-object { $_.userType -eq "normal" }
     # Remove user accounts and all related content
-    $existingUsers.Users | ForEach-Object -Parallel {
+    $normalUsers | ForEach-Object -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
         ${function:Get-UserName} = $using:GetUsernameDef
         ${function:Send-Update} = $using:SendUpdateDef
         $user = $_
-        # Delete  AKS if it exists
-        # Delete Resource group if it exists
-        # Delete User
-        if ($user.Username -eq "consoleadmin") {
-            Send-Update -t 2 -c "The user principal $($user.Username) is a special account. Skipping!"
-        }
-        else {
-            Send-Update -t 1 -c "Removing $($user.Username) from group" -r "aws iam remove-user-from-group --group-name Attendees --user-name $($user.Username)"
-            Send-Update -t 1 -c "Remove login profile from $($user.Username)" -r "aws iam delete-login-profile --user-name $($user.Username)"
-            Send-Update -t 1 -c "Removing $($user.Username) and all related items" -r "aws iam delete-user --user-name $($user.Username)"
-            # Confirm Delete
-            Do {
-                Start-sleep -s 2
-                #$userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
-            } until (-not $userExists)
-        }
-
-
-    }
+        # Remove nodegroup
+        Send-Update -o -c "Delete EKS nodegroup" -r "aws eks delete-nodegroup --region $($user.awsRegion) --cluster-name $($user.targetCluster) --nodegroup-name $($user.targetNodeGroup)" -t 1
+        Do {
+            $nodegroupExists = Send-Update -a -e -c "Check status" -r "aws eks describe-nodegroup --region $($user.awsRegion) --cluster-name $($user.targetCluster) --nodegroup-name $($user.targetNodeGroup)" -t 1 | Convertfrom-Json
+            Start-Sleep -s 10
+            Send-Update -t 1 -c $($nodegroupExists.nodegroup.status)
+        } while ($nodegroupExists)
+        # Remove cluster
+        Send-Update -o -c "Delete EKS CLuster" -r "aws eks delete-cluster --region $($user.awsRegion) --name $($user.targetCluster) --output json" -t 1
+        Do {
+            $clusterExists = Send-Update -t 1 -a -e -c "Check status" -r "aws eks describe-cluster --region $($user.awsRegion) --name $($user.targetCluster) --output json" | ConvertFrom-Json
+            Start-Sleep -s 10
+            Send-Update -t 1 -c $($clusterExists.cluster.status)
+        } while ($clusterExists)
+        # Remove user
+        Send-Update -t 1 -c "Removing $($user.Username) from group" -r "aws iam remove-user-from-group --group-name Attendees --user-name $($user.Username)"
+        Send-Update -t 1 -c "Remove login profile from $($user.Username)" -r "aws iam delete-login-profile --user-name $($user.Username)"
+        Send-Update -t 1 -c "Removing $($user.Username) and all related items" -r "aws iam delete-user --user-name $($user.Username)"
+        # Confirm Delete
+        # Do {
+        #     Start-sleep -s 2
+        #     $userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
+        # } until (-not $userExists)
+    } -ThrottleLimit 8
     Add-AWSMultiUserSteps
 }
 function Add-AWSMultiUser() {
@@ -1114,6 +1150,7 @@ function Add-AWSMultiUser() {
         } Until ($user)
         Send-Update -t 1 -o -c  "Add login profile for $newUserName " -r "aws iam create-login-profile --user-name $newUserName --password 1Dynatrace##"
         Send-Update -t 1 -c "Add $newUserName to group" -r "aws iam add-user-to-group --group-name Attendees --user-name $newUserName"
+        Send-Update -t 1 -c "Tagging $newUserName" -r "aws iam tag-user --user-name $newUserName --tags Key=type,Value=normal"
     }
     Add-AWSMultiUserSteps
 }

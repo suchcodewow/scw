@@ -1,0 +1,29 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURCVENDQWUyZ0F3SUJBZ0lJU0J3OVRkTllsdVF3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TXpFeE16QXdOalF6TURWYUZ3MHpNekV4TWpjd05qUTRNRFZhTUJVeApFekFSQmdOVkJBTVRDbXQxWW1WeWJtVjBaWE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUUMvcmxwSUdnaGxaZVM1L2thU3V2c3Z2M21kcWliOXFLcHNiMEt6UWFCSlFsRSt3RzBNV2pQL0dGOHkKaXBwMjJwbUhEdmNhZWtra050c2lqUEdEZzRTUmxhd09nQS8yQk9MUDNPMCtYcThnSDNYSzUxMDNGK1NSZk5BSQpza2RjQm4rSjRCdGdKYmc2bUVrV3Rzb09PTWdWcEU0aTVwMi93czdYU0pGOXJhSU5IM1pvSjVsVGFTeldQYjd5Ck1JTVFuNXJ6cGRDRTRtNXR6UlowTHRsUk5qcXpFZ1RXVW1zcGJ5UG1CWSthN2pGRDZ6eGw5WlZoYk5SSTQ0NzcKbXhWdFRzengwRFk0Wm4zV2ZHQVRueGNEaXplK3p2SklVTkU5SDBZVTk3bzRYdzMvZnA2RjYvVndpQXB0OEhTdgo3NmM1U1dxa1RPQldBbnR4WFdLa2R0NkNFMXJsQWdNQkFBR2pXVEJYTUE0R0ExVWREd0VCL3dRRUF3SUNwREFQCkJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJUNXc5NkNCZ0pxaGZmRHl2OU4zODk5dm1xWEFEQVYKQmdOVkhSRUVEakFNZ2dwcmRXSmxjbTVsZEdWek1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQWdQZHR3eG91dQpMMXBHWVdGWGE0RHZ3UlZ3eGVqY1hIYWY1SVdvejZSV0JqWmxoYkJYTlp2NHlmWXFKUW5MY2NkR2Y0OXZua0ltCm5ZMk9sOXJyNms4cVFQUHBCOEtHeDQ4TDQ4R1pib1hWWUpjaE5xSEc2NEZwdG9DWE9PdW9TSEFtQ0RTZUYrRlUKaFlIVHFoQzhjWWpnQVNmS3VNazl4L0tQbld2SktGc0l6dTZ5WTVQTGZFRSs3Ky9uVE5wM0lTZEd1NjRDL1lwOApqTG56OTlXRXlacURnM09ZUzFMcno1VkFnVzhGTGhIcHRUMUJwb1JjdUNncm9wNzN4dlQ0aUNuaFFxektrZXA0CisxUkordEd1d2N1NkVWT2VUMVZmdzN3bm53YWpmcHU5QlJyRzZqU2RpaVFQK0RBME1NMnlNMm9NZlhzNlJ0SUwKYk8rSnNZVmVuVnZOCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    server: https://AA8287BF8A18E75F5AA9236A7ED49B4C.sk1.us-east-2.eks.amazonaws.com
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-orangeincome
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-orangeincome
+    user: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-orangeincome
+  name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-orangeincome
+current-context: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-orangeincome
+kind: Config
+preferences: {}
+users:
+- name: arn:aws:eks:us-east-2:187260983114:cluster/scw-AWS-orangeincome
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      args:
+      - --region
+      - us-east-2
+      - eks
+      - get-token
+      - --cluster-name
+      - scw-AWS-orangeincome
+      - --output
+      - json
+      command: aws
