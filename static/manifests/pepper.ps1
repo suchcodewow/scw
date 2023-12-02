@@ -1089,14 +1089,14 @@ function Remove-AWSMultiUser() {
         # Remove nodegroup
         Send-Update -o -c "Delete EKS nodegroup" -r "aws eks delete-nodegroup --region $($user.awsRegion) --cluster-name $($user.targetCluster) --nodegroup-name $($user.targetNodeGroup)" -t 1
         Do {
-            $nodegroupExists = Send-Update -a -e -c "Check status" -r "aws eks describe-nodegroup --region $($user.awsRegion) --cluster-name $($user.targetCluster) --nodegroup-name $($user.targetNodeGroup)" -t 1 | Convertfrom-Json
+            $nodegroupExists = Send-Update -e -c "Check status" -r "aws eks describe-nodegroup --region $($user.awsRegion) --cluster-name $($user.targetCluster) --nodegroup-name $($user.targetNodeGroup)" -t 1 | Convertfrom-Json
             Start-Sleep -s 10
             Send-Update -t 1 -c $($nodegroupExists.nodegroup.status)
         } while ($nodegroupExists)
         # Remove cluster
         Send-Update -o -c "Delete EKS CLuster" -r "aws eks delete-cluster --region $($user.awsRegion) --name $($user.targetCluster) --output json" -t 1
         Do {
-            $clusterExists = Send-Update -t 1 -a -e -c "Check status" -r "aws eks describe-cluster --region $($user.awsRegion) --name $($user.targetCluster) --output json" | ConvertFrom-Json
+            $clusterExists = Send-Update -t 1 -e -c "Check status" -r "aws eks describe-cluster --region $($user.awsRegion) --name $($user.targetCluster) --output json" | ConvertFrom-Json
             Start-Sleep -s 10
             Send-Update -t 1 -c $($clusterExists.cluster.status)
         } while ($clusterExists)
