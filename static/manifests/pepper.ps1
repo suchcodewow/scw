@@ -879,6 +879,9 @@ function Remove-AzureResourceGroup($targetGroup) {
     Send-Update -t 1 -content "Azure: Remove Resource Group" -run "az group delete -n $targetGroup"
     Add-AzureSteps
 }
+function Add-AzureWebApp() {
+    
+}
 function Add-AKSCluster() {
     param(
         [string] $g, #resource group
@@ -1931,6 +1934,7 @@ function Add-Dynatrace {
 }
 function Get-DTconnected {
     # Check if Dynatrace token and url are valid
+    Send-Update -c "Checking if existing Dynatrace connection is valid." -t 1
     if ($config.tenantID -AND $config.k8stoken) {
         $url = $config.tenantID
         $token = $config.k8stoken
@@ -1993,17 +1997,29 @@ function Add-CommonSteps() {
         }
     }
     else {
-        # Make sure all Dynatrace dependent items clear
-        if ($existingNamespaces.contains("dynatrace")) {
-            Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
+        # Recommend removing dynatrace since no valid dynakube detected
+        While (!$optionSelected) {
+            $userChoice = (read-host -prompt "Dynatrace connection invalid, remove dynatrace operator? (recommended!) Y/N ?").toUpper()
+            if ($userChoice -eq "Y" -or $userChoice -eq "N") {
+                $optionSelected = $userChoice
+            }
+            else {
+                write-host "Y or N only please!"
+            }
+            
         }
-        # Yaml files depend on URLs/tokens, remove them
-        foreach ($yaml in $yamlList) {
-            [uri]$uri = $yaml
-            $yamlName = $uri.Segments[-1]
-            if (test-path $yamlName) { remove-item $yamlName }
+        if ($optionSelected -eq "Y") {
+            if ($existingNamespaces.contains("dynatrace")) {
+                # Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
+            }
+            # Yaml files depend on URLs/tokens, remove them
+            foreach ($yaml in $yamlList) {
+                [uri]$uri = $yaml
+                $yamlName = $uri.Segments[-1]
+                if (test-path $yamlName) { remove-item $yamlName }
+            }
+            if (test-path dynakube.yaml) { Remove-item dynakube.yaml }
         }
-        if (test-path dynakube.yaml) { Remove-item dynakube.yaml }
         # Add first Dynatrace option
         Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
     }

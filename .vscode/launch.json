@@ -9,7 +9,7 @@
       "type": "PowerShell",
       "request": "launch",
       "script": "${file}",
-      "args": ["-c", "-l", "-v", "-m", "-aws"]
+      "args": ["-c", "-l", "-v", "-azure"]
     }
   ]
 }
