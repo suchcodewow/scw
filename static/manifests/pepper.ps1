@@ -77,8 +77,8 @@ function Get-Prefs($scriptPath) {
     $script:currentLogEntry = $null
     $script:muCreateClusters = $false
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
-    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic.yaml",
-        "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos.yaml" )
+    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic",
+        "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
     $script:ProgressPreference = "SilentlyContinue"
     if ($scriptPath) {
         $script:logFile = "$($scriptPath).log"
@@ -1900,6 +1900,10 @@ spec:
     capabilities:
       - routing
       - kubernetes-monitoring
+    customProperties:
+      value: |
+        [azure_monitoring]
+        azure_monitoring=true
     resources:
       requests:
         cpu: 100m
@@ -1979,11 +1983,11 @@ function Add-CommonSteps() {
     # Check for valid Dynatrace connection
     $DTconnected = Get-DTconnected
     if ($DTconnected) {
-        # Determine appropriate Dynatrace option
+        # Determine appropriate Dynatrace optionyamlName
         if ($existingNamespaces.contains("dynatrace")) {
             #1 Dynatrace installed.  Add status and removal options
-            Add-Choice -k "DTCFG" -d "dynatrace : Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
-            Add-Choice -k "STATUSDT" -d "dynatrace : Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+            Add-Choice -k "DTCFG" -d "Dynatrace: Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
+            Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
         }
         elseif (test-path dynakube.yaml) {
             #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
@@ -2010,12 +2014,12 @@ function Add-CommonSteps() {
         }
         if ($optionSelected -eq "Y") {
             if ($existingNamespaces.contains("dynatrace")) {
-                # Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
+                Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
             }
             # Yaml files depend on URLs/tokens, remove them
             foreach ($yaml in $yamlList) {
                 [uri]$uri = $yaml
-                $yamlName = $uri.Segments[-1]
+                $yamlName = "$($uri.Segments[-1]).yaml"
                 if (test-path $yamlName) { remove-item $yamlName }
             }
             if (test-path dynakube.yaml) { Remove-item dynakube.yaml }
@@ -2028,7 +2032,7 @@ function Add-CommonSteps() {
         [System.Collections.ArrayList]$yamlReady = @()
         foreach ($yaml in $yamlList) {
             [uri]$uri = $yaml
-            $yamlName = $uri.Segments[-1]
+            $yamlName = "$($uri.Segments[-1]).yaml"
             $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
             if (test-path $yamlName) {
                 $newYaml = New-Object PSCustomObject -Property @{
@@ -2052,11 +2056,13 @@ function Add-CommonSteps() {
             $ns = $app.namespace
             if ($existingNamespaces.contains($ns)) {
                 # Namespace exists- add status option
-                Add-Choice -k "STATUS$ns" -d "$ns : Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
+                Add-Choice -k "STATUS$ns" -d "$($ns): Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
                 # add restart option
-                Add-Choice -k "RESTART$ns" -d "$ns : Reset Pods" -c  $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
+                Add-Choice -k "RESTART$ns" -d "$($ns): Reset Pods" -c  $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
                 # add remove option
-                Add-Choice -k "DEL$ns" -d "$ns : Remove Pods"  -f "Remove-NameSpace -n $ns"
+                Add-Choice -k "DEL$ns" -d "$($ns): Remove Pods"  -f "Remove-NameSpace -n $ns"
+                # parse any custom options
+                Get-CustomSteps -n $ns
             }
             else {
                 # Yaml is available but not yet applied.  Add option to apply it
@@ -2065,15 +2071,27 @@ function Add-CommonSteps() {
         }
     }
 }
+function Get-CustomSteps() {
+    Param(
+        [string] $namespace #namespace to parse
+    )
+
+}
 function Get-Apps() {
     foreach ($yaml in $yamlList) {
+        # Get base yaml file for kubernetes
         [uri]$uri = $yaml
-        $yamlName = $uri.Segments[-1]
-        #$yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
-        Invoke-WebRequest -Uri $uri.OriginalString -OutFile $yamlName | Out-Host
+        $yamlName = "$($uri.Segments[-1]).yaml"
+        Invoke-WebRequest -Uri "$($uri.OriginalString).yaml" -OutFile $yamlName | Out-Host
         ((Get-Content -path $yamlName -Raw) -replace '<dynatraceURL>', $config.tenantID) | Set-Content -Path $yamlName
         ((Get-Content -path $yamlName -Raw) -replace '<dynatraceToken>', $config.k8stoken) | Set-Content -Path $yamlName
         ((Get-Content -path $yamlName -Raw) -replace 'dnsplaceholder', "scw$($config.textUserId)") | Set-Content -Path $yamlName
+        # Get config options if they exist
+        $jsonName = "$($uri.Segments[-1]).json"
+        $jsonFile = Invoke-WebRequest -SkipHttpErrorCheck -Uri "$($uri.OriginalString).json"
+        if ($jsonFile.StatusCode -eq 200) {
+            $jsonFile.RawContent | Out-file -Filepath $jsonName
+        }
     }
     Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
