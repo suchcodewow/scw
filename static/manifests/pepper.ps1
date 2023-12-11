@@ -114,7 +114,7 @@ function Get-Prefs($scriptPath) {
             }
         }
     }
-    Set-Prefs -k UserCount -v $users
+    Set-Prefs -k userCount -v $users
     write-host
 
 }
@@ -601,18 +601,18 @@ function Set-Provider() {
         "Azure" {
             # Set the Azure subscription
             Send-Update -t 1 -c "Azure: Set Subscription" -r "az account set --subscription $($providerSelected.identifier)"
-            Set-Prefs -k "Provider" -v "AZ"
+            Set-Prefs -k "provider" -v "azure"
             Add-AzureSteps 
         }
         "AWS" {
             Send-Update -t 1 -c "AWS: Set region"
-            Set-Prefs -k "Provider" -v "AWS"
+            Set-Prefs -k "provider" -v "aws"
             Add-AWSSteps 
         }
         "GCP" { 
             # set the GCP Project
             Send-Update -OutputSuppression -t 1 -c "GCP: Set Project" -r "gcloud config set account '$($providerSelected.identifier)' --no-user-output-enabled"
-            Set-Prefs -k "Provider" -v "GCP"
+            Set-Prefs -k "provider" -v "gcp"
             Add-GCPSteps 
         }
     }
@@ -834,6 +834,7 @@ function Add-AzureSteps() {
     if ($groupExists -eq "true") {
         Send-Update -content "yes" -type 1
         Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
+        Set-Prefs -k azureRG -v $targetGroup
     }
     else {
         Send-Update -content "no" -type 1
@@ -850,7 +851,9 @@ function Add-AzureSteps() {
         #Refresh cluster credentials
         Get-AKSCluster -g $targetGroup -c $targetCluster
         #Record the region for Azure DNS k8s annotation later
-        Set-Prefs -k "K8sregion" -v ($aksExists | ConvertFrom-Json).location
+        Set-Prefs -k "k8sregion" -v ($aksExists | ConvertFrom-Json).location
+        # Add optional Azure webapp components
+        Add-AzureWebAppSteps
         #We have a cluster so add common things to do with it
         Add-CommonSteps
     }
@@ -879,8 +882,42 @@ function Remove-AzureResourceGroup($targetGroup) {
     Send-Update -t 1 -content "Azure: Remove Resource Group" -run "az group delete -n $targetGroup"
     Add-AzureSteps
 }
+function Add-AzureWebAppSteps() {
+    # Set variables
+    $webASPName = "scw-asp-$($config.textUserId)"
+    Set-Prefs -k webASPName -v $webASPName
+    $webAppName = "scw-webapp-$($config.textUserId)"
+    Set-Prefs -k webAppName -v $webAppName
+    $resourceGroup = "scw-group-$($config.textUserId)"
+    Set-Prefs -k resourceGroup -v $resourceGroup
+    #Check for plan
+    $planExists = Send-Update -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
+    if ($planExists) {
+        #check for Web App
+        Send-Update -c " yes" 
+        $webAppExists = Send-Update -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        #Add-Choice -d "Remove Azure Web App plan" -c $webASPName -f "az appservice plan delete --resource-group $resourceGroup --name $webASPName"
+        #Add-Choice -d "Deploy Azure Web App plan" -f "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
+    }
+    if ($webAppExists) {
+        Send-Update -c " yes"
+        Add-Choice -d "Remove Azure Web App/Plan" -c $webAppName -f "Remove-AzureWebApp" -key "AZRWA"
+    }
+    else {
+        Send-Update -c " no"
+        Add-Choice -d "Deploy Azure Web App/Plan" -f "Add-AzureWebApp" -key "AZAWA"
+    }
+    # az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
+}
 function Add-AzureWebApp() {
-    
+    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B1" -o
+    Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.resourceGroup) --name $($config.webAppName) --plan $($config.webASPName)" -o
+    Add-CommonSteps
+}
+function Remove-AzureWebApp() {
+    Send-Update -c "Removing Azure Web App" -t 1 -r "az"
+    Send-Update -c "Removing Azure Web App Plan" -t 1 -r "az appservice plan delete --resource-group $($config.resourceGroup) --name $($config.webASPName)"
+    Add-AzureWebAppSteps
 }
 function Add-AKSCluster() {
     param(
@@ -1171,9 +1208,6 @@ function Set-AWSMultiUserCreateCluster() {
 function Add-AWSSteps() {
     # Get AWS specific properties from current choice
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
-    # Set-Prefs -k "textUserId" -v $($userProperties.userid)
-    # Set-Prefs -k "subscriptionId" -v $($userProperties.id)
-    
     # -> jump to multi-user mode if selected
     if ($multiUserMode) {
         Add-AWSMultiUserSteps
@@ -1189,10 +1223,6 @@ function Add-AWSSteps() {
     $targetComponents = 6
     # Use specified network name for CloudFormation- otherwise use default single stack for whole classroom.
     if ($network) { $stackId = $network } else { $stackId = $config.AWSregion.replace("-", '') }
-    # # use specific Cloudformation stack
-    # Send-Update -t 1 "Overriding CloudFormation Stack with: $network"
-    # set-prefs -k AWScfstack -v $network
-    
     # Component: AWS cluster role
     #$targetComponents++
     Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
@@ -1762,8 +1792,20 @@ function Remove-NameSpace {
     param(
         [string] $namespace
     )
-    Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
-    Add-CommonSteps
+    While (!$optionSelected) {
+        $userChoice = (read-host -prompt "Remove namespace? (typically NO unless ending workshop!) Y/N?").toUpper()
+        if ($userChoice -eq "Y" -or $userChoice -eq "N") {
+            $optionSelected = $userChoice
+        }
+        else {
+            write-host "Y or N only please!"
+        }
+        
+    }
+    if ($optionSelected -eq "Y") {
+        Send-Update -t 1 -c "Delete Namespace" -r "kubectl delete ns $namespace"
+        Add-CommonSteps
+    }
 }
 
 # Dynatrace Functions
@@ -2062,20 +2104,35 @@ function Add-CommonSteps() {
                 # add remove option
                 Add-Choice -k "DEL$ns" -d "$($ns): Remove Pods"  -f "Remove-NameSpace -n $ns"
                 # parse any custom options
-                Get-CustomSteps -n $ns
+                # Get-CustomSteps -n $ns
             }
             else {
                 # Yaml is available but not yet applied.  Add option to apply it
-                Add-Choice -k "INST$ns" -d "$ns : Deploy App" -f "Add-App -y $($app.name) -n $ns"        
+                Add-Choice -k "INST$ns" -d "$($ns): Deploy App" -f "Add-App -y $($app.name) -n $ns"
             }
         }
     }
 }
 function Get-CustomSteps() {
+    #Stub out using custom files
     Param(
         [string] $namespace #namespace to parse
     )
-
+    $jsonFile = "$($namespace).json"
+    if (test-path($jsonFile)) {
+        $jsonContent = Send-Update -c "Loading custom config json" -t 0 -r "Get-Content $jsonFile" | Convertfrom-Json
+        foreach ($step in $jsonContent.$($config.provider)) {
+            if ($step.key -and $step.description -and $step.dependsOnKey -in $choices.key) {
+                $Params = @{}
+                $Params['key'] = $step.key
+                $Params['description'] = "$($ns): $($step.description)"
+                if ($step.current) { $Params['current'] = $step.current }
+                if ($step.function) { $Params['function'] = $step.function }
+                if ($step.properties) { $Params['properties'] = $step.properties }
+                Add-Choice @Params
+            }
+        }
+    }
 }
 function Get-Apps() {
     foreach ($yaml in $yamlList) {
@@ -2111,7 +2168,7 @@ function Get-AppUrls {
             if ($service.status.loadBalancer.ingress[0].hostname) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
             }
-            if ($namespace -eq "dbic" -and $config.Provider -eq "AZ") {
+            if ($namespace -eq "dbic" -and $config.Provider -eq "azure") {
                 $returnList = "http://scw$($config.textUserId).$($config.K8sregion).cloudapp.azure.com"
             }
             if ($service.status.loadBalancer.ingress[0].ip) {
