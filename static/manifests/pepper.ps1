@@ -632,26 +632,36 @@ function Add-AzureMultiUserSteps() {
 
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-
+    $ignoredUsers = Send-Update -c "Get IgnoredUsers" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
+    $script:targetUsers = @()
+    $script:ignoredUsers = @()
+    # Remove ignored users
+    foreach ($user in $existingUsers) {
+        if ($user.DisplayName -in $ignoredUsers.DisplayName) {
+            write-host "Ignoring user: $($user.DisplayName)"
+            $ignoredUsers += $user.DisplayName
+        }
+        else {
+            $targetUsers += $user.DisplayName
+        }
+    }
     # Check status for users
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
-    
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-    $existingUsers | ForEach-Object -Parallel {
+    $targetUsers | ForEach-Object -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
         ${function:Get-UserName} = $using:GetUsernameDef
         ${function:Send-Update} = $using:SendUpdateDef
-        $user = $_
         $dict = $using:parallelResults
         $config = $using:config
         $muCreateClusters = $using:muCreateClusters
         $muCreateWebApp = $using:muCreateWebApp
         # Setup core variables
-        $userName = $user.DisplayName
+        $userName = $_
         $resourceGroup = "scw-group-$userName"
         $targetCluster = "scw-AKS-$userName"
         $webASPName = "scw-asp-$userName"
@@ -681,7 +691,7 @@ function Add-AzureMultiUserSteps() {
         if ($webAppExists) { $appExists = $true }
         # Update bag, baby
         $result = New-Object PSCustomObject -Property @{
-            userName      = $user.DisplayName
+            userName      = $userName
             targetGroup   = $resourceGroup
             targetCluster = $targetCluster
             targetWebApp  = $webAppName
@@ -699,6 +709,7 @@ function Add-AzureMultiUserSteps() {
     if ($existingUsers.count -gt 0) {
         Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
         Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
+        Add-Choice -k "AZIU" -d "  Change ignored users" -c "Currently: $ignoredUsers"
     }
     else {
         # End here, no existing users
@@ -706,6 +717,28 @@ function Add-AzureMultiUserSteps() {
     }
     # write-host $parallelResults | format-table
 
+}
+function Set-AzureMultiUserDoNotDelete() {
+    # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $counter = 0; $userChoices = Foreach ($i in $muUsers) {
+        $counter++
+        New-object PSCustomObject -Property @{Option = $counter; userName = $i.userName; userType = $i.userType }
+    }
+    $userChoices | sort-object -property Option | format-table -Property Option, userName, userType | Out-Host
+    while (-not $userId) {
+        $userSelected = read-host -prompt "Which user to change?"
+        if (-not $userSelected) { return }
+        $userId = $userChoices | Where-Object -FilterScript { $_.Option -eq $userSelected } | Select-Object -first 1
+        if (-not $userId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    if ($userId.userType -eq "normal") {
+        Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=DoNotDelete"
+    }
+    else {
+        Send-Update -t 1 -c "Removing DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=normal"
+
+    }
+    Add-AzureMultiUserSteps
 }
 function Add-AzureMultiUser() {
     # Create user accounts
@@ -979,7 +1012,6 @@ function Get-AKSCluster() {
 
 # AWS MU Functions
 function Add-AWSMultiUserSteps() {
-
     # Setup Variables
     if ($network) { $stackId = $network } else { $stackId = $config.AWSregion.replace("-", '') }
     Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
@@ -1109,7 +1141,6 @@ function Add-AWSMultiUserSteps() {
     Add-Choice -k "AWSMDU" -d "  Remove Attendee Accounts" -f Remove-AWSMultiUser
     $doNotDeleteUsers = $muUsers | where-object { $_.userType -eq "DoNotDelete" }
     Add-Choice -k "AWSMUL" -d "  View/Change DoNotDelete users" -f Set-AWSMultiUserDoNotDelete -c "Currently: $($doNotDeleteUsers.count)"
-
 }
 function Set-AWSMultiUserDoNotDelete() {
     # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
