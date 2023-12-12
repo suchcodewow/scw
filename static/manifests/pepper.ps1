@@ -76,6 +76,7 @@ function Get-Prefs($scriptPath) {
     [System.Collections.ArrayList]$script:choices = @()
     $script:currentLogEntry = $null
     $script:muCreateClusters = $false
+    $script:muCreateWebApp = $false
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic",
         "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
@@ -620,28 +621,17 @@ function Set-Provider() {
 
 # Azure MU Functions
 function Add-AzureMultiUserSteps() {
-    if (-not (test-path variable:muCreateClusters)) {
-        $script:muCreateClusters = $true
-    }
     # Region Selected
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) {
         return
     }
+    # Add toggles for content
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
+    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create AWS Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
+
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Current users: $($existingUsers.count)"
-    
-    #existingUsers fields: displayName, id, userPrincipalName
-    if ($existingUsers.count -gt 0) {
-        Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
-        Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
-    }
-    else {
-        # End here, no existing users
-        return
-    }
 
     # Check status for users
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
@@ -657,41 +647,65 @@ function Add-AzureMultiUserSteps() {
         ${function:Send-Update} = $using:SendUpdateDef
         $user = $_
         $dict = $using:parallelResults
-
-        # TODO: Remove throttling
-        if ($user.displayName -ne "eagergiraffe") {
-            write-host "ignoring $($user.displayName)"
-            return
+        $config = $using:config
+        $muCreateClusters = $using:muCreateClusters
+        $muCreateWebApp = $using:muCreateWebApp
+        # Setup core variables
+        $userName = $user.DisplayName
+        $resourceGroup = "scw-group-$userName"
+        $targetCluster = "scw-AKS-$userName"
+        $webASPName = "scw-asp-$userName"
+        $webAppName = "scw-webapp-$userName"
+        # Check if a resource group exists
+        $groupExists = Send-Update -t 0 -content "$userName : Resource Group check" -run "az group exists -g $resourceGroup"
+        if ($groupExists -eq "false") {
+            Send-Update -t 1 -c "$userName : create Resource Group" -run "az group create --name $resourceGroup --location $($config.muAzureRegion) -o none"
         }
+        # Create AKS cluster if needed and enabled
+        $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
+        if (-not $aksExists -and $muCreateClusters) {
+            write-host "cluster create go!"
+            # AKS not created & flag set to allow creation
+            Send-Update -o -t 1 -content "$userName : create AKS Cluster" -run "az aks create -g $resourceGroup -n $targetCluster --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
+            $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
 
-        # Create resource group  if needed
-        $targetGroup = "scw-group-$($user.DisplayName)"
-        $targetCluster = "scw-AKS-$($userProperties.userid)"
-        $groupExists = Send-Update -t 0 -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup"
-        write-host $user
-        write-host $groupExists
-        if (-not $groupExists -eq "true") {
-            Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $($config.muAzureRegion) -o none"
         }
-
-        # Check for AKS cluster
+        if ($aksExists) { $clusterExists = $true }
+        # Create WebApp if needed and enabled
+        $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        if (-not $webAppExists -and $muCreateWebApp) {
+            Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1" -o
+            Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName" -o
+            $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        }
+        if ($webAppExists) { $appExists = $true }
+        # Update bag, baby
         $result = New-Object PSCustomObject -Property @{
             userName      = $user.DisplayName
-            targetGroup   = $targetGroup
+            targetGroup   = $resourceGroup
             targetCluster = $targetCluster
-            groupExists   = $groupName
-            clusterExists = $false
-
+            targetWebApp  = $webAppName
+            clusterExists = $clusterExists
+            appExists     = $appExists
         }
         $dict.add($result)
     }
-    # $hasResourceGroup = $parallelResults | where-object { $_.groupExists }
-    # if ($parallelResults.count - $hasResourceGroup.count -ne 0) {
-    #     $script:resourceGroups = $parallelResults | where-object { -not $_.groupExists } | select-object -ExpandProperty targetGroup
-    #     write-host $resourceGroups.count
-    #     Add-Choice -k "AZMCRG" -d "Create Resource Groups" -c "$($hasResourceGRoup.count)/$($parallelResults.count) created" -f "Add-AzureMultiUserRG"
-    #     return
-    # }
+    $global:muUsers = $parallelResults
+    $muCreatedClusters = $muUsers | where-object { $_.clusterExists -eq $true }
+    $muCreatedApps = $muUsers | where-object { $_.appExists -eq $true }
+    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Users: $($muUsers.count) / Clusters: $($muCreatedClusters.count) / Webapps: $($muCreatedApps.count)"
+
+    #existingUsers fields: displayName, id, userPrincipalName
+    if ($existingUsers.count -gt 0) {
+        Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
+        Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
+    }
+    else {
+        # End here, no existing users
+        return
+    }
+    # write-host $parallelResults | format-table
+
 }
 function Add-AzureMultiUser() {
     # Create user accounts
@@ -819,6 +833,16 @@ function Set-AzureMultiUserCreateCluster() {
     }
     else {
         $script:muCreateClusters = $false
+    }
+    Add-AzureMultiUserSteps
+}
+function Set-AzureMultiUserCreateWebApp() {
+    if (-not $muCreateWebApp) {
+        write-host "setting to true"
+        $script:muCreateWebApp = $true
+    }
+    else {
+        $script:muCreateWebApp = $false
     }
     Add-AzureMultiUserSteps
 }
@@ -955,9 +979,7 @@ function Get-AKSCluster() {
 
 # AWS MU Functions
 function Add-AWSMultiUserSteps() {
-    # if (-not (test-path variable:muCreateClusters)) {
-    #     $script:muCreateClusters = $true
-    # }
+
     # Setup Variables
     if ($network) { $stackId = $network } else { $stackId = $config.AWSregion.replace("-", '') }
     Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
