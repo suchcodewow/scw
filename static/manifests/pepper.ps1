@@ -901,7 +901,7 @@ function Add-AzureWebAppSteps() {
     }
     if ($webAppExists) {
         Send-Update -c " yes"
-        Add-Choice -d "Remove Azure Web App/Plan" -c $webAppName -f "Remove-AzureWebApp" -key "AZRWA"
+        Add-Choice -d "Remove Azure Web App/Plan" -c "$webASPName / $webAppName" -f "Remove-AzureWebApp" -key "AZRWA"
     }
     else {
         Send-Update -c " no"
