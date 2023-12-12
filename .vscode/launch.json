@@ -10,7 +10,7 @@
       "request": "launch",
       "script": "${file}",
       "cwd": "${env:USERPROFILE}",
-      "args": ["-c", "-l", "-v", "-azure"]
+      "args": ["-c", "-l", "-azure", "-m"]
     }
   ]
 }
