@@ -749,19 +749,18 @@ function Set-AzureMultiUserCreateCluster() {
     Add-AzureMultiUserSteps
 }
 function Add-AzureMultiUserSteps() {
+    # Set cluster create variable if needed
     if (-not (test-path variable:muCreateClusters)) {
         $script:muCreateClusters = $true
     }
     # Region Selected
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
-    if (-not $config.muAzureRegion) {
-        return
-    }
+    if (-not $config.muAzureRegion) { return }
+    # Add toggle option for creating clusters
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Current users: $($existingUsers.count)"
-    
     #existingUsers fields: displayName, id, userPrincipalName
     if ($existingUsers.count -gt 0) {
         Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
@@ -771,10 +770,8 @@ function Add-AzureMultiUserSteps() {
         # End here, no existing users
         return
     }
-
     # Check status for users
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
-    
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
