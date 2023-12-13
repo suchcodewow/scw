@@ -117,7 +117,6 @@ function Get-Prefs($scriptPath) {
     }
     Set-Prefs -k userCount -v $users
     write-host
-
 }
 function Set-Prefs {
     param(
@@ -623,34 +622,28 @@ function Set-Provider() {
 function Add-AzureMultiUserSteps() {
     # Region Selected
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
-    if (-not $config.muAzureRegion) {
-        return
-    }
+    if (-not $config.muAzureRegion) { return }
     # Add toggles for content
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
     Add-Choice -k "AZMCWA" -d "[toggle] Auto-create AWS Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
-
     # User Options
-    $existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    $ignoredUsers = Send-Update -c "Get IgnoredUsers" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
-    $script:targetUsers = @()
-    $script:ignoredUsers = @()
+    $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
+    $ignoredUsers = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
     # Remove ignored users
     foreach ($user in $existingUsers) {
         if ($user.DisplayName -in $ignoredUsers.DisplayName) {
-            write-host "Ignoring user: $($user.DisplayName)"
-            $ignoredUsers += $user.DisplayName
+            $user | Add-Member -NotePropertyName "type" -NotePropertyValue "ignore"
         }
-        else {
-            $targetUsers += $user.DisplayName
-        }
+        else { $user | Add-Member -NotePropertyName "type" -NotePropertyValue "normal" }
     }
+    # $targetUsers = $existingUsers | where-object { $_.type -eq "normal" }
+    $ignoredUsers = $existingUsers | where-object { $_.type -eq "ignore" }
     # Check status for users
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-    $targetUsers | ForEach-Object -Parallel {
+    $existingUsers | ForEach-Object -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
@@ -661,7 +654,8 @@ function Add-AzureMultiUserSteps() {
         $muCreateClusters = $using:muCreateClusters
         $muCreateWebApp = $using:muCreateWebApp
         # Setup core variables
-        $userName = $_
+        $userName = $_.DisplayName
+        $type = $_.type
         $resourceGroup = "scw-group-$userName"
         $targetCluster = "scw-AKS-$userName"
         $webASPName = "scw-asp-$userName"
@@ -671,23 +665,24 @@ function Add-AzureMultiUserSteps() {
         if ($groupExists -eq "false") {
             Send-Update -t 1 -c "$userName : create Resource Group" -run "az group create --name $resourceGroup --location $($config.muAzureRegion) -o none"
         }
-        # Create AKS cluster if needed and enabled
+        # Check for existing resources
         $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
-        if (-not $aksExists -and $muCreateClusters) {
-            write-host "cluster create go!"
-            # AKS not created & flag set to allow creation
-            Send-Update -o -t 1 -content "$userName : create AKS Cluster" -run "az aks create -g $resourceGroup -n $targetCluster --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
-            $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
-
+        $webAppExists = Send-Update -t 1 -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        if ($type -eq "normal") {
+            if (-not $aksExists -and $muCreateClusters) {
+                write-host "cluster create go!"
+                # AKS not created & flag set to allow creation
+                Send-Update -o -t 1 -content "$userName : create AKS Cluster" -run "az aks create -g $resourceGroup -n $targetCluster --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
+                $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
+            }
+            # Create WebApp if needed and enabled
+            if (-not $webAppExists -and $muCreateWebApp) {
+                Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1" -o
+                Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName" -o
+                $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+            }
         }
         if ($aksExists) { $clusterExists = $true }
-        # Create WebApp if needed and enabled
-        $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
-        if (-not $webAppExists -and $muCreateWebApp) {
-            Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1" -o
-            Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName" -o
-            $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
-        }
         if ($webAppExists) { $appExists = $true }
         # Update bag, baby
         $result = New-Object PSCustomObject -Property @{
@@ -704,25 +699,17 @@ function Add-AzureMultiUserSteps() {
     $muCreatedClusters = $muUsers | where-object { $_.clusterExists -eq $true }
     $muCreatedApps = $muUsers | where-object { $_.appExists -eq $true }
     Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Users: $($muUsers.count) / Clusters: $($muCreatedClusters.count) / Webapps: $($muCreatedApps.count)"
-
-    #existingUsers fields: displayName, id, userPrincipalName
     if ($existingUsers.count -gt 0) {
         Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
         Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
-        Add-Choice -k "AZIU" -d "  Change ignored users" -c "Currently: $ignoredUsers"
+        Add-Choice -k "AZIU" -d "  Change ignored users" -c "Currently: $($ignoredUsers.count)" -f Set-AzureMultiUserDoNotDelete
     }
-    else {
-        # End here, no existing users
-        return
-    }
-    # write-host $parallelResults | format-table
-
+    else { return }
 }
 function Set-AzureMultiUserDoNotDelete() {
-    # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
-    $counter = 0; $userChoices = Foreach ($i in $muUsers) {
+    $counter = 0; $userChoices = Foreach ($i in $existingUsers) {
         $counter++
-        New-object PSCustomObject -Property @{Option = $counter; userName = $i.userName; userType = $i.userType }
+        New-object PSCustomObject -Property @{Option = $counter; userName = $i.displayName; userType = $i.type; id = $i.id }
     }
     $userChoices | sort-object -property Option | format-table -Property Option, userName, userType | Out-Host
     while (-not $userId) {
@@ -731,37 +718,29 @@ function Set-AzureMultiUserDoNotDelete() {
         $userId = $userChoices | Where-Object -FilterScript { $_.Option -eq $userSelected } | Select-Object -first 1
         if (-not $userId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    if ($userId.userType -eq "normal") {
-        Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=DoNotDelete"
+    if ($userId.type -eq "normal") {
+        Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "az ad group member add --group IgnoreAutomation --member-id $($userId.id)"
     }
     else {
-        Send-Update -t 1 -c "Removing DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=normal"
-
+        Send-Update -t 1 -c "Removing DoNotDelete flag for $($userId.userName)" -r "az ad group member remove --group IgnoreAutomation --member-id $($userId.id)"
     }
     Add-AzureMultiUserSteps
 }
 function Add-AzureMultiUser() {
     # Create user accounts
-
     while (-not $addUserCount) {
         $addUserResponse = read-host -prompt "How many attendee accounts to generate? <enter> to cancel"
-        if (-not($addUserResponse)) {
-            return
-        }
+        if (-not($addUserResponse)) { return }
         try {
             $addUserCount = [convert]::ToInt32($addUserResponse)
-
         }
         catch {
-            write-host "`r`nPositives integers only"
-            
+            write-host "`r`nPositives integers only"            
         }
     }
-
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-
     # Create user accounts
     1..$addUserCount | ForEach-Object -Parallel {
         # Import functions and variables from main script
@@ -769,45 +748,32 @@ function Add-AzureMultiUser() {
         $script:outputLevel = $using:outputLevel
         ${function:Get-UserName} = $using:GetUsernameDef
         ${function:Send-Update} = $using:SendUpdateDef
-        
         # Create User
         Do {
             $newUserName = Get-UserName
             $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
         } Until ($user)
         Send-Update -t 0 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
-
     }
     Add-AzureMultiUserSteps
-    # $users | Foreach-Object -Parallel {
-    #     # Every parallel process runs in a separate shell, so defining everything in-line for now.
-    #     $password = "1Dynatrace##"
-    #     $userObject = az ad user create --display-name $user --password $password --force-change-password-next-sign-in false --user-principal-name "$user@suchcodewow.io" | ConvertFrom-Json
-    #     az ad group member add --group "Attendees" --member-id $($userObject.id)
-    #     # az group create --name "scw-group-$user" --location eastus2 -o none
-    #     # az aks create -g "scw-group-$user" -n "scw-AKS-$user" --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys
-    #     write-host "$user@suchcodewow.io"
-       
-    # } -ThrottleLimit 10
 }
 function Get-AzureMultiUser() {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.userPrincipalName
-
 }
 function Remove-AzureMultiUser() {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     foreach ($user in $existingUsers) {
         if ($user.userPrincipalName -contains "@suchcodewow.io") {
+            # TODO fix whatever this is
             Send-Update -t 0 -
         }
     }
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-    
     # Remove user accounts and all related content
     $existingUsers | ForEach-Object -Parallel {
         # Import functions and variables from main script
@@ -819,7 +785,6 @@ function Remove-AzureMultiUser() {
         # Delete  AKS if it exists
         # Delete Resource group if it exists
         # Delete User
-  
         if ($user.userPrincipalName -like "*@suchcodewow.io") {
             Send-Update -t 1 -c "Removing $($user.userPrincipalName) and all related items" -r "az ad user delete --id $($user.id)"
             # Confirm Delete
@@ -835,12 +800,6 @@ function Remove-AzureMultiUser() {
 
     }
     Add-AzureMultiUserSteps
-}
-function Add-AzureMultiUserRG() {
-    write-host "starting"
-    write-host $resourceGroups
-    # $needsResourceGroup = $parallelResults | where-object { $_.resourceGroup -eq $false }
-    # write-host $needsResourceGroup
 }
 function Get-AzureMultiUserRegion() {
     $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
@@ -1608,6 +1567,7 @@ function Remove-GCPMultiUser() {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     foreach ($user in $existingUsers) {
         if ($user.userPrincipalName -contains "@suchcodewow.io") {
+            # TODO fix whatever... this is
             Send-Update -t 0 -
         }
     }
@@ -1870,7 +1830,7 @@ function Remove-NameSpace {
 }
 
 # Dynatrace Functions
-function Set-DTConfig() {
+function Set-DTConfig {
     While (-not $k8sToken) {
         # Get Tenant ID
         While (-not $cleantenantID) {
@@ -2016,7 +1976,6 @@ spec:
         memory: 1.5Gi
 "@
     $dynaKubeContent | out-File -FilePath dynakube.yaml
-
 }
 function Add-Dynatrace {
     Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl create ns dynatrace"
