@@ -915,11 +915,11 @@ function Add-AzureWebAppSteps() {
     $resourceGroup = "scw-group-$($config.textUserId)"
     Set-Prefs -k resourceGroup -v $resourceGroup
     #Check for plan
-    $planExists = Send-Update -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
+    $planExists = Send-Update -t 1 -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
     if ($planExists) {
         #check for Web App
         Send-Update -c " yes" 
-        $webAppExists = Send-Update -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        $webAppExists = Send-Update -t 1 -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
         #Add-Choice -d "Remove Azure Web App plan" -c $webASPName -f "az appservice plan delete --resource-group $resourceGroup --name $webASPName"
         #Add-Choice -d "Deploy Azure Web App plan" -f "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
     }
@@ -1966,7 +1966,7 @@ spec:
     customProperties:
       value: |
         [azure_monitoring]
-        azure_monitoring=true
+        azure_monitoring_enabled=true
     resources:
       requests:
         cpu: 100m
