@@ -625,7 +625,7 @@ function Add-AzureMultiUserSteps() {
     if (-not $config.muAzureRegion) { return }
     # Add toggles for content
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
-    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create AWS Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
+    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
     # User Options
     $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     $ignoredUsers = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
