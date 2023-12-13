@@ -7,10 +7,9 @@ title: DTOrders
 This deployment will create an application in the **dtorders** namespace and automatically generate synthetic traffic for you.
 
 <details>
-  <summary>What's a deployment?</summary>A deployment is a set of instructions,
-  usually in a YAML file like below, that provide a blueprint for what
-  components we want to add to our cluster. If one of the components of that
-  deployment is removed, kubernetes will automatically recreate them.
+  <summary>What's a deployment?</summary>A deployment is a set of instructions, usually in a YAML file like below, that
+  provide a blueprint for what components we want to add to our cluster. If one of the components of that deployment is
+  removed, kubernetes will automatically recreate them.
 </details>
 
 The deployment creates the DTORDERS namespace.
@@ -54,10 +53,12 @@ Replace `dev.local` in this yaml file with your public IP address.
 sed "s/dev.local/$(cat myip)/g" dtorders-all.yaml > dtorders-all-hasIP.yaml
 ```
 
-<details><summary>What is sed?</summary>
-sed is a utility that replaces one string of text with another.  Here we're telling it to search for **dev.local** (a placeholder) in **dtorders-all.yaml** and use the contents of the *myip* file as the replacement.  The **/g** tells sed to replace every instance.  The part starting with **>** means to send the result of all those replacements to the target filename.
+What is sed?
 
-</details>
+    sed is a utility that replaces one string of text with another. Here we're telling it to search for **dev.local** (a
+    placeholder) in **dtorders-all.yaml** and use the contents of the *myip* file as the replacement. The **/g** tells
+    sed to replace every instance. The part starting with **>** means to send the result of all those replacements to
+    the target filename.
 
 Apply the updated yaml file.
 

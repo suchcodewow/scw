@@ -6,20 +6,15 @@ const FeatureList = [
   {
     title: "Easy to Learn",
     Svg: require("@site/static/img/learn.svg").default,
-    description: (
-      <>
-        These tutorials have background for each step so you know what is
-        happening and why it's there.
-      </>
-    ),
+    description: <>These tutorials have background for each step so you know what is happening and why it's there.</>,
   },
   {
     title: "Easy to Build",
     Svg: require("@site/static/img/build.svg").default,
     description: (
       <>
-        The environment you'll build is modular and can be easily adapted to a
-        variety of hardware- all leading to the same platform.
+        The environment you'll build is modular and can be easily adapted to a variety of hardware- all leading to the
+        same platform.
       </>
     ),
   },

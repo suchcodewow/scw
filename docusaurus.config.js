@@ -1,5 +1,6 @@
 // @ts-check
-// Note: type annotations allow type checking and IDEs autocompletion
+// Note: type annotations allow type checking and IDEs autocompletion3
+import { themes as prismThemes } from "prism-react-renderer";
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -87,8 +88,7 @@ const config = {
         copyright: `Copyright © ${new Date().getFullYear()} SuchCodeWow`,
       },
       prism: {
-        theme: require("prism-react-renderer/themes/dracula"),
-        darkTheme: require("prism-react-renderer/themes/dracula"),
+        theme: prismThemes.dracula,
       },
     }),
 };

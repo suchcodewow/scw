@@ -53,7 +53,7 @@ Kubectl get pod
 
 ![Prometheus_4](/img/prom_4.png)
 
-Copy the name of one of the prometheus-node-exporter pods, replace the {POD NAME} and {PORT} with the port identified above and run the command:
+Copy the name of one of the prometheus-node-exporter pods, replace the POD NAME and PORT with the port identified above and run the command:
 
 - This will expose the port to the host to be accessible on localhost.
 
@@ -133,7 +133,7 @@ Run the describe kubectl command to identify port:
 kubectl get deployment prometheus-kube-state-metrics -o jsonpath='{.spec.template.spec.containers[0].ports[].containerPort}{"\n"}'
 ```
 
-Identify the pod name of the kube-state metric pod, replace the {POD NAME} and {PORT} with the port identified above and run the command:
+Identify the pod name of the kube-state metric pod, replace the POD NAME and PORT with the port identified above and run the command:
 This will expose the port to the host to be accessible on localhost.
 
 ```bash
@@ -171,7 +171,7 @@ Run the describe kubectl command to identify port:
 kubectl get deployment nginx-nginx-ingress -o jsonpath='{.spec.template.spec.containers[0].ports[2].containerPort}{"\n"}'
 ```
 
-Identify the pod name of the nginx-nginx-ingress pod, replace the {POD NAME} and {PORT} with the port identified above and run the command:
+Identify the pod name of the nginx-nginx-ingress pod, replace the POD NAME and PORT with the port identified above and run the command:
 
 ```bash
  kubectl port-forward {POD NAME} {PORT}:{PORT}
