@@ -718,7 +718,7 @@ function Set-AzureMultiUserDoNotDelete() {
         $userId = $userChoices | Where-Object -FilterScript { $_.Option -eq $userSelected } | Select-Object -first 1
         if (-not $userId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    if ($userId.type -eq "normal") {
+    if ($userId.userType -eq "normal") {
         Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "az ad group member add --group IgnoreAutomation --member-id $($userId.id)"
     }
     else {
