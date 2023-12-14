@@ -718,7 +718,7 @@ function Set-AzureMultiUserDoNotDelete() {
         $userId = $userChoices | Where-Object -FilterScript { $_.Option -eq $userSelected } | Select-Object -first 1
         if (-not $userId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    if ($userId.type -eq "normal") {
+    if ($userId.userType -eq "normal") {
         Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "az ad group member add --group IgnoreAutomation --member-id $($userId.id)"
     }
     else {
@@ -915,11 +915,11 @@ function Add-AzureWebAppSteps() {
     $resourceGroup = "scw-group-$($config.textUserId)"
     Set-Prefs -k resourceGroup -v $resourceGroup
     #Check for plan
-    $planExists = Send-Update -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
+    $planExists = Send-Update -t 1 -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
     if ($planExists) {
         #check for Web App
         Send-Update -c " yes" 
-        $webAppExists = Send-Update -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        $webAppExists = Send-Update -t 1 -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
         #Add-Choice -d "Remove Azure Web App plan" -c $webASPName -f "az appservice plan delete --resource-group $resourceGroup --name $webASPName"
         #Add-Choice -d "Deploy Azure Web App plan" -f "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
     }
@@ -1966,7 +1966,7 @@ spec:
     customProperties:
       value: |
         [azure_monitoring]
-        azure_monitoring=true
+        azure_monitoring_enabled=true
     resources:
       requests:
         cpu: 100m
@@ -1975,7 +1975,7 @@ spec:
         cpu: 500m
         memory: 1.5Gi
 "@
-    $dynaKubeContent | out-File -FilePath dynakube.yaml
+    $dynaKubeContent | out-File -FilePath "$($config.textUserId)-dynakube.yaml"
 }
 function Add-Dynatrace {
     Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl create ns dynatrace"
@@ -1995,7 +1995,7 @@ function Add-Dynatrace {
     Send-Update -c " Activated!" -t 1
     Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
     Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
-    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
+    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f $($config.textUserId)-dynakube.yaml"
     Add-CommonSteps
 }
 function Get-DTconnected {
@@ -2051,10 +2051,7 @@ function Add-CommonSteps() {
             Add-Choice -k "DTCFG" -d "Dynatrace: Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
             Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
         }
-        elseif (test-path dynakube.yaml) {
-            #2 Dynatrace not present but dynakube.yaml available.  Add Install Option
-            # $fileTimeStamp = (Get-ChildItem -path dynakube.yaml | select-object -Property CreationTime).CreationTime | Get-Date -Format g
-            # Dynakube file found. Provide install option
+        elseif (test-path "$($config.textUserId)-dynakube.yaml") {
             Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "Target DT tenant: $($config.tenantID)" -function Add-Dynatrace
         }
         else {
@@ -2084,7 +2081,7 @@ function Add-CommonSteps() {
                 $yamlName = "$($uri.Segments[-1]).yaml"
                 if (test-path $yamlName) { remove-item $yamlName }
             }
-            if (test-path dynakube.yaml) { Remove-item dynakube.yaml }
+            if (test-path "$($config.textUserId)-dynakube.yaml") { Remove-item "$($config.textUserId)-dynakube.yaml" }
         }
         # Add first Dynatrace option
         Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
