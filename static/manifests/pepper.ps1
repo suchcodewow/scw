@@ -628,10 +628,10 @@ function Add-AzureMultiUserSteps() {
     Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
     # User Options
     $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    $ignoredUsers = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
+    $ignoreList = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
     # Remove ignored users
     foreach ($user in $existingUsers) {
-        if ($user.DisplayName -in $ignoredUsers.DisplayName) {
+        if ($user.DisplayName -in $ignoreList.DisplayName) {
             $user | Add-Member -NotePropertyName "type" -NotePropertyValue "ignore"
         }
         else { $user | Add-Member -NotePropertyName "type" -NotePropertyValue "normal" }
@@ -764,45 +764,46 @@ function Get-AzureMultiUser() {
     $existingUsers.userPrincipalName
 }
 function Remove-AzureMultiUser() {
-    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    foreach ($user in $existingUsers) {
-        if ($user.userPrincipalName -contains "@suchcodewow.io") {
-            # TODO fix whatever this is
-            Send-Update -t 0 -
-        }
-    }
+    # Get normal users only
+    $normalUsers = $existingUsers | where-object { $_.type -eq "normal" }
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
     # Remove user accounts and all related content
-    $existingUsers | ForEach-Object -Parallel {
+    $normalUsers | ForEach-Object -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
         ${function:Get-UserName} = $using:GetUsernameDef
         ${function:Send-Update} = $using:SendUpdateDef
-        $user = $_
-        # Delete  AKS if it exists
-        # Delete Resource group if it exists
-        # Delete User
-        if ($user.userPrincipalName -like "*@suchcodewow.io") {
-            Send-Update -t 1 -c "Removing $($user.userPrincipalName) and all related items" -r "az ad user delete --id $($user.id)"
-            # Confirm Delete
-            Do {
-                Start-sleep -s 2
-                $userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
-            } until (-not $userExists)
-        }
-        else {
-            Send-Update -t 2 -c "The user principal $($user.userPrincipalName) didn't mactch @suchcodewow.io. Skipping!"
-        }
+        # $dict = $using:parallelResults
+        $config = $using:config
+        $muCreateClusters = $using:muCreateClusters
+        $muCreateWebApp = $using:muCreateWebApp
+        # Setup core variables
+        $userName = $_.DisplayName
+        $id = $_.id
+        # $type = $_.type
+        $resourceGroup = "scw-group-$userName"
+        # $targetCluster = "scw-AKS-$userName"
+        # $webASPName = "scw-asp-$userName"
+        # $webAppName = "scw-webapp-$userName"
+        # Delete User and all resources
+        Send-Update -t 1 -c "$userName : Remove resource group and content" -r "az group delete --resource-group $resourceGroup -y"
+        Send-Update -t 1 -c "$userName : Remove account" -r "az ad user delete --id $id"
+        # Confirm Delete
+        Do {
+            Start-sleep -s 2
+            $userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
+        } until (-not $userExists)
+
 
 
     }
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUserRegion() {
-    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended'].{ name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; id = $i.id; name = $i.name }
