@@ -19,7 +19,6 @@
     "@mdx-js/react": "^3.0.0",
     "autoprefixer": "^10.4.16",
     "clsx": "^2.0.0",
-    "dracula-prism": "^2.1.13",
     "npm": "^10.2.5",
     "postcss": "^8.4.32",
     "prism-react-renderer": "^2.3.0",

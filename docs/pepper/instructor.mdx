@@ -1,0 +1,83 @@
+# Instructor Guide
+
+## Introduction
+
+### Why use this?
+
+If you are planning to run an event with multiple attendees, Pepper's multiuser mode deploys many of the resources needed.
+
+This is also useful if you need one or more users to test features/additions prior to an event.
+
+### What does it do?
+
+Most importantly, you can create attendee accounts in AWS and Azure. Pepper will ensure each account has a correct login, password, and permissions required to run all workshop steps.
+
+You can also toggle various options to deploy other resources that might be time consuming or tricky to setup to accelerate workshop deployments.
+
+For example, deploying kubernetes to AWS can take 12-15 minutes at the start of a class. There are potential benefits to this as it creates a natural window of opportunity to demo Dynatrace or the final product. Or attendees might appreciate starting with a completely "blank" environment.
+
+## Usage
+
+### Getting Started
+
+Using Multiuser mode is nearly the same as when running it as an individual. With an administrative account provided to you (not a 'madlibs' style attendee account) login to the cloud provider you will use for your session and open a cloud shell.
+
+Then run Pepper with the `-m` flag:
+
+```bash
+curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pepper.ps1 -c -m
+```
+
+:::tip
+When done with multiuser steps, remember to log out of your admin account cloud shell! Don't try to use it as an attendee or login to an attendee account from the cloud shell.
+:::
+
+Exactly like individual mode, Pepper will show all commands if you run it with the `-c` flag. On startup, Pepper checks for any existing attendee accounts and if found will check for any existing resources already built.
+
+### Creating Attendees
+
+Prior to creating users, you can use any toggles shown to enable or disable the automatic creation of that resource. This way any attendees you create will automatically have that resource. For example, if you want to generate the kubernetes cluster, select that option prior to creating users.
+
+When ready, use the `Create Attendee Accounts` option to add attendees.
+
+After creation, Pepper will show the total number of attendees that currently exist along with counts for any other resources you elected to add. (See below- showing an Azure setup with Azure web app added.)
+
+```bash
+Option description                         current
+------ -----------                         -------
+     1 Switch Cloud Provider               Azure subscription: DLF
+     2 Select Region                       eastus2
+     3 [toggle] Auto-create AKS clusters?  Currently: True
+     4 [toggle] Auto-create Azure Web App? Currently: True
+     5 Create Attendee Accounts            Users: 4 / Clusters: 4 / Webapps: 4
+```
+
+### Listing accounts
+
+Once attendees are created, you can use the `List current Attendee Accounts` to generate a list. This will show all current valid attendee accounts and the password to login.
+
+### Using the ignored flag
+
+The `change ignored users` option appears when you have 1 or more attendees. This option allows you to "lock" an attendee and all resources related to that attendee from being deleted. This is mostly used at the end of an event when a team decides they want to keep one environment running to show other teams, work with further, or some other activity.
+
+It's also designed to allow multiple instructors to keep test accounts running and prevent other instructors from removing them.
+
+### Removing accounts
+
+When the event is complete, ensure you have set an account to ignored if needed, and then choose the option to `Remove Attendee Accounts`. This will delete the attendee login and ALL content/resources associated with the account.
+:::tip Dynatrace Learning Facilities Policy
+If you are running an event anywhere in the cloud accounts of the Dynatrace Learning Facilities, you are expected to **immediately** remove all resources not pre-negotiated to remain on with an AE.  
+All resources created are designed to be extremely cost-effective. However, even a few kubernetes clusters running for a short time after an event will incur significant cost.
+:::
+
+## Cloud specific details
+
+### Azure
+
+- The first choice to make will be which region to use for your class. This selection will be used when creating the resource groups for attendees. The resource group then dictates where all subsequent resources will be built.
+- Azure has a **hard limit** of 20 concurrent cloud shells **across the account**. If you are approaching that limit for your event, you'll need to have some attendees use their own terminal with the _az cli package_ installed.
+
+### AWS
+
+- Whichever region you have configured when you run Pepper will be the region where Pepper deploys resources.
+- AWS has a **hard limit** of 10 cloud shell users **per region**. If you have more than 10 (including any instructors), make sure to split up attendee creation across multiple regions.
