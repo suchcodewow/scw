@@ -678,7 +678,7 @@ function Add-AzureMultiUserSteps() {
             # Create WebApp if needed and enabled
             if (-not $webAppExists -and $muCreateWebApp) {
                 Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1" -o
-                Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName" -o
+                Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName --runtime 'dotnet:6'" -o
                 $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
             }
         }
@@ -916,7 +916,7 @@ function Add-AzureWebAppSteps() {
     $resourceGroup = "scw-group-$($config.textUserId)"
     Set-Prefs -k resourceGroup -v $resourceGroup
     #Check for plan
-    $planExists = Send-Update -t 1 -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
+    $planExists = Send-Update -t 1 -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
     if ($planExists) {
         #check for Web App
         Send-Update -c " yes" 
@@ -936,13 +936,13 @@ function Add-AzureWebAppSteps() {
 }
 function Add-AzureWebApp() {
     Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B1" -o
-    Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.resourceGroup) --name $($config.webAppName) --plan $($config.webASPName)" -o
-    Add-CommonSteps
+    Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.resourceGroup) --name $($config.webAppName) --plan $($config.webASPName) --runtime 'dotnet:6'" -o
+    Add-AzureSteps
 }
 function Remove-AzureWebApp() {
-    Send-Update -c "Removing Azure Web App" -t 1 -r "az"
+    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete  --resource-group $($config.resourceGroup) --name $($config.webAppName)"
     Send-Update -c "Removing Azure Web App Plan" -t 1 -r "az appservice plan delete --resource-group $($config.resourceGroup) --name $($config.webASPName)"
-    Add-AzureWebAppSteps
+    Add-AzureSteps
 }
 function Add-AKSCluster() {
     param(
@@ -2064,7 +2064,7 @@ function Add-CommonSteps() {
         if ($existingNamespaces.contains("dynatrace")) {
             # Recommend removing dynatrace since no valid dynakube detected
             While (!$optionSelected) {
-                $userChoice = (read-host -prompt "Dynatrace connection invalid, remove dynatrace operator? (recommended!) Y/N ?").toUpper()
+                $userChoice = (read-host -prompt "Dynatrace connection missing/invalid, remove dynatrace operator? (recommended!) Y/N ?").toUpper()
                 if ($userChoice -eq "Y" -or $userChoice -eq "N") {
                     $optionSelected = $userChoice
                 }

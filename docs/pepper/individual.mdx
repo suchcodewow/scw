@@ -1,18 +1,18 @@
 # Individual Setup Guide
 
-## Introduction
+## A) Introduction
 
 This quick guide essentially condenses a dynabank workshop event down to the deployment steps used.  
 It's useful for testing new content or to quickly setup/confirm a working environment ahead of an event.
 
-## Before Starting
+## B) Before Starting
 
 All Dynabank workshop events use the Dynatrace Cloud Learning (DLF) Facilities. Essentially these are "blank" cloud environments in all 3 major providers (Azure, AWS, and GCP).  
 To start, you would either need an attendee account in the DLF for your cloud choice, or you'd need an account in another cloud environment that has access to all components you want to install.
 
 This guide assumes you created (or had someone create) a DLF account for you to use.
 
-## Starting the assistant
+## C) Starting the assistant
 
 Log into a cloud shell using the account provided.  
 Then, run this command to get started:
@@ -21,7 +21,7 @@ Then, run this command to get started:
 curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pepper.ps1 -c
 ```
 
-## Initial cloud specific steps
+## D) Initial cloud specific steps
 
 Pepper will determine which cloud environments you can access. When running in the DLF, there will be only one option and Pepper will choose that as default. If you have more than you, the first option to `switch cloud provider` allows you to pick something different.
 
@@ -66,7 +66,7 @@ Google is fairly straightforward and will simply deploy Google Kubernetes Engine
 | --------- | ------------- |
 | Cluster   | scw-gke--[ID] |
 
-## Common steps
+## E) Common steps
 
 ### Create dynakube.yaml
 
@@ -77,15 +77,16 @@ It's recommended to let Pepper generate the dynakube.yaml. It has a few options 
 - It adds support for cloud metrics
 - It saves a step in downloading the dynakube.yaml to your computer & uploading the file through cloud shell.
   :::
-  With Kubernetes deployed, the next step is to add Dynatrace. To deploy, you'll need a Dynatrace tenant available (Live recommended; sprint works as well). In your Dyantrace tenant, open Access tokens settings:
-  ![menu](/img/deploy1.jpg)
-  Then create a new token with the `API write` permission.
-  ![API Token](/img/token.jpg)
-  Save the token value and click Done.
 
-Back in Pepper, select the option to `create: dynakube.yaml`. Provide the URL of your tenant (ex: abc12345.live.dynatrace.com). Don't worry about the https:// or if you have extra characters. Pepper will automatically trim what you enter.
+1. With Kubernetes deployed, the next step is to add Dynatrace. To deploy, you'll need a Dynatrace tenant available (Live recommended; sprint works as well). In your Dyantrace tenant, open Access tokens settings:
+   ![menu](/img/deploy1.jpg)
+1. Then create a new token with the `API write` permission.
+   ![API Token](/img/token.jpg)
+1. Save the token value and click Done.
 
-Then, paste in the token you created.
+1. Back in Pepper, select the option to `create: dynakube.yaml`. Provide the URL of your tenant (ex: abc12345.live.dynatrace.com). Don't worry about the https:// or if you have extra characters. Pepper will automatically trim what you enter.
+
+1. Then, paste in the token you created.
 
 :::tip Pasting into cloud shell is hard
 If you are using the vendor provided cloud shell, each one picked a different solution for paste.
@@ -109,20 +110,47 @@ However, it's perfectly viable to drop out of Pepper at this point & use the 'De
 Keep in mind that you won't have the tweaks mentioned above.
 :::
 
-### Hang tight for the deployment
+### Hang tight!
 
 Pepper will query the dynatrace namespace and report how many pods are ready. There is an option to `refresh` the dynatrace namespace.
 
 Hang tight for 1-2 minutes using the refresh option until you have 5/5 pods ready. This is an important step! If you move forward before 5/5 pods ready, Dynatrace won't catch your deployment and won't monitor Dynabank.
 
+1. Refresh the pods a few times over a couple of minutes until you have 5/5 pods.
+
 ### Deploy Dynabank
 
-Once you have 5/5 pods ready in Dynatrace, select the option to `Download demo apps yaml files`.
+1. Once you have 5/5 pods ready in Dynatrace, select the option to `Download demo apps yaml files`.
+   This will pull the yaml blueprints for Dynabank (dbic) and any other demo apps packaged for deployment.
 
-This will pull the yaml blueprints for Dynabank (dbic) and any other demo apps packaged for deployment.
-
-Select the option to `Deploy: dbic`. Use the `refresh pods` option over a few minutes until you have all pods deployed.
+1. Select the option to `Deploy: dbic`. Use the `refresh pods` option over a few minutes until you have all pods deployed.
 
 At this point, Pepper should provide a URL to access your new deployment. In Azure, you should also use a more friendly URL.
 
-### Configure Dynatrace
+### Cloud-specific deployments
+
+#### Azure Web App
+
+Make sure to deploy the Azure web app framework with Pepper prior to completing these steps.
+
+1. In the Azure Console, go to "App Services."
+1. Find and click your webapp. It will be in the format scw-webapp-[yourid].
+1. Select the Deployment Center (blue highlight) then External Git as the source (green highlight).  
+   ![awa1](/img/awa1.png)
+1. Copy the following service repository link into the repository field and type `main` for the branch (blue highlight) then Save (green highlight).
+
+```bash
+https://github.com/suchcodewow/instamationsvc
+```
+
+![awa2](/img/awa2.png)
+
+1. Go back to the overview page (blue highlight) and click the default domain (green highlight) to see your new service.
+   ![awa3](/img/awa3.png)
+1. The deployment will likely take a minute or two. You might see a boilerplate message the first time you click- or it might not respond. When successfully deployed, you should see a simple json response simlar to:
+
+```bash
+{"status":"ready","appname":"scw-webapp-colossalcactus"}
+```
+
+When this appears, it means your service is working! You can copy the URL in your browser into the 'Operations' page of your Dynabank.
