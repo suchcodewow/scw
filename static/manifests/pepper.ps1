@@ -2061,28 +2061,29 @@ function Add-CommonSteps() {
         }
     }
     else {
-        # Recommend removing dynatrace since no valid dynakube detected
-        While (!$optionSelected) {
-            $userChoice = (read-host -prompt "Dynatrace connection invalid, remove dynatrace operator? (recommended!) Y/N ?").toUpper()
-            if ($userChoice -eq "Y" -or $userChoice -eq "N") {
-                $optionSelected = $userChoice
+        if ($existingNamespaces.contains("dynatrace")) {
+            # Recommend removing dynatrace since no valid dynakube detected
+            While (!$optionSelected) {
+                $userChoice = (read-host -prompt "Dynatrace connection invalid, remove dynatrace operator? (recommended!) Y/N ?").toUpper()
+                if ($userChoice -eq "Y" -or $userChoice -eq "N") {
+                    $optionSelected = $userChoice
+                }
+                else {
+                    write-host "Y or N only please!"
+                }
             }
-            else {
-                write-host "Y or N only please!"
+            if ($optionSelected -eq "Y") {
+                if ($existingNamespaces.contains("dynatrace")) {
+                    Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
+                }
+                # Yaml files depend on URLs/tokens, remove them
+                foreach ($yaml in $yamlList) {
+                    [uri]$uri = $yaml
+                    $yamlName = "$($uri.Segments[-1]).yaml"
+                    if (test-path $yamlName) { remove-item $yamlName }
+                }
+                if (test-path "$($config.textUserId)-dynakube.yaml") { Remove-item "$($config.textUserId)-dynakube.yaml" }
             }
-            
-        }
-        if ($optionSelected -eq "Y") {
-            if ($existingNamespaces.contains("dynatrace")) {
-                Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
-            }
-            # Yaml files depend on URLs/tokens, remove them
-            foreach ($yaml in $yamlList) {
-                [uri]$uri = $yaml
-                $yamlName = "$($uri.Segments[-1]).yaml"
-                if (test-path $yamlName) { remove-item $yamlName }
-            }
-            if (test-path "$($config.textUserId)-dynakube.yaml") { Remove-item "$($config.textUserId)-dynakube.yaml" }
         }
         # Add first Dynatrace option
         Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
