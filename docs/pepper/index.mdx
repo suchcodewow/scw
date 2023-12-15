@@ -1,0 +1,148 @@
+---
+sidebar_position: 2
+pagination_prev:
+pagination_next:
+title: Pepper Details
+---
+
+This page contains specific notes on differences in cloud providers, Dynatrace itself, and other apps.
+
+## Assistant guide
+
+In summary, Pepper will:
+
+- Query all authenticated cloud environments
+- Check the chosen environment for necessary kubernetes components specific to that provider
+- Suggest next steps and deploy them when selected
+- Assist with the deployment of [Dynatrace Observability Platform](http://www.dynatrace.com)
+- Deploy, remove, and display status of sample applications
+
+## About the assistant
+
+The assistant is written in powershell. The main reasons for this are:
+
+- It is well supported natively on all 3 cloud platforms & kept up to date.
+- Versus bash, the other built in option, it offers real arraylist support and native json parsing.
+
+It is purposefully written as a single script to allow a quick download vs cloning a repo. However, the file is fully commented and if using vscode, there are instructions at the top for folding the various functions into neat one-liners making the file simple to navigate.
+
+You can run this assistant either in the cloud shell or a local terminal with the cli tools available for your cloud vendor. Please check out the cloud vendor specific notes below if relevant.
+
+### Startup
+
+When started, Pepper will check for access to AWS, Azure, or GCLOUD (possibly multiple when running in a local terminal). It will add viable environments to the providers list.
+
+If there is one default, Pepper will automatically select it and move to the appropriate provider components (see below).
+
+If not, Pepper will present you with a list of cloud options. When you select one, Pepper will remember it.
+
+If you want to switch providers at any time, select the `Switch Cloud Provider` menu option.
+
+### Azure
+
+Pepper checks for the following required Azure Kubernetes components.
+
+- Availability of the az command
+- Azure resource group **scw-group-[ id ]**
+- AKS kubernetes cluster **scw-AKS-[ id ]** 1 node x Standard_D4s_v5 (4cpu x 16GB)
+- AKS credentials to enable kubectl commands (done automatically)
+
+Where **[ id ]** is the alpha part of your email address before the '@' symbol.
+
+When all components are present, Pepper moves to the _common steps_ below.
+
+### AWS
+
+Pepper checks for the following required AWS components.
+
+- Availability of the aws command
+- AWS role Arn **scw-awsrole-[ id ]**
+- AWs nodegroup Arn **scw-awsngrole-[ id ]**
+- AWS cloudformation stack **scw-AWSstack-[ id ]** (contains VPC, subnets, security group)
+- EKS kubernetes cluster **scw-AWS-[ id ]**
+- EKS kubernetes nodegroup **scw-AWSBG-[ id ]** 1 node x t3.xlarge (4cpu x 16GB)
+- EKS credentials (done automatically)
+
+Where **[ id ]** is either the last six characters of your access token ID or the alpha characters up to the '@' of your root account email address.
+
+When all components are present, Pepper moves to the _common steps_ below.
+
+:::info
+If your AWS account is not found (typically on a terminal with cli tools installed):
+
+- Check configuration with `aws configure list`. Ensure you have a secret, key, and valid region available.
+- Check that pepper can find your account with `aws sys get-caller-identity`. Ideally the ARN should have an email in it. Pepper will extract the alpha characters. If not, it will fall back to whatever is after user/.
+
+:::
+
+### GCP
+
+Pepper checks for the following required GCLOUD components.
+
+- Availability of the gcloud command
+- A valid GCP project for the authenticated account
+- GKE kubernetes cluster **scw-GKE-[ id ]** 1 node x e2-standard-4 (4cpu x 16GB)
+
+where **[ id ]** is the alpha characters of your account email up to the '@' symbol.
+
+When all components are present, Pepper moves to the _common steps_ below.
+:::info
+You might need to run `gcloud components update` if you run into script issues.  
+You might need to authorize google cloud services via popup.
+:::
+
+### Common steps
+
+Pepper checks the existing namespaces and offers deploy/status/remove options as appropriate.
+
+For the dynatrace namespace, Pepper has built-in options to create Paas token, generate dynakube.yaml, and deploy. See _Dynatrace_ below.
+
+As of this writing, Pepper is pre-loaded with DynabankInsuraCart (dbic). The `Download sample apps Yaml` will retrieve the latest deployment file. Any sample app with a yaml file could be added to Pepper.
+
+Once you download the sample app(s), Pepper will offer to deploy, check status, and remove the application.
+
+### Dynatrace
+
+These steps are completely optional. Pepper can do each step for you, give you a jumpstart with a dynakube.yaml, or you can do all steps in the Dynatrace UI.
+
+When you select `dynatrace: Create dynakube.yaml`, Pepper will ask for:
+
+- A Dynatrace tenant ID (i.e. abc12345). It should easily extract it from complete URLS like `https://abc1235.live.>>`, `abc12345.live.>>`, etc.
+- A Dynatrace token that has the **Write API Tokens** permission. ![API Token](/img/token.jpg)
+
+Pepper will confirm access and then:
+
+- Create a Paas token & convert it to base64
+- Write a local dynakube.yaml file using your tenant URL and token
+
+Then, you can choose the `dynatrace: Deploy to k8s` to have Pepper complete the dynatrace deployment.
+
+Alternatively, you can copy and paste the kubernetes commands from the Dynatrace UI (skipping the download dynakube.yaml part). ![Copy Command](/img/commands.jpg)
+
+### Other Applications
+
+When you choose the `<app>: Deploy App` option, Pepper will apply the downloaded yaml file & install the application.
+
+During deployment, you'll see a report in Pepper of the current status similar to:
+
+```bash
+     <app> : Refresh/Show Pods            x/y pods READY
+     <app> : Reset Pods
+     <app> : Remove Pods
+```
+
+If you choose `Refresh/Show Pods`, Pepper will show the result of the pods & update the summary screen with pods currently running.
+
+The `Reset Pods` option will delete all pods in that namespace. This is useful to deployed the app prior to Dynatrace or simply want to lobotimize the application back to starting state.
+
+The `Reset Pods` option shows the URL to your application as well. In most cloud shells, you can ctrl+click to launch the app directly from here. Or copy/paste the URL to a new window.
+
+The `Remove Pods` option simply deletes the application namespace leaving all other applications and the kubernetes cluster running.
+
+### Next Steps?
+
+- Try it out to see Kubernetes deployments or when you want a "real" environment fast to try features
+- It's vetting out to be extremely useful for workshops- more opportunity here?
+- Add other application yaml (EasyTrade, etc)
+- Expand the technology stack (what's most important out there? Logic Apps? fargate? rabbitMQ?)
+- Add more problem scenarios, what's used a lot? (CPU saturation? Opentelemetry in network devices?)

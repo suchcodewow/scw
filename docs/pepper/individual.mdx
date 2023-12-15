@@ -1,0 +1,128 @@
+# Individual Setup Guide
+
+## Introduction
+
+This quick guide essentially condenses a dynabank workshop event down to the deployment steps used.  
+It's useful for testing new content or to quickly setup/confirm a working environment ahead of an event.
+
+## Before Starting
+
+All Dynabank workshop events use the Dynatrace Cloud Learning (DLF) Facilities. Essentially these are "blank" cloud environments in all 3 major providers (Azure, AWS, and GCP).  
+To start, you would either need an attendee account in the DLF for your cloud choice, or you'd need an account in another cloud environment that has access to all components you want to install.
+
+This guide assumes you created (or had someone create) a DLF account for you to use.
+
+## Starting the assistant
+
+Log into a cloud shell using the account provided.  
+Then, run this command to get started:
+
+```
+curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pepper.ps1 -c
+```
+
+## Initial cloud specific steps
+
+Pepper will determine which cloud environments you can access. When running in the DLF, there will be only one option and Pepper will choose that as default. If you have more than you, the first option to `switch cloud provider` allows you to pick something different.
+
+### Azure
+
+Azure setup will deploy a resource group first. When you create it, you'll have option to select which region to use. Generally, useast2, uswest2-3 are good choices. (Sometimes useast1 has trouble with enough space to deploy!) All other content you choose to deploy with Pepper will be located in that resource group/zone.  
+Next, you'll have the option to deploy Azure Kubernetes Services (AKS). This will build a 1 node 4cpu cluster sufficient to run Dynabank.  
+You also have the option to deploy an Azure Web app. If you deploy this, Pepper will create an Azure web services plan with the B1 (basic) settings and create an azure web app on top.
+
+#### Resources:
+
+| Component        | Name            |
+| ---------------- | --------------- |
+| Resource group   | scw-group-[ID]  |
+| AKS cluster      | scw-AKS-[ID]    |
+| App Service Plan | scw-ASP-[ID]    |
+| Web App          | scw-webapp-[ID] |
+
+### AWS
+
+AWS requires significantly more steps than the other two clouds due to significant pre-requisites. If you used a DLF admin account and Pepper to create your account, you will likely have the pre-requisites already done. If not detected, Pepper will install those first.  
+The AWS commands will use whichever region is currently configured! If you are in the cloud shell, this will typically be the region selected at the top of the UI.  
+If you are using Pepper in a local terminal, use `aws configure` to change your settings/region.  
+Once the pre-requisites are installed, Pepper will be ready to deploy Elastic Kubernetes Services (EKS). This will create a 1 node 4cpu cluster (Cluster itself & a nodegroup) sufficient to run Dynabank.
+
+#### Resources:
+
+| Type      | Component            | Name                         |
+| --------- | -------------------- | ---------------------------- |
+| pre-req   | AWS Role             | scw-awsrole-[REGION]         |
+| pre-req   | AWS nodegroup Role   | scw-AWSnodeRoleName-[REGION] |
+| pre-req   | Cloudformation stack | scw-AWScfstack-[REGION]      |
+| component | EKS Cluster          | scw-AWS-[ID]                 |
+| component | EKS Nodegroup        | scw-AWSNG--[ID]              |
+
+### GCP
+
+Google Cloud will deploy into your current project. This can be selected with the initial startup options in Pepper, or you can configure it in the command window before starting.
+Google is fairly straightforward and will simply deploy Google Kubernetes Enginer (GKE). You'll have a 1cpu 4node cluster sufficient to run Dynabank.
+
+| Component | Name          |
+| --------- | ------------- |
+| Cluster   | scw-gke--[ID] |
+
+## Common steps
+
+### Create dynakube.yaml
+
+:::tip About the dynakube.yaml for this workshop
+It's recommended to let Pepper generate the dynakube.yaml. It has a few options set to faciliate the workshop:
+
+- The resource limits are trimmed to work well in a 'lean' kubernetes environment
+- It adds support for cloud metrics
+- It saves a step in downloading the dynakube.yaml to your computer & uploading the file through cloud shell.
+  :::
+  With Kubernetes deployed, the next step is to add Dynatrace. To deploy, you'll need a Dynatrace tenant available (Live recommended; sprint works as well). In your Dyantrace tenant, open Access tokens settings:
+  ![menu](/img/deploy1.jpg)
+  Then create a new token with the `API write` permission.
+  ![API Token](/img/token.jpg)
+  Save the token value and click Done.
+
+Back in Pepper, select the option to `create: dynakube.yaml`. Provide the URL of your tenant (ex: abc12345.live.dynatrace.com). Don't worry about the https:// or if you have extra characters. Pepper will automatically trim what you enter.
+
+Then, paste in the token you created.
+
+:::tip Pasting into cloud shell is hard
+If you are using the vendor provided cloud shell, each one picked a different solution for paste.
+
+Azure: right-click in the shell window and select 'paste'.
+
+AWS: ctrl+v works just fine (right click and select `paste` works too.)
+
+GCP: ctrl+v only
+:::
+
+Pepper will confirm that your URL and token combination is valid and then create the dynakube.yaml.
+
+### Deploy Dynatrace
+
+:::tip Dynatrace deployment options
+This guide shows how to use Pepper to deploy Dynatrace.
+
+However, it's perfectly viable to drop out of Pepper at this point & use the 'Deploy Dynatrace' app and select Kubernetes install. You'd just need to download dynakube.yaml and upload it to your cloud shell.
+
+Keep in mind that you won't have the tweaks mentioned above.
+:::
+
+### Hang tight for the deployment
+
+Pepper will query the dynatrace namespace and report how many pods are ready. There is an option to `refresh` the dynatrace namespace.
+
+Hang tight for 1-2 minutes using the refresh option until you have 5/5 pods ready. This is an important step! If you move forward before 5/5 pods ready, Dynatrace won't catch your deployment and won't monitor Dynabank.
+
+### Deploy Dynabank
+
+Once you have 5/5 pods ready in Dynatrace, select the option to `Download demo apps yaml files`.
+
+This will pull the yaml blueprints for Dynabank (dbic) and any other demo apps packaged for deployment.
+
+Select the option to `Deploy: dbic`. Use the `refresh pods` option over a few minutes until you have all pods deployed.
+
+At this point, Pepper should provide a URL to access your new deployment. In Azure, you should also use a more friendly URL.
+
+### Configure Dynatrace
