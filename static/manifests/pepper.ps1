@@ -925,11 +925,11 @@ function Add-AzureWebAppSteps() {
         #Add-Choice -d "Deploy Azure Web App plan" -f "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
     }
     if ($webAppExists) {
-        Send-Update -c " yes"
+        Send-Update -t 1 -c " yes"
         Add-Choice -d "Remove Azure Web App/Plan" -c "$webASPName / $webAppName" -f "Remove-AzureWebApp" -key "AZRWA"
     }
     else {
-        Send-Update -c " no"
+        Send-Update -t 1 -c " no"
         Add-Choice -d "Deploy Azure Web App/Plan" -f "Add-AzureWebApp" -key "AZAWA"
     }
     # az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
@@ -1921,7 +1921,7 @@ function Add-DynakubeYaml {
         [string] $url, # URL To Dynatrace tenant
         [string] $clusterName # Name of cluster in Dynatrace
     )
-    if ($config.Provider -eq "GCP") {
+    if ($config.provider -eq "GCP") {
         $storage = "true"
     }
     else {
@@ -2187,8 +2187,8 @@ function Get-AppUrls {
             if ($service.status.loadBalancer.ingress[0].hostname) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
             }
-            if ($namespace -eq "dbic" -and $config.Provider -eq "azure") {
-                $returnList = "http://scw$($config.textUserId).$($config.K8sregion).cloudapp.azure.com"
+            if ($namespace -eq "dbic" -and $config.provider -eq "azure") {
+                $returnList = "http://scw$($config.textUserId).$($config.k8sregion).cloudapp.azure.com"
             }
             if ($service.status.loadBalancer.ingress[0].ip) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
