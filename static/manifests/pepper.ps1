@@ -676,7 +676,7 @@ function Add-AzureMultiUserSteps() {
             }
             # Create WebApp if needed and enabled
             if (-not $webAppExists -and $muCreateWebApp) {
-                Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1" -o
+                Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B2" -o
                 Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName --runtime 'dotnet:6'" -o
                 $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
             }
@@ -920,8 +920,6 @@ function Add-AzureWebAppSteps() {
         #check for Web App
         Send-Update -c " yes" 
         $webAppExists = Send-Update -t 1 -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
-        #Add-Choice -d "Remove Azure Web App plan" -c $webASPName -f "az appservice plan delete --resource-group $resourceGroup --name $webASPName"
-        #Add-Choice -d "Deploy Azure Web App plan" -f "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
     }
     if ($webAppExists) {
         Send-Update -t 1 -c " yes"
@@ -931,10 +929,9 @@ function Add-AzureWebAppSteps() {
         Send-Update -t 1 -c " no"
         Add-Choice -d "Deploy Azure Web App/Plan" -f "Add-AzureWebApp" -key "AZAWA"
     }
-    # az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
 }
 function Add-AzureWebApp() {
-    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B1" -o
+    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B2" -o
     Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.resourceGroup) --name $($config.webAppName) --plan $($config.webASPName) --runtime 'dotnet:6'" -o
     Add-AzureSteps
 }
@@ -2036,6 +2033,21 @@ function Get-DTconnected {
         return $false
     }
 }
+function Get-DynatraceToken {
+    write-host ""
+    write-host "Dynatrace Environment ID:"
+    write-host $config.tenantID.split(".")[0]
+    write-host ""
+    write-host "Dynatrace API Token:"
+    write-host $config.k8stoken
+    write-host ""
+    if ($config.tenantID -notlike "*live*") {
+        write-host "Server URL:"
+        write-host "https://$($config.tenantID)/api"
+        write-host ""
+    }
+    
+}
 
 # Application Functions
 function Add-CommonSteps() {
@@ -2050,6 +2062,7 @@ function Add-CommonSteps() {
             #1 Dynatrace installed.  Add status and removal options
             Add-Choice -k "DTCFG" -d "Dynatrace: Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
             Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+            Add-Choice -k "TOKENDT" -d "Dynatrace: Token Details" -f Get-DynatraceToken
         }
         elseif (test-path "$($config.textUserId)-dynakube.yaml") {
             Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "Target DT tenant: $($config.tenantID)" -function Add-Dynatrace
