@@ -670,7 +670,6 @@ function Add-AzureMultiUserSteps() {
         $webAppExists = Send-Update -t 1 -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
         if ($type -eq "normal") {
             if (-not $aksExists -and $muCreateClusters) {
-                write-host "cluster create go!"
                 # AKS not created & flag set to allow creation
                 Send-Update -o -t 1 -content "$userName : create AKS Cluster" -run "az aks create -g $resourceGroup -n $targetCluster --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
                 $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
