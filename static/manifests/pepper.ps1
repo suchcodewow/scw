@@ -2046,17 +2046,17 @@ function Get-DynatraceToken {
         write-host "https://$($config.tenantID)/api"
         write-host ""
     }
-    if ($textUserId.length -gt 15) {
-        $logName = $testUserId.substring(0, 15)
+    if ($config.textUserId.length -gt 15) {
+        $logName = $config.textUserId.substring(0, 15)
     }
     else {
-        $logName = $testUserId
+        $logName = $config.textUserId
     }
-    write-host "DEPLOYMENT_NAME=log$logName"
-    write-host "TARGET_URL=$($config.tenantID)"
-    write-host "TARGET_API_TOKEN=$($config.k8stoken)"
-    write-host "RESOURCE_GROUP=$($config.resourceGroup)"
-    write-host "EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
+    write-host "export DEPLOYMENT_NAME=log$logName"
+    write-host "export TARGET_URL=$($config.tenantID)"
+    write-host "export TARGET_API_TOKEN=$($config.k8stoken)"
+    write-host "export RESOURCE_GROUP=$($config.resourceGroup)"
+    write-host "export EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
     write-host ""
 }
 
