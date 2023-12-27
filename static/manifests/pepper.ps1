@@ -2053,7 +2053,7 @@ function Get-DynatraceToken {
         $logName = $config.textUserId
     }
     write-host "export DEPLOYMENT_NAME=log$logName"
-    write-host "export TARGET_URL=$($config.tenantID)"
+    write-host "export TARGET_URL=https://$($config.tenantID)"
     write-host "export TARGET_API_TOKEN=$($config.k8stoken)"
     write-host "export RESOURCE_GROUP=$($config.resourceGroup)"
     write-host "export EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
