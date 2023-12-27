@@ -1898,7 +1898,6 @@ function Set-DTConfig {
             Set-Prefs -k k8stoken -v $k8stoken
             Set-Prefs -k base64Token -v $base64Token
             Add-DynakubeYaml -t $base64Token -u "https://$tenantURL/api" -c "k8s$($choices.callProperties.userid)"
-
         }
         else {
             write-host "Failed to connect to $tenantURL"
@@ -1984,7 +1983,7 @@ function Add-Dynatrace {
             break
         }
         $counter++
-        Send-Update -c " $counter" -t 1 -a
+        Send-Update -c " $($counter)..." -t 1 -a
         Start-Sleep -s 1
         #Query for namespace viability
         $namespaceState = (kubectl get ns dynatrace -ojson | Convertfrom-Json).status.phase
@@ -2034,6 +2033,7 @@ function Get-DTconnected {
     }
 }
 function Get-DynatraceToken {
+    $authRule = Send-Update -t 0 -c "Get authorization rules" -r "az eventhubs eventhub authorization-rule keys list --eventhub-name scw-$($config.k8sregion)-ehub --namespace-name scw-$($config.k8sregion)-ehubns --name scw-$($config.k8sregion)-ehubns-auth-rule --resource-group scw-$($config.k8sregion)-common --only-show-errors" | Convertfrom-Json
     write-host ""
     write-host "Dynatrace Environment ID:"
     write-host $config.tenantID.split(".")[0]
@@ -2046,7 +2046,18 @@ function Get-DynatraceToken {
         write-host "https://$($config.tenantID)/api"
         write-host ""
     }
-    
+    if ($textUserId.length -gt 15) {
+        $logName = $testUserId.substring(0, 15)
+    }
+    else {
+        $logName = $testUserId
+    }
+    write-host "DEPLOYMENT_NAME=log$logName"
+    write-host "TARGET_URL=$($config.tenantID)"
+    write-host "TARGET_API_TOKEN=$($config.k8stoken)"
+    write-host "RESOURCE_GROUP=$($config.resourceGroup)"
+    write-host "EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
+    write-host ""
 }
 
 # Application Functions
