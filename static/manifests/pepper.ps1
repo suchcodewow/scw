@@ -643,7 +643,7 @@ function Add-AzureMultiUserSteps() {
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-    $existingUsers | ForEach-Object -Parallel {
+    $existingUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
@@ -769,7 +769,7 @@ function Remove-AzureMultiUser() {
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
     # Remove user accounts and all related content
-    $normalUsers | ForEach-Object -Parallel {
+    $normalUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
