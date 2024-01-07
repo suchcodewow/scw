@@ -643,7 +643,7 @@ function Add-AzureMultiUserSteps() {
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
-    $existingUsers | ForEach-Object -Parallel {
+    $existingUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
@@ -676,7 +676,7 @@ function Add-AzureMultiUserSteps() {
             }
             # Create WebApp if needed and enabled
             if (-not $webAppExists -and $muCreateWebApp) {
-                Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1" -o
+                Send-Update -c "$userName : create Azure Service Plan" -t 1 -r "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B2" -o
                 Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName --runtime 'dotnet:6'" -o
                 $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
             }
@@ -769,7 +769,7 @@ function Remove-AzureMultiUser() {
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
     # Remove user accounts and all related content
-    $normalUsers | ForEach-Object -Parallel {
+    $normalUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
@@ -920,8 +920,6 @@ function Add-AzureWebAppSteps() {
         #check for Web App
         Send-Update -c " yes" 
         $webAppExists = Send-Update -t 1 -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
-        #Add-Choice -d "Remove Azure Web App plan" -c $webASPName -f "az appservice plan delete --resource-group $resourceGroup --name $webASPName"
-        #Add-Choice -d "Deploy Azure Web App plan" -f "az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
     }
     if ($webAppExists) {
         Send-Update -t 1 -c " yes"
@@ -931,10 +929,9 @@ function Add-AzureWebAppSteps() {
         Send-Update -t 1 -c " no"
         Add-Choice -d "Deploy Azure Web App/Plan" -f "Add-AzureWebApp" -key "AZAWA"
     }
-    # az appservice plan create --name $webASPName --resource-group $resourceGroup --sku B1"
 }
 function Add-AzureWebApp() {
-    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B1" -o
+    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B2" -o
     Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.resourceGroup) --name $($config.webAppName) --plan $($config.webASPName) --runtime 'dotnet:6'" -o
     Add-AzureSteps
 }
@@ -1901,7 +1898,6 @@ function Set-DTConfig {
             Set-Prefs -k k8stoken -v $k8stoken
             Set-Prefs -k base64Token -v $base64Token
             Add-DynakubeYaml -t $base64Token -u "https://$tenantURL/api" -c "k8s$($choices.callProperties.userid)"
-
         }
         else {
             write-host "Failed to connect to $tenantURL"
@@ -1987,7 +1983,7 @@ function Add-Dynatrace {
             break
         }
         $counter++
-        Send-Update -c " $counter" -t 1 -a
+        Send-Update -c " $($counter)..." -t 1 -a
         Start-Sleep -s 1
         #Query for namespace viability
         $namespaceState = (kubectl get ns dynatrace -ojson | Convertfrom-Json).status.phase
@@ -2036,6 +2032,33 @@ function Get-DTconnected {
         return $false
     }
 }
+function Get-DynatraceToken {
+    $authRule = Send-Update -t 0 -c "Get authorization rules" -r "az eventhubs eventhub authorization-rule keys list --eventhub-name scw-$($config.k8sregion)-ehub --namespace-name scw-$($config.k8sregion)-ehubns --name scw-$($config.k8sregion)-ehubns-auth-rule --resource-group scw-$($config.k8sregion)-common --only-show-errors" | Convertfrom-Json
+    write-host ""
+    write-host "Dynatrace Environment ID:"
+    write-host $config.tenantID.split(".")[0]
+    write-host ""
+    write-host "Dynatrace API Token:"
+    write-host $config.k8stoken
+    write-host ""
+    if ($config.tenantID -notlike "*live*") {
+        write-host "Server URL:"
+        write-host "https://$($config.tenantID)/api"
+        write-host ""
+    }
+    if ($config.textUserId.length -gt 15) {
+        $logName = $config.textUserId.substring(0, 15)
+    }
+    else {
+        $logName = $config.textUserId
+    }
+    write-host "export DEPLOYMENT_NAME=log$logName"
+    write-host "export TARGET_URL=https://$($config.tenantID)"
+    write-host "export TARGET_API_TOKEN=$($config.k8stoken)"
+    write-host "export RESOURCE_GROUP=$($config.resourceGroup)"
+    write-host "export EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
+    write-host ""
+}
 
 # Application Functions
 function Add-CommonSteps() {
@@ -2050,6 +2073,7 @@ function Add-CommonSteps() {
             #1 Dynatrace installed.  Add status and removal options
             Add-Choice -k "DTCFG" -d "Dynatrace: Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
             Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+            Add-Choice -k "TOKENDT" -d "Dynatrace: Token Details" -f Get-DynatraceToken
         }
         elseif (test-path "$($config.textUserId)-dynakube.yaml") {
             Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "Target DT tenant: $($config.tenantID)" -function Add-Dynatrace
