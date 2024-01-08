@@ -463,7 +463,6 @@ function Add-Provider() {
         [switch] $d, # [$true/$false] default option
         [string] $u # unique user identifier (for creating groups/clusters)
     )
-    #TODO match Add-Choice Params
     #---Add an option selector to item then add to provider list
     $provider = New-Object PSCustomObject -Property @{
         provider   = $p
@@ -636,15 +635,52 @@ function Add-AzureMultiUserSteps() {
         if ($user.DisplayName -in $ignoreList.DisplayName) {
             $user | Add-Member -NotePropertyName "type" -NotePropertyValue "ignore"
         }
-        else { $user | Add-Member -NotePropertyName "type" -NotePropertyValue "normal" }
+        else {
+            $user | Add-Member -NotePropertyName "type" -NotePropertyValue "normal"
+
+        }
     }
-    # $targetUsers = $existingUsers | where-object { $_.type -eq "normal" }
+    # pair up normal users with a Dynatrace tenant if option selected
+    if ($muDeployDynatrace) { 
+        Send-Update -t 0 -c "Load tenant list"
+        $tenantList = $selectedCsv | import-csv | where-object { $_.username -eq "" }
+        $normalUserCount = $existingUsers | where-object { $_.type -eq "normal" }
+        if ($normaluserCount.count -gt $tenantList.count) {
+            while (-not $choice) {
+                $userChoice = read-host -prompt "$($normaluserCount.count) attendees but only $($tenantList.count) tenants. OK to assign multiple users per tenant? (y/n)"
+                if ($userChoice -eq "y" -or $userChoice -eq "n") {
+                    $choice = $userChoice
+                }
+                else {
+                    write-host "y / n ONLY please."
+                }
+            }
+            if ($choice -eq "n") {
+                write-host "Turning off Dynatrace Autodeploy"
+                $muDeployDynatrace = $false
+                Add-AzureMultiUserSteps
+                return
+            }
+        }
+        Send-Update -t 0 -c "Viable Tenants: $($tenantList.count) / Normal users: $($normalUserCount.count)"
+        $i = 0
+        foreach ($user in $existingUsers | where-object { $_.type -eq "normal" }) {
+            $user | Add-Member -NotePropertyName "tenant" -NotePropertyValue $tenantList[$i].tenant
+            $user | Add-Member -NotePropertyName "token" -NotePropertyValue $tenantList[$i].token
+            if ($i -ge $tenantList.count - 1) {
+                Send-Update -t 1 -c "Starting over with first tenant to assign more attendees."
+                $i = 0
+            }
+            else { $i++ }
+        }
+    }
     $ignoredUsers = $existingUsers | where-object { $_.type -eq "ignore" }
-    # Check status for users
+    # Create a parallel-compliant library
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
+    # Parallel Execution Mode
     $existingUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
@@ -684,8 +720,11 @@ function Add-AzureMultiUserSteps() {
                 $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
             }
         }
+        # Update settings if we changed things
         if ($aksExists) { $clusterExists = $true }
         if ($webAppExists) { $appExists = $true }
+        # If there's a Dynatrace tenant assigned, deploy Dynatrace if it doesn't exist yet
+        
         # Update bag, baby
         $result = New-Object PSCustomObject -Property @{
             userName      = $userName
@@ -845,10 +884,35 @@ function Set-AzureMultiUserCreateWebApp() {
 }
 function Set-AzureMultiUserDeployDynatrace() {
     if (-not $muDeployDynatrace) {
-        write-host "setting to true"
+        Send-Update -t 0 -c "Checking for csv files in current directory"
+        $localCsv = @(get-childitem -include *.csv -path * -name)
+        Send-Update -t 0 -c "Found $($localCsv.count) possible files"
+        if (-not $localCsv) {
+            Send-Update -t 2 -c "No local CSV found. Aborting"
+            return
+        }
+        $i = 0
+        do {
+            $currentCSV = $localCsv[$i] | Import-Csv
+            $possibleTenants = $currentCSV | where-object { $_.username -eq "" -and $null -ne $_.tenant -and $null -ne $_.token }
+            if ($possibleTenants.count -gt 0) {
+                $script:selectedCSV = $localCsv[$i]
+                Send-Update -t 1 -c "Found $($possibleTenants.count) usable tenant/tokens in $($localCsv[$i])"
+            }
+            else {
+                Send-Update -t 1 -c "No viable tenants in $($localCsv[$i])"
+            }
+            $i++
+        } until ($selectedCsv -or $i -ge $localCsv.count - 1)
+        if (-not $selectedCsv) {
+            Send-Update -t 2 -c "No valid csv found. CSV required with tenant & token columns populated and a BLANK username column to update when done."
+            return
+        }
+        Send-Update -t 0 -c "Valid tenant/token list, setting to true"
         $script:muDeployDynatrace = $true
         # Need to create clusters if we're deploying Dynatrace
-        $script:muCreateClusters = $true
+        # TODO Turn below back on
+        # $script:muCreateClusters = $true
     }
     else {
         $script:muDeployDynatrace = $false
@@ -932,10 +996,10 @@ function Add-AzureWebAppSteps() {
     $resourceGroup = "scw-group-$($config.textUserId)"
     Set-Prefs -k resourceGroup -v $resourceGroup
     #Check for plan
-    $planExists = Send-Update -t 1 -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
+    $planExists = Send-Update -t 1 -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
     if ($planExists) {
         #check for Web App
-        Send-Update -c " yes" 
+        Send-Update -t 1 -c " yes" 
         $webAppExists = Send-Update -t 1 -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
     }
     if ($webAppExists) {
@@ -1069,14 +1133,14 @@ function Add-AWSMultiUserSteps() {
             $clusterExists = Send-Update -t 1 -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
             if (!$clusterExists -and $muCreateClusters) {
                 # Create cluster-  wait for 'active' state
-                Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $awsRegion --name $targetCluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$cfSubnets,securityGroupIds=$cfSecurityGroup"
+                Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $awsRegion --name $targetCluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$cfSubnets, securityGroupIds=$cfSecurityGroup"
                 While ($clusterExists.cluster.status -ne "ACTIVE") {
                     $clusterExists = Send-Update -t 1 -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
                     # Send-Update -t 1 -c "$($clusterExists.cluster.status)"
                     Start-Sleep -s 10
                 }
                 # Create nodegroup- wait for 'active' state
-                Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --node-role $AWSnodeRoleArn --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($cfSubnets.replace(',', ' ')) --instance-types t3.xlarge"
+                Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --node-role $AWSnodeRoleArn --scaling-config minSize=1, maxSize=1, desiredSize=1 --subnets $($cfSubnets.replace(',', ' ')) --instance-types t3.xlarge"
                 While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
                     $nodeGroupExists = Send-Update -t 1 -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --output json" | ConvertFrom-Json
                     # Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
@@ -1129,10 +1193,10 @@ function Set-AWSMultiUserDoNotDelete() {
         if (-not $userId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
     if ($userId.userType -eq "normal") {
-        Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=DoNotDelete"
+        Send-Update -t 1 -c "Setting DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type, Value=DoNotDelete"
     }
     else {
-        Send-Update -t 1 -c "Removing DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type,Value=normal"
+        Send-Update -t 1 -c "Removing DoNotDelete flag for $($userId.userName)" -r "aws iam tag-user --user-name $($userId.userName) --tags Key=type, Value=normal"
 
     }
     Add-AWSMultiUserSteps
@@ -1145,7 +1209,6 @@ function Get-AWSMultiUser() {
     $muUsers | Format-table -Property userName, userType, clusterExists
     write-host ""
     $muUsers | Format-table -Property userName
-
 }
 function Remove-AWSMultiUser() {
     # Save functions to string to use in parallel processing
@@ -1224,7 +1287,7 @@ function Add-AWSMultiUser() {
         } Until ($user)
         Send-Update -t 1 -o -c  "Add login profile for $newUserName " -r "aws iam create-login-profile --user-name $newUserName --password 1Dynatrace##"
         Send-Update -t 1 -c "Add $newUserName to group" -r "aws iam add-user-to-group --group-name Attendees --user-name $newUserName"
-        Send-Update -t 1 -c "Tagging $newUserName" -r "aws iam tag-user --user-name $newUserName --tags Key=type,Value=normal"
+        Send-Update -t 1 -c "Tagging $newUserName" -r "aws iam tag-user --user-name $newUserName --tags Key=type, Value=normal"
     }
     Add-AWSMultiUserSteps
 }
@@ -1438,7 +1501,7 @@ function Add-AWSCluster {
         Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
-    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1, maxSize=1, desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
@@ -1914,7 +1977,7 @@ function Set-DTConfig {
             Set-Prefs -k writeToken -v $token
             Set-Prefs -k k8stoken -v $k8stoken
             Set-Prefs -k base64Token -v $base64Token
-            Add-DynakubeYaml -t $base64Token -u "https://$tenantURL/api" -c "k8s$($choices.callProperties.userid)"
+            Add-DynakubeYaml -t $base64Token -u $tenantURL -c "k8s$($choices.callProperties.userid)"
         }
         else {
             write-host "Failed to connect to $tenantURL"
@@ -1934,6 +1997,7 @@ function Add-DynakubeYaml {
         [string] $clusterName, # Name of cluster in Dynatrace
         [string] $muUsername # optional name of MU attendee
     )
+    $fullURL = "https://$url/api"
     if ($muUsername) {
         $configName = $muUsername
     }
@@ -1948,6 +2012,14 @@ function Add-DynakubeYaml {
     }
     $dynaKubeContent = 
     @"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: scw
+data:
+    tenantid: $url
+    k8stoken: $k8stoken
+---
 apiVersion: v1
 data:
   apiToken: $base64Token
@@ -1965,7 +2037,7 @@ metadata:
   annotations:
     feature.dynatrace.com/automatic-kubernetes-api-monitoring: "true"
 spec:
-  apiUrl: $url
+  apiUrl: $fullURL
   skipCertCheck: true
   oneAgent:
     classicFullStack:
@@ -2020,7 +2092,17 @@ function Add-Dynatrace {
 }
 function Get-DTconnected {
     # Check if Dynatrace token and url are valid
-    Send-Update -c "Checking if existing Dynatrace connection is valid." -t 1
+    Send-Update -c "Checking for valid Dynatrace connection details." -t 1
+    # If tenant & token missing, import from Configmap if available
+    if (-not $config.tenantID -or -not $config.k8stoken) {
+        $configMap = Send-Update -t 0 -c "Importing Dynatrace details from ConfigMap" -r "kubectl get cm -o json" | ConvertFrom-Json
+        $scwData = $configMap.items | where-object { $_.metadata.name -eq "scw" }
+        if ($scwData.data.tenantid -and $scwData.data.k8stoken) {
+            Set-Prefs -k tenantID -v $scwData.data.tenantid
+            Set-Prefs -k k8stoken -v $scwData.data.k8stoken
+            Send-Update -t 0 -c "Imported!"
+        }
+    }
     if ($config.tenantID -AND $config.k8stoken) {
         $url = $config.tenantID
         $token = $config.k8stoken
