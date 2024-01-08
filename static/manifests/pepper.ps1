@@ -680,13 +680,19 @@ function Add-AzureMultiUserSteps() {
     #   Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
+    $AddDynakubeDef = ${function:Add-DynakubeYaml}.ToString()
+    $GetAKSClusterDef = ${function:Get-AKSCluster}.ToString()
     # Parallel Execution Mode
     $existingUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         # Import functions and variables from main script
         if ($using:showCommands) { $script:showCommands = $true }
         $script:outputLevel = $using:outputLevel
+        # Import packed functions
         ${function:Get-UserName} = $using:GetUsernameDef
         ${function:Send-Update} = $using:SendUpdateDef
+        ${function:Add-DynakubeYaml} = $using:AddDynakubeDef
+        ${function:Get-AKSCluster} = $using:GetAKSClusterDef
+        # Setup Variables
         $dict = $using:parallelResults
         $config = $using:config
         $muCreateClusters = $using:muCreateClusters
@@ -699,6 +705,8 @@ function Add-AzureMultiUserSteps() {
         $targetCluster = "scw-AKS-$userName"
         $webASPName = "scw-asp-$userName"
         $webAppName = "scw-webapp-$userName"
+        $tenantid = $_.tenant
+        $k8stoken = $_.token
         # Check if a resource group exists
         $groupExists = Send-Update -t 0 -content "$userName : Resource Group check" -run "az group exists -g $resourceGroup"
         if ($groupExists -eq "false") {
@@ -721,18 +729,54 @@ function Add-AzureMultiUserSteps() {
             }
         }
         # Update settings if we changed things
-        if ($aksExists) { $clusterExists = $true }
+        if ($aksExists) { 
+            $clusterExists = $true
+            az aks get-credentials --file "$($userName).kube" -g $resourceGroup -n $targetCluster --overwrite-existing --only-show-errors
+            $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl --kubeconfig $($userName).kube get ns -o json  | Convertfrom-Json).items.metadata.name"
+            if ($existingNamespaces.contains("dynatrace")) {
+                $dynatraceState = $true
+            }
+        }
         if ($webAppExists) { $appExists = $true }
-        # If there's a Dynatrace tenant assigned, deploy Dynatrace if it doesn't exist yet
-        
+        if ($tenantID -and $k8stoken -and -not $dynatraceState) {
+            # We need Dynatrace.  Generate DynaKube.yaml
+            Send-Update -t 1 -c "Generating Dynatrace Yaml for $userName"
+            if ($tenantid.substring(0, 8) = "https://") {
+                $url = $tenantid.substring(8)
+            }
+            else {
+                $url = $tenantid                   
+            }
+            Add-DynakubeYaml -muUsername $userName -c $targetCluster -token $k8stoken -url $url
+            # Deploy Dynatrace steps.
+            Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl --kubeconfig $($userName).kube create ns dynatrace"
+            Send-Update -c "Waiting 10s for activation" -a -t 1
+            $counter = 0
+            While ($namespaceState.status.phase -ne "Active") {
+                if ($counter -ge 10) {
+                    Send-Update -t 2 -c " Failed to create namespace!"
+                    break
+                }
+                $counter++
+                Send-Update -c " $($counter)..." -t 1 -a
+                Start-Sleep -s 1
+                #Query for namespace viability
+                $namespaceState = Send-Update -t 1 -c "Checking namespace state for: $targetCluster" -r "kubectl --kubeconfig drysmoke.kube get ns dynatrace -ojson " | Convertfrom-Json
+            }
+            Send-Update -c " Activated!" -t 1
+            Send-Update -c "Loading Operator" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
+            Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl --kubeconfig $($userName).kube -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
+            Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f $($userName)-dynakube.yaml" 
+        }
         # Update bag, baby
         $result = New-Object PSCustomObject -Property @{
-            userName      = $userName
-            targetGroup   = $resourceGroup
-            targetCluster = $targetCluster
-            targetWebApp  = $webAppName
-            clusterExists = $clusterExists
-            appExists     = $appExists
+            userName         = $userName
+            targetGroup      = $resourceGroup
+            targetCluster    = $targetCluster
+            targetWebApp     = $webAppName
+            clusterExists    = $clusterExists
+            appExists        = $appExists
+            $dynatraceStatus = $dynatraceStatus
         }
         $dict.add($result)
     }
@@ -2176,7 +2220,7 @@ function Add-CommonSteps() {
     if ($DTconnected) {
         # Determine appropriate Dynatrace optionyamlName
         if ($existingNamespaces.contains("dynatrace")) {
-            #1 Dynatrace installed.  Add status and removal options
+            # Dynatrace installed.  Add status and removal options
             Add-Choice -k "DTCFG" -d "Dynatrace: Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
             Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
             Add-Choice -k "TOKENDT" -d "Dynatrace: Token Details" -f Get-DynatraceToken
