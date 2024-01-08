@@ -77,6 +77,7 @@ function Get-Prefs($scriptPath) {
     $script:currentLogEntry = $null
     $script:muCreateClusters = $false
     $script:muCreateWebApp = $false
+    $script:muDeployDynatrace = $false
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic",
         "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
@@ -625,6 +626,7 @@ function Add-AzureMultiUserSteps() {
     if (-not $config.muAzureRegion) { return }
     # Add toggles for content
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
+    ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "Currently: $($muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
     Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
     # User Options
     $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
@@ -653,6 +655,7 @@ function Add-AzureMultiUserSteps() {
         $config = $using:config
         $muCreateClusters = $using:muCreateClusters
         $muCreateWebApp = $using:muCreateWebApp
+        $muDeployDynatrace = $using:muDeployDynatrace
         # Setup core variables
         $userName = $_.DisplayName
         $type = $_.type
@@ -825,6 +828,8 @@ function Set-AzureMultiUserCreateCluster() {
     }
     else {
         $script:muCreateClusters = $false
+        # Need to disable the option to deploy Dynatrace
+        $script:muDeployDynatrace = $false
     }
     Add-AzureMultiUserSteps
 }
@@ -835,6 +840,18 @@ function Set-AzureMultiUserCreateWebApp() {
     }
     else {
         $script:muCreateWebApp = $false
+    }
+    Add-AzureMultiUserSteps
+}
+function Set-AzureMultiUserDeployDynatrace() {
+    if (-not $muDeployDynatrace) {
+        write-host "setting to true"
+        $script:muDeployDynatrace = $true
+        # Need to create clusters if we're deploying Dynatrace
+        $script:muCreateClusters = $true
+    }
+    else {
+        $script:muDeployDynatrace = $false
     }
     Add-AzureMultiUserSteps
 }
@@ -1914,8 +1931,15 @@ function Add-DynakubeYaml {
     param (
         [string] $token, # Dynatrace API token
         [string] $url, # URL To Dynatrace tenant
-        [string] $clusterName # Name of cluster in Dynatrace
+        [string] $clusterName, # Name of cluster in Dynatrace
+        [string] $muUsername # optional name of MU attendee
     )
+    if ($muUsername) {
+        $configName = $muUsername
+    }
+    else {
+        $configName = $config.textUserId
+    }
     if ($config.provider -eq "GCP") {
         $storage = "true"
     }
@@ -1971,7 +1995,7 @@ spec:
         cpu: 500m
         memory: 1.5Gi
 "@
-    $dynaKubeContent | out-File -FilePath "$($config.textUserId)-dynakube.yaml"
+    $dynaKubeContent | out-File -FilePath "$($configName)-dynakube.yaml"
 }
 function Add-Dynatrace {
     Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl create ns dynatrace"
