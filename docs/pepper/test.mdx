@@ -8,7 +8,7 @@ Confirm login to [Azure portal](https://portal.azure.com) with [yourmadlibsname]
 
 ### Azure: Command Line
 
-Use University terminal (or Azure Portal console if not registered) to reach an Azure prompt.
+Use University terminal (or Azure Portal console if not registered) to reach an Azure prompt. Make sure to pick BASH!
 
 If using Unversity terminal, run `az login` and follow prompts to connect to Azure. Use the [yourmadlibsname]@suchcodewow.io and password.
 
@@ -181,3 +181,17 @@ In a real-world scenario we wouldn't go without a subscription/authorization mec
 4. Before leaving this screen, find the _Base URL_ of your service and copy it.
 1. Confirm it worked by pasting this URL into a new tab of your browser. You should see your service respond just fine behind the apim!
 1. In your Dynabank Operations portal (click orange button top right -> Operations), you can replace the Instamation Web App with the APIM version and click _save_. You should receive the same _succesfully configured_ message.
+
+## D) Monitoring Azure
+
+### Azure Log Forwarder
+
+1. Run the option in Pepper again to show token details. Copy all EXPORT commands. Exit Pepper. PASTE the commands.
+1. Then run the standard Dynatrace Log Forwarder:
+
+```bash
+wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/latest/download/dynatrace-azure-logs.sh -O dynatrace-azure-logs.sh && chmod +x ./dynatrace-azure-logs.sh \
+&& ./dynatrace-azure-logs.sh --deployment-name $DEPLOYMENT_NAME --target-url $TARGET_URL --target-api-token $TARGET_API_TOKEN --resource-group $RESOURCE_GROUP --event-hub-connection-string $EVENT_HUB_CONNECTION_STRING  --require-valid-certificate true
+```
+
+It should let you know it successfully deployed.
