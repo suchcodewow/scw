@@ -732,13 +732,18 @@ function Add-AzureMultiUserSteps() {
         if ($aksExists) { 
             $clusterExists = $true
             az aks get-credentials --file "$($userName).kube" -g $resourceGroup -n $targetCluster --overwrite-existing --only-show-errors
-            $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl --kubeconfig $($userName).kube get ns -o json  | Convertfrom-Json).items.metadata.name"
+            Do {
+                $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl --kubeconfig $($userName).kube get ns -o json  | Convertfrom-Json).items.metadata.name"
+                Start-Sleep -seconds 20
+            } until($existingNamespaces)
             if ($existingNamespaces.contains("dynatrace")) {
                 $dynatraceState = $true
             }
         }
         if ($webAppExists) { $appExists = $true }
         if ($tenantID -and $k8stoken -and -not $dynatraceState) {
+            # Wait 5 minutes for AKS cluster to hopefully be available
+            # Start-Sleep -seconds 300
             # We need Dynatrace.  Generate DynaKube.yaml
             Send-Update -t 1 -c "Generating Dynatrace Yaml for $userName"
             if ($tenantid.substring(0, 8) = "https://") {
