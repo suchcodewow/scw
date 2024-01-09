@@ -778,6 +778,8 @@ function Add-AzureMultiUserSteps() {
             clusterExists  = $clusterExists
             appExists      = $appExists
             dynatraceState = $dynatraceState
+            targetTenant   = $tenantid
+            targetToken    = $token
         }
         $dict.add($result)
     }
@@ -958,7 +960,7 @@ function Set-AzureMultiUserDeployDynatrace() {
         $script:muDeployDynatrace = $true
         # Need to create clusters if we're deploying Dynatrace
         # TODO Turn below back on
-        # $script:muCreateClusters = $true
+        $script:muCreateClusters = $true
     }
     else {
         $script:muDeployDynatrace = $false
