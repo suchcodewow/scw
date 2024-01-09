@@ -776,7 +776,7 @@ function Add-AzureMultiUserSteps() {
             targetCluster  = $targetCluster
             targetWebApp   = $webAppName
             clusterExists  = $clusterExists
-            appExists      = $appExists4
+            appExists      = $appExists
             dynatraceState = $dynatraceState
         }
         $dict.add($result)
