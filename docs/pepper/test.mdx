@@ -22,13 +22,13 @@ curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pe
 
 Pepper will take an inventory of what is loaded. Confirm:
 
-| Component        | Name                         |
-| ---------------- | ---------------------------- |
-| Resource group   | scw-group-[yourmadlibsname]  |
-| AKS cluster      | scw-AKS-[yourmadlibsname]    |
-| App Service Plan | scw-ASP-[yourmadlibsname]    |
-| Web App          | scw-webapp-[yourmadlibsname] |
-| Dynatrace        | tenant shown on spreadsheet  |
+| Component        | Name                                         |
+| ---------------- | -------------------------------------------- |
+| Resource group   | scw-group-[yourmadlibsname]                  |
+| AKS cluster      | scw-AKS-[yourmadlibsname]                    |
+| App Service Plan | scw-ASP-[yourmadlibsname]                    |
+| Web App          | scw-webapp-[yourmadlibsname]                 |
+| Dynatrace        | tenant shown on spreadsheet & 5/5 pods ready |
 
 ### Dynatrace
 
@@ -44,10 +44,34 @@ Confirm that "Node.js Fetch" [Opt-in] is enabled. Then turn on:
 
 - Node.js - Trace/span context enrichment for logs [Opt-In]
 - Node.js - Trace/span context enrichment for unstructured logs [Opt-In]
+- Node.js Business Events [Opt-In] AND the sub-selector to enabled
 
-Go to Settings -> Log Ingest Rules. Turn on:
+Save!
+
+Go to Settings -> Log Ingest Rules. Turn on/confirm:
 
 - [Built-in] Ingest all logs
+
+## C) Deploy
+
+### Dynabank
+
+#### Deploy
+
+1. In your command line with Pepper running select the option to `Download demo apps yaml files`.
+1. Select the option to `Deploy: dbic`. Use the `refresh pods` option over a **few minutes** until you have all pods deployed.
+
+At this point, Pepper should provide the URL to your environment. Where available, you'll also get a more 'friendly' link.
+
+#### Confirm
+
+1. In your Dynabank instance, ensure you can login top right.
+1. Feel free to go to banking, do a desposit from left, make sure it saves, etc.
+1. Make sure to go to the insurance page and submit a Collecticare quote. This is the main service used in HoT session.
+1. Click your orange name badge top right, choose administration. Confirm the load generator is starting to send sessions through all components of Dynabank.
+1. Confirm Collecticare quotes (far left side) have a status of "NEW".
+
+Leave this window open!
 
 ### Azure Web App
 
@@ -85,7 +109,7 @@ When this appears, it means your service is working! You are ready to move to th
 1. At the bottom of the panel, check the agreement box, then click _Add_.
 1. Hang tight for a few seconds until it loads, then click the small browse box:
    ![extension2](/img/extension2.png)
-1. Create a token in Dynatrace with the PaaS template to use here.
+1. In Pepper, choose the option for `Dynatrace: Token Details`. This will provide the settings for the box.
 1. Using the image below as a guide, paste in the URL of your tenant adding `/api` to the end. Fill in the environment ID using the first part of the URL, then paste in the Paas token created above.
    ![extension3](/img/extension3.png)
 1. Click _Install OneAgent_ and hang tight until you see _Enjoy monitoring from Dynatrace._ at the top of the screen.
@@ -94,15 +118,6 @@ When this appears, it means your service is working! You are ready to move to th
 :::tip Lab vs Real World
 For most Dynatrace deployments, only the Environment ID is needed. Since we're using Dynatrace tenants that contain the word 'sprint' instead of the normal 'live', we need to specify the Server URL.
 :::
-
-### Deploy Dynabank
-
-1. Once you have 5/5 pods ready in Dynatrace, select the option to `Download demo apps yaml files`.
-   This will pull the yaml blueprints for Dynabank (dbic) and any other demo apps packaged for deployment.
-
-1. Select the option to `Deploy: dbic`. Use the `refresh pods` option over a few minutes until you have all pods deployed.
-
-At this point, Pepper should provide the URL to your environment. Where available, you'll also get a more 'friendly' link.
 
 ## G) Cloud-specific deployments
 
