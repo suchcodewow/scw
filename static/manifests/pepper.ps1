@@ -624,9 +624,9 @@ function Add-AzureMultiUserSteps() {
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) { return }
     # Add toggles for content
-    Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "Currently: $($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
-    ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "Currently: $($muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
-    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "Currently: $($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
+    Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "$($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
+    ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
+    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "$($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
     # User Options
     $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     $ignoreList = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
@@ -789,7 +789,7 @@ function Add-AzureMultiUserSteps() {
     if ($existingUsers.count -gt 0) {
         Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
         Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
-        Add-Choice -k "AZIU" -d "  Change ignored users" -c "Currently: $($ignoredUsers.count)" -f Set-AzureMultiUserDoNotDelete
+        Add-Choice -k "AZIU" -d "  Change ignored users" -c "$($ignoredUsers.count)" -f Set-AzureMultiUserDoNotDelete
     }
     else { return }
 }
