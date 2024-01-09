@@ -52,7 +52,7 @@ Go to Settings -> Log Ingest Rules. Turn on/confirm:
 
 - [Built-in] Ingest all logs
 
-## C) Deploy
+## C) Core Deployment
 
 ### Dynabank
 
@@ -101,7 +101,7 @@ When this appears, it means your service is working! You are ready to move to th
 
 1. Copy the URL of your azure web service from the address bar at the top of your browser to use later.
 
-#### Dynatrace Extension
+### Dynatrace Extension
 
 1. In the inset-menu, click on _Extensions_ within the _Development Tools_ section.
 1. Click Add in the main window. Search/Find Dynatrace Oneagent and select it:
@@ -109,8 +109,8 @@ When this appears, it means your service is working! You are ready to move to th
 1. At the bottom of the panel, check the agreement box, then click _Add_.
 1. Hang tight for a few seconds until it loads, then click the small browse box:
    ![extension2](/img/extension2.png)
-1. In Pepper, choose the option for `Dynatrace: Token Details`. This will provide the settings for the box.
-1. Using the image below as a guide, paste in the URL of your tenant adding `/api` to the end. Fill in the environment ID using the first part of the URL, then paste in the Paas token created above.
+1. In Pepper, choose the option for `Dynatrace: Token Details`. This will provide pre-formatted settings.
+1. Copy and Paste the details from the TOP section of the Pepper Token Details screen. (The bottom section is a bit later.)
    ![extension3](/img/extension3.png)
 1. Click _Install OneAgent_ and hang tight until you see _Enjoy monitoring from Dynatrace._ at the top of the screen.
 1. In the _Overview_ page of your web app, click the _Restart_ button.
@@ -119,57 +119,22 @@ When this appears, it means your service is working! You are ready to move to th
 For most Dynatrace deployments, only the Environment ID is needed. Since we're using Dynatrace tenants that contain the word 'sprint' instead of the normal 'live', we need to specify the Server URL.
 :::
 
-## G) Cloud-specific deployments
+### Logging
 
-### Azure Web App
+1. In the Azure web app, scroll down to and click on `Diagnostic Settings`.
+1. Name your Diagnostic setting. 'Steve' or 'Fluffy' is fun.
+1. Click `+Add diagnostic setting`.
+1. Select **App Service Application Logs** on the left.
+1. ON the right, click **stream to an event ** and enter these settings:
 
-#### Deploy
+| Setting               | Value                      |
+| --------------------- | -------------------------- |
+| Subscription          | DLF                        |
+| Event Hub Namespace   | scw-eastus2-ehubns         |
+| Event Hub Name        | scw-eastus2-ehub           |
+| Event Hub Policy Name | RootManagedSharedAccessKey |
 
-:::tip Prequisite!
-Make sure to deploy the Azure web app framework with Pepper prior to completing these steps.
-:::
-
-1. In the Azure Console, go to "App Services."
-1. Find and click on your webapp. It will be in the _format scw-webapp-[yourid]_.
-1. Select the Deployment Center (blue highlight) then External Git as the source (green highlight).  
-   ![awa1](/img/awa1.png)
-1. Copy the following service repository link into the repository field and type `main` for the branch (blue highlight) then Save (green highlight).
-
-```bash
-https://github.com/suchcodewow/instamationsvc
-```
-
-![awa2](/img/awa2.png)
-
-1. Go back to the overview page (blue highlight) and click the default domain (green highlight) to see your new service.
-   ![awa3](/img/awa3.png)
-1. The deployment will likely take a minute or two. You might see a boilerplate message the first time you click- or it might not respond. When successfully deployed, you should see a simple json response simlar to:
-
-```bash
-{"status":"ready","appname":"scw-webapp-colossalcactus"}
-```
-
-When this appears, it means your service is working! You are ready to move to the next step.
-
-1. Copy the URL of your azure web service from the address bar at the top of your browser to use later.
-
-#### Dynatrace Extension
-
-1. In the inset-menu, click on _Extensions_ within the _Development Tools_ section.
-1. Click Add in the main window. Search/Find Dynatrace Oneagent and select it:
-   ![extension1](/img/extension1.png)
-1. At the bottom of the panel, check the agreement box, then click _Add_.
-1. Hang tight for a few seconds until it loads, then click the small browse box:
-   ![extension2](/img/extension2.png)
-1. Create a token in Dynatrace with the PaaS template to use here.
-1. Using the image below as a guide, paste in the URL of your tenant adding `/api` to the end. Fill in the environment ID using the first part of the URL, then paste in the Paas token created above.
-   ![extension3](/img/extension3.png)
-1. Click _Install OneAgent_ and hang tight until you see _Enjoy monitoring from Dynatrace._ at the top of the screen.
-1. In the _Overview_ page of your web app, click the _Restart_ button.
-
-:::tip Lab vs Real World
-For most Dynatrace deployments, only the Environment ID is needed. Since we're using Dynatrace tenants that contain the word 'sprint' instead of the normal 'live', we need to specify the Server URL.
-:::
+Save top right!
 
 #### Dynabank & Azure Web App
 
@@ -183,6 +148,8 @@ For most Dynatrace deployments, only the Environment ID is needed. Since we're u
    ![dynabankwebapp3](/img/dynabankwebapp3.png)
 1. And reviewing new Collecticare quotes on the first administration panel. Instead of quotes showing up in the _new_ state, they will show as 'quoted' instead:
    ![dynabankwebapp4](/img/dynabankwebapp4.png)
+
+## C) Extended Deployment
 
 #### Dynabank & APIM
 
@@ -198,7 +165,7 @@ Instamation also works through Azure APIM (API Management).
 1. Copy the name provided into the API URL suffix box. Your Base URL should look something like:
 
 ```bash
-https://scw-useast2-apim.azure-api.net/scw-webapp-colossalcactus
+https://scw-useast2-apim.azure-api.net/scw-webapp-[yourmadlibsname]
 ```
 
 1. Click _Create_.
