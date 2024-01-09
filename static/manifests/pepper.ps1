@@ -747,7 +747,7 @@ function Add-AzureMultiUserSteps() {
             else {
                 $url = $tenantid                   
             }
-            Add-DynakubeYaml -muUsername $userName -c $targetCluster -token $k8stoken -url $url
+            Add-DynakubeYaml -muUsername $userName -c "k8s$userName" -token $k8stoken -url $url
             # Deploy Dynatrace steps.
             Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl --kubeconfig $($userName).kube create ns dynatrace"
             Send-Update -c "Waiting 10s for activation" -a -t 1
@@ -766,24 +766,26 @@ function Add-AzureMultiUserSteps() {
             Send-Update -c " Activated!" -t 1
             Send-Update -c "Loading Operator" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
             Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl --kubeconfig $($userName).kube -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
-            Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f $($userName)-dynakube.yaml" 
+            Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f $($userName)-dynakube.yaml"
+            $dynatraceState = $true
         }
         # Update bag, baby
         $result = New-Object PSCustomObject -Property @{
-            userName         = $userName
-            targetGroup      = $resourceGroup
-            targetCluster    = $targetCluster
-            targetWebApp     = $webAppName
-            clusterExists    = $clusterExists
-            appExists        = $appExists
-            $dynatraceStatus = $dynatraceStatus
+            userName       = $userName
+            targetGroup    = $resourceGroup
+            targetCluster  = $targetCluster
+            targetWebApp   = $webAppName
+            clusterExists  = $clusterExists
+            appExists      = $appExists4
+            dynatraceState = $dynatraceState
         }
         $dict.add($result)
     }
     $global:muUsers = $parallelResults
     $muCreatedClusters = $muUsers | where-object { $_.clusterExists -eq $true }
     $muCreatedApps = $muUsers | where-object { $_.appExists -eq $true }
-    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Users: $($muUsers.count) / Clusters: $($muCreatedClusters.count) / Webapps: $($muCreatedApps.count)"
+    $muDynatraceState = $muUsers | where-object { $_.dynatraceState -eq $true }
+    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Users: $($muUsers.count) / Clusters: $($muCreatedClusters.count) / Dynatrace: $($muDynatraceState.count) / Webapps: $($muCreatedApps.count)"
     if ($existingUsers.count -gt 0) {
         Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
         Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
@@ -2016,12 +2018,11 @@ function Set-DTConfig {
         if ($response.token) {
             # API Token has to be base64. #PropsDaveThomas<3
             $k8stoken = $response.token
-            $base64Token = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($k8stoken))
             Set-Prefs -k tenantID -v $tenantURL
             Set-Prefs -k writeToken -v $token
             Set-Prefs -k k8stoken -v $k8stoken
-            Set-Prefs -k base64Token -v $base64Token
-            Add-DynakubeYaml -t $base64Token -u $tenantURL -c "k8s$($choices.callProperties.userid)"
+            # Set-Prefs -k base64Token -v $base64Token
+            Add-DynakubeYaml -t $k8stoken -u $tenantURL -c "k8s$($choices.callProperties.userid)"
         }
         else {
             write-host "Failed to connect to $tenantURL"
@@ -2041,6 +2042,7 @@ function Add-DynakubeYaml {
         [string] $clusterName, # Name of cluster in Dynatrace
         [string] $muUsername # optional name of MU attendee
     )
+    $base64Token = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($token))
     $fullURL = "https://$url/api"
     if ($muUsername) {
         $configName = $muUsername
@@ -2062,7 +2064,7 @@ metadata:
     name: scw
 data:
     tenantid: $url
-    k8stoken: $k8stoken
+    k8stoken: $token
 ---
 apiVersion: v1
 data:
