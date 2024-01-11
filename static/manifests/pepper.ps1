@@ -1179,14 +1179,14 @@ function Add-AWSMultiUserSteps() {
             $clusterExists = Send-Update -t 1 -e -c "Check for EKS Cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
             if (!$clusterExists -and $muCreateClusters) {
                 # Create cluster-  wait for 'active' state
-                Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $awsRegion --name $targetCluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$cfSubnets, securityGroupIds=$cfSecurityGroup"
+                Send-Update -o -c "Create Cluster" -t 1 -r "aws eks create-cluster --region $awsRegion --name $targetCluster --role-arn $AWSclusterRoleArn --resources-vpc-config subnetIds=$cfSubnets,securityGroupIds=$cfSecurityGroup"
                 While ($clusterExists.cluster.status -ne "ACTIVE") {
                     $clusterExists = Send-Update -t 1 -e -c "Wait for ACTIVE cluster" -r "aws eks describe-cluster --region $awsRegion --name $targetCluster --output json" | ConvertFrom-Json
                     # Send-Update -t 1 -c "$($clusterExists.cluster.status)"
                     Start-Sleep -s 10
                 }
                 # Create nodegroup- wait for 'active' state
-                Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --node-role $AWSnodeRoleArn --scaling-config minSize=1, maxSize=1, desiredSize=1 --subnets $($cfSubnets.replace(',', ' ')) --instance-types t3.xlarge"
+                Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --node-role $AWSnodeRoleArn --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($cfSubnets.replace(',', ' ')) --instance-types t3.xlarge"
                 While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
                     $nodeGroupExists = Send-Update -t 1 -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $awsRegion --cluster-name $targetCluster --nodegroup-name $targetNodeGroup --output json" | ConvertFrom-Json
                     # Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
@@ -1333,7 +1333,7 @@ function Add-AWSMultiUser() {
         } Until ($user)
         Send-Update -t 1 -o -c  "Add login profile for $newUserName " -r "aws iam create-login-profile --user-name $newUserName --password 1Dynatrace##"
         Send-Update -t 1 -c "Add $newUserName to group" -r "aws iam add-user-to-group --group-name Attendees --user-name $newUserName"
-        Send-Update -t 1 -c "Tagging $newUserName" -r "aws iam tag-user --user-name $newUserName --tags Key=type, Value=normal"
+        Send-Update -t 1 -c "Tagging $newUserName" -r "aws iam tag-user --user-name $newUserName --tags Key=type,Value=normal"
     }
     Add-AWSMultiUserSteps
 }
@@ -1351,6 +1351,8 @@ function Set-AWSMultiUserCreateCluster() {
 function Add-AWSSteps() {
     # Get AWS specific properties from current choice
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+    # Save region to use in commands
+    Set-Prefs -k AWSregion -v $($userProperties.id)
     # -> jump to multi-user mode if selected
     if ($multiUserMode) {
         Add-AWSMultiUserSteps
@@ -1359,8 +1361,7 @@ function Add-AWSSteps() {
     # Add all components for AWS EKS
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     $userid = $userProperties.userid
-    # Save region to use in commands
-    Set-Prefs -k AWSregion -v $($userProperties.id)
+
     # Counter to determine how many AWS components are ready.  AWS is really annoying.
     $componentsReady = 0
     $targetComponents = 6
@@ -1547,7 +1548,7 @@ function Add-AWSCluster {
         Start-Sleep -s 20
     }
     # Create nodegroup- wait for 'active' state
-    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1, maxSize=1, desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
+    Send-Update -o -c "Create nodegroup" -t 1 -r "aws eks create-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --node-role $($config.AWSnodeRoleArn) --scaling-config minSize=1,maxSize=1,desiredSize=1 --subnets $($config.AWSsubnets.replace(",", " "))  --instance-types t3.xlarge"
     While ($nodeGroupExists.nodegroup.status -ne "ACTIVE") {
         $nodeGroupExists = Send-Update -t 1 -a -e -c "Wait for ACTIVE nodegroup" -r "aws eks describe-nodegroup --region $($config.AWSregion) --cluster-name $($config.AWScluster) --nodegroup-name $($config.AWSnodegroup) --output json" | ConvertFrom-Json
         Send-Update -t 1 -c "$($nodeGroupExists.nodegroup.status)"
