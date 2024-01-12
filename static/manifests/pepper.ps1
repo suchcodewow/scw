@@ -1360,6 +1360,7 @@ function Add-AWSSteps() {
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     # Save region to use in commands
     Set-Prefs -k AWSregion -v $($userProperties.id)
+    Set-Prefs -k textUserId -v $($userProperties.userid)
     # -> jump to multi-user mode if selected
     if ($multiUserMode) {
         Add-AWSMultiUserSteps
