@@ -1,0 +1,19 @@
+environment variables: url and token
+@url = {{$processEnv url}}
+@token = {{$processEnv token}}
+
+###
+
+GET {{url}}/api/v1/config/clusterversion
+accept: application/json; charset=utf-8
+content-type: application/json; charset=utf-8
+Authorization: Api-Token {{token}}
+
+###
+
+POST https://api.dynatrace.com/iam/v1/accounts/
+content-type: application/json
+
+{
+"email": "1157wcl@gmail.com"
+}
