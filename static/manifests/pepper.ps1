@@ -60,7 +60,7 @@ function Send-Update {
     if ($run) { return invoke-expression $run }
 }
 function Get-Prefs($scriptPath) {
-    # Do the things for the command line switched selected
+    # Do the things for the command line switches selected
     if ($help) { Get-Help }
     if ($verbose) { $script:outputLevel = 0 } else { $script:outputLevel = 1 }
     if ($cloudCommands) { $script:showCommands = $true } else { $script:showCommands = $false }
@@ -707,19 +707,20 @@ function Add-AzureMultiUserSteps() {
         $webAppName = "scw-webapp-$userName"
         $tenantid = $_.tenant
         $k8stoken = $_.token
-        # Check if a resource group exists
-        $groupExists = Send-Update -t 0 -content "$userName : Resource Group check" -run "az group exists -g $resourceGroup"
-        if ($groupExists -eq "false") {
-            Send-Update -t 1 -c "$userName : create Resource Group" -run "az group create --name $resourceGroup --location $($config.muAzureRegion) -o none"
-        }
-        # Check for existing resources
-        $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
-        $webAppExists = Send-Update -t 1 -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+        # Action/Status ONLY if normal (i.e. not ignored) user
         if ($type -eq "normal") {
-            if (-not $aksExists -and $muCreateClusters) {
-                # AKS not created & flag set to allow creation
+            # Check if a resource group exists
+            $groupExists = Send-Update -t 0 -content "$userName : Resource Group check" -run "az group exists -g $resourceGroup"
+            if ($groupExists -eq "false") {
+                Send-Update -t 1 -c "$userName : create Resource Group" -run "az group create --name $resourceGroup --location $($config.muAzureRegion) -o none"
+            }
+            # Check for AKS cluster and web app
+            $aksState = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location, state:powerState.code, provision:provisioningState}'" | ConvertFrom-Json
+            $webAppExists = Send-Update -t 1 -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
+            if (-not $aksState -and $muCreateClusters) {
+                # AKS not created but it should be
                 Send-Update -o -t 1 -content "$userName : create AKS Cluster" -run "az aks create -g $resourceGroup -n $targetCluster --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
-                $aksExists = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location}'"
+                $aksState = Send-Update -t 1 -e -content "$userName : AKS Cluster check" -run "az aks show -n $targetCluster -g $resourceGroup --query '{id:id, location:location, state:powerState.code, provision:provisioningState}'" | ConvertFrom-Json
             }
             # Create WebApp if needed and enabled
             if (-not $webAppExists -and $muCreateWebApp) {
@@ -727,66 +728,67 @@ function Add-AzureMultiUserSteps() {
                 Send-Update -c "$userName : create Azure Web App" -t 1 -r "az webapp create --resource-group $resourceGroup --name $webAppName --plan $webASPName --runtime 'dotnet:6'" -o
                 $webAppExists = Send-Update -a -c "$userName : check Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
             }
-        }
-        # Update settings if we changed things
-        if ($aksExists) { 
-            $clusterExists = $true
-            az aks get-credentials --file "$($userName).kube" -g $resourceGroup -n $targetCluster --overwrite-existing --only-show-errors
-            Do {
-                $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl --kubeconfig $($userName).kube get ns -o json  | Convertfrom-Json).items.metadata.name"
-                Start-Sleep -seconds 20
-            } until($existingNamespaces)
-            if ($existingNamespaces.contains("dynatrace")) {
-                $dynatraceState = $true
-            }
-        }
-        if ($webAppExists) { $appExists = $true }
-        if ($tenantID -and $k8stoken -and -not $dynatraceState) {
-            # Wait 5 minutes for AKS cluster to hopefully be available
-            # Start-Sleep -seconds 300
-            # We need Dynatrace.  Generate DynaKube.yaml
-            Send-Update -t 1 -c "Generating Dynatrace Yaml for $userName"
-            if ($tenantid.substring(0, 8) = "https://") {
-                $url = $tenantid.substring(8)
-            }
-            else {
-                $url = $tenantid                   
-            }
-            Add-DynakubeYaml -muUsername $userName -c "k8s$userName" -token $k8stoken -url $url
-            # Deploy Dynatrace steps.
-            Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl --kubeconfig $($userName).kube create ns dynatrace"
-            Send-Update -c "Waiting 10s for activation" -a -t 1
-            $counter = 0
-            While ($namespaceState.status.phase -ne "Active") {
-                if ($counter -ge 10) {
-                    Send-Update -t 2 -c " Failed to create namespace!"
-                    break
+            if ($webAppExists) { $appExists = $true }
+            # Check on operator if it is running
+            if ($aksState.provision -eq "Starting") { $clusterState = "starting" }
+            if ($aksState.provision -eq "Succeeded") { 
+                $clusterState = "running"
+                az aks get-credentials --file "$($userName).kube" -g $resourceGroup -n $targetCluster --overwrite-existing --only-show-errors
+                Do {
+                    $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl --kubeconfig $($userName).kube get ns -o json  | Convertfrom-Json).items.metadata.name"
+                    Start-Sleep -seconds 20
+                } until($existingNamespaces)
+                if ($existingNamespaces.contains("dynatrace")) {
+                    $dynatraceState = $true
                 }
-                $counter++
-                Send-Update -c " $($counter)..." -t 1 -a
-                Start-Sleep -s 1
-                #Query for namespace viability
-                $namespaceState = Send-Update -t 1 -c "Checking namespace state for: $targetCluster" -r "kubectl --kubeconfig drysmoke.kube get ns dynatrace -ojson " | Convertfrom-Json
+                if ($tenantID -and $k8stoken -and -not $dynatraceState) {
+                    # Wait 5 minutes for AKS cluster to hopefully be available
+                    # Start-Sleep -seconds 300
+                    # We need Dynatrace.  Generate DynaKube.yaml
+                    Send-Update -t 1 -c "Generating Dynatrace Yaml for $userName"
+                    if ($tenantid.substring(0, 8) = "https://") {
+                        $url = $tenantid.substring(8)
+                    }
+                    else {
+                        $url = $tenantid                   
+                    }
+                    Add-DynakubeYaml -muUsername $userName -c "k8s$userName" -token $k8stoken -url $url
+                    # Deploy Dynatrace steps.
+                    Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl --kubeconfig $($userName).kube create ns dynatrace"
+                    Send-Update -c "Waiting 10s for activation" -a -t 1
+                    $counter = 0
+                    While ($namespaceState.status.phase -ne "Active") {
+                        if ($counter -ge 10) {
+                            Send-Update -t 2 -c " Failed to create namespace!"
+                            break
+                        }
+                        $counter++
+                        Send-Update -c " $($counter)..." -t 1 -a
+                        Start-Sleep -s 1
+                        #Query for namespace viability
+                        $namespaceState = Send-Update -t 1 -c "Checking namespace state for: $targetCluster" -r "kubectl --kubeconfig drysmoke.kube get ns dynatrace -ojson " | Convertfrom-Json
+                    }
+                    Send-Update -c " Activated!" -t 1
+                    Send-Update -c "Loading Operator" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
+                    Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl --kubeconfig $($userName).kube -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
+                    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f $($userName)-dynakube.yaml"
+                    $dynatraceState = $true
+                }
             }
-            Send-Update -c " Activated!" -t 1
-            Send-Update -c "Loading Operator" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
-            Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl --kubeconfig $($userName).kube -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
-            Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f $($userName)-dynakube.yaml"
-            $dynatraceState = $true
+            # Update bag, baby
+            $result = New-Object PSCustomObject -Property @{
+                userName       = $userName
+                targetGroup    = $resourceGroup
+                targetCluster  = $targetCluster
+                targetWebApp   = $webAppName
+                clusterState   = $clusterState
+                appExists      = $appExists
+                dynatraceState = $dynatraceState
+                targetTenant   = $tenantid
+                targetToken    = $token
+            }
+            $dict.add($result)
         }
-        # Update bag, baby
-        $result = New-Object PSCustomObject -Property @{
-            userName       = $userName
-            targetGroup    = $resourceGroup
-            targetCluster  = $targetCluster
-            targetWebApp   = $webAppName
-            clusterExists  = $clusterExists
-            appExists      = $appExists
-            dynatraceState = $dynatraceState
-            targetTenant   = $tenantid
-            targetToken    = $token
-        }
-        $dict.add($result)
     }
     $global:muUsers = $parallelResults
     $muCreatedClusters = $muUsers | where-object { $_.clusterExists -eq $true }
