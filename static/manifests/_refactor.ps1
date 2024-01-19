@@ -78,7 +78,7 @@ function Get-Prefs {
     if ($help) { Get-Help }
     if ($verbose) { Set-Prefs -k "outputLevel" -v 0 } else { Set-Prefs -k "outputLevel" -v 1 }
     if ($cloudCommands) { Set-Prefs -k "showCommands" -v $true } else { Set-Prefs -k "showCommands" }
-    if ($logReset) { Set-Prefs -k "retainLog" } else { Set-Prefs -k "retainLog" -v $true }
+    if ($log) { $script:logFile = "pepper.log" }
     if ($aws) { Set-Prefs -k "useAWS" -v $true } else { Set-Prefs -k "useAWS" }
     if ($azure) { Set-Prefs -k "useAzure" -v $true } else { Set-Prefs -k "useAzure" }
     if ($gcp) { Set-Prefs -k "useGCP" -v $true } else { Set-Prefs -k "useGCP" }
@@ -94,12 +94,6 @@ function Get-Prefs {
     # $script:muDeployDynatrace = $false
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     Set-Prefs -k yamlList -v @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic", "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
-    # Setup Log
-    $script:logFile = "pepper.log"
-    Send-Update -t 0 -c "Log: $logFile"
-    if ((test-path $logFile) -and -not $config.retainLog) {
-        Remove-Item $logFile
-    }
     if ($outputLevel -eq 0) {
         $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties")
         $script:providerColumns = @("option", "provider", "name", "identifier", "userid", "default")
@@ -991,17 +985,14 @@ function Add-AzureSteps() {
     Set-Prefs -k "userName" -v $($userProperties.userid)
     # Set-Prefs -k "subscriptionId" -v $($userProperties.id)
     Set-ResourceNames
-    # $groupExists = Send-Update -t 1 -content "Azure: Resource group exists?" -run "az group exists -g $targetGroup --subscription $SubId" -append
-    # if ($groupExists -eq "true") {
-    #     Send-Update -content "yes" -type 1
-    #     Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
-    #     Set-Prefs -k azureRG -v $targetGroup
-    # }
-    # else {
-    #     Send-Update -content "no" -type 1
-    #     Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup $targetGroup"
-    #     return
-    # }
+    Get-AzureGroup
+    if ($config.azureGroupStatus -eq $true) {
+        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
+    }
+    else {
+        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup $targetGroup"
+        return
+    }
     # #AKS Cluster Check
     # $targetCluster = "scw-AKS-$($userProperties.userid)"
     # $aksExists = Send-Update -t 1 -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query '{id:id, location:location}'" -append
@@ -1023,7 +1014,7 @@ function Add-AzureSteps() {
     #     Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
     # }
 }
-function Add-AzureResourceGroup($targetGroup) {
+function Add-AzureGroup($targetGroup) {
     $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
@@ -1039,7 +1030,19 @@ function Add-AzureResourceGroup($targetGroup) {
     Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
     Add-AzureSteps
 }
-function Remove-AzureResourceGroup($targetGroup) {
+function Get-AzureGroup {
+    $key = "azureGroupStatus"
+    $groupExists = Send-Update -t 1 -content "Azure: Resource group $($config.azureGroup) exists?" -run "az group exists -g $($config.azureGroup)" -append
+    if ($groupExists -eq "true") {
+        Send-Update -t 1 -content " yes."
+        set-prefs -k $key -v $true
+    }
+    else {
+        Send-Update -t 1 -content " no."
+        Set-Prefs -k $key -v $false
+    }
+}
+function Remove-AzureGroup($targetGroup) {
     Send-Update -t 1 -content "Azure: Remove Resource Group" -run "az group delete -n $targetGroup"
     Add-AzureSteps
 }
