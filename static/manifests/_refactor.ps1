@@ -1,16 +1,16 @@
 # VSCODE: ctrl/cmd+k+1 folds all functions, ctrl/cmd+k+j unfold all functions. Check '.vscode/launch.json' for any current parameters
 param (
     [switch] $help, # show other command options and exit
-    [switch] $verbose, # default output level is 1 (info/errors), use -v for level 0 (debug/info/errors)
+    [switch] $verbose, # show debug messages in addition to normal & error messages
     [switch] $cloudCommands, # enable to show commands
-    [switch] $logReset, # enable to reset log between runs
-    [int] $users, # Users to create, switches to multiuser mode
+    [switch] $log, # enable to log commands executed
     [string] $impersonate, #User Name to use instead of default (not used in multiUser mode)
     [string] $network, # Specify cloudformation stack in AWS (vs default group 'scw-AWSStack')
     [switch] $aws, # use aws
     [switch] $azure, # use azure
     [switch] $gcp, # use gcp
-    [switch] $multiUserMode #Switch to classroom setup for x users
+    [switch] $multiUserMode, #Switch to classroom setup mode
+    [switch] $quickDeploy #enable option to deploy everything possible (automatically set in multiUserMode)
 )
 
 # Core Functions
@@ -45,8 +45,8 @@ function Send-Update {
     if ($currentLogEntry) { $screenOutput = "$content$showcmd" } else { $screenOutput = "   $start $content$showcmd" }
     if ($append) { $Params['NoNewLine'] = $true; $script:currentLogEntry = "$script:currentLogEntry $content$showcmd"; }
     if (-not $append) {
-        #This is the last item in-line.  Write it out if log exists
-        if ($logFile) {
+        #Write to log if option picked
+        if ($logFile -and $type -ge 1) {
             "$(get-date -format "yyyy-MM-dd HH:mm:ss"): $currentLogEntry $content$showcmd" | out-file $logFile -Append
         }
         #Reset inline recording
@@ -84,7 +84,8 @@ function Get-Prefs {
     if ($azure) { Set-Prefs -k "useAzure" -v $true } else { Set-Prefs -k "useAzure" }
     if ($gcp) { Set-Prefs -k "useGCP" -v $true } else { Set-Prefs -k "useGCP" }
     if ($multiUserMode) { Set-Prefs -k "multiUserMode" -v $true } else { Set-Prefs -k "multiUserMode" }
-    if ($impersonate) { $script:impersonateUser }
+    if ($impersonate) { $script:impersonateUser = $impersonate }
+    if ($quickDeploy) { Set-Prefs -k "quickDeploy" -v $true } else { Set-Prefs -k "quickDeploy" -v $false }
     # If no cloud selected, use all
     if ((-not $config.useAWS) -and (-not $config.useAzure) -and (-not $config.useGCP)) { Set-Prefs -k "useAWS" -v $true; Set-Prefs -k "useAzure" -v $true; Set-Prefs -k "useGCP" -v $true }
     # Set Script level variables and housekeeping stuffs
@@ -167,7 +168,7 @@ function Set-Prefs {
         Send-Update -c "No command name, skipping write" -t 0
     }
 }
-function Add-Choice() {
+function Add-Choice {
     #example: Add-Choice -k 'key' -d 'description' -c 'current' -f 'function' -p 'parameters'
     param(
         [string] $key, # key identifying this choice, unique only
@@ -195,7 +196,7 @@ function Add-Choice() {
     }
     [void]$choices.add($choice)
 }
-function Get-Choice() {
+function Get-Choice {
     # Present list of options and get selection
     write-output $choices | sort-object -property Option | format-table $choiceColumns | Out-Host
     $cmd_selected = read-host -prompt "Which option to execute? [<enter> to quit]"
@@ -236,7 +237,7 @@ function Get-Help {
     write-host "Options:"
     write-host "                    -v Show debug/trivial messages"
     write-host "                    -c Show cloud commands as they run"
-    write-host "                    -l Reset the log on each run"
+    write-host "                    -l Log events"
     write-host "    -aws, -azure, -gcp Use specific cloud only (can be combined)"
     exit
 }
@@ -454,14 +455,15 @@ function Get-FunctionAsScriptBlock {
     $sb = [scriptblock]::Create($code)
     return $sb
 }
-function Set-ResourceNames {
+function Set-Resources {
     #muReady
     switch ($config.provider) {
         "azure" {
             Set-Prefs -k "azureGroup" -v "scw-group-$($config.userName)"
             Set-Prefs -k "azureCluster" -v "scw-AKS-$($config.userName)"
             Set-Prefs -k "azureServicePlan" -v "scw-asp-$($config.userName)"
-            Set-Prefs -k "AzureWebApp" -v "scw-webapp-$($config.userName)"
+            Set-Prefs -k "azureWebApp" -v "scw-webapp-$($config.userName)"
+            Set-Prefs -k "loginEmail" -v "$($config.userName)@suchcodewow.io"
         }
         "aws" {
             Send-Update -t 2 -c "UPDATE AWS"
@@ -476,7 +478,7 @@ function Set-ResourceNames {
 }
 
 # Provider Functions
-function Add-Provider() {
+function Add-Provider {
     param(
         [string] $p, # provider
         [string] $n, # name of item
@@ -495,7 +497,7 @@ function Add-Provider() {
     }
     [void]$providerList.add($provider)
 }
-function Get-Providers() {
+function Get-Providers {
     Send-Update -content "Gathering provider options... " -t 1 -a
     $providerList.Clear()
     # AZURE
@@ -594,7 +596,7 @@ function Get-Providers() {
         Set-Provider
     }
 }
-function Set-Provider() {
+function Set-Provider {
     param(
         [object] $preset # optional preset to bypass selection
     )
@@ -620,7 +622,6 @@ function Set-Provider() {
             Send-Update -t 1 -c "Azure: Set Subscription" -r "az account set --subscription $($providerSelected.identifier)"
             Set-Prefs -k "provider" -v "azure"
             if ($config.multiUserMode) { Add-AzureMultiUserSteps } else { Add-AzureSteps }
-             
         }
         "AWS" {
             Send-Update -t 1 -c "AWS: Set region"
@@ -637,14 +638,19 @@ function Set-Provider() {
 }
 
 # Azure MU Functions
-function Add-AzureMultiUserSteps() {
+function Add-AzureMultiUserSteps {
     # Region Selected
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) { return }
+    if (-not $muSetupDone) {
+        Set-Prefs -k "muCreateClusters" -v $false
+        Set-Prefs -k "muDeployDynatrace" -v $false
+        Set-Prefs -k "muCreateWebApp" -v $false
+    }
     # Add toggles for content
-    Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "$($muCreateClusters)" -f Set-AzureMultiUserCreateCluster
-    ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
-    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "$($muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
+    Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "$($config.muCreateClusters)" -f Set-AzureMultiUserCreateCluster
+    ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($config.muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
+    Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "$($config.muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
     # User Options
     $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     $ignoreList = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
@@ -699,7 +705,7 @@ function Add-AzureMultiUserSteps() {
     $existingUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
         $using:muFunctions | ForEach-Object { . $_ }
         Set-Prefs -u $_.DisplayName
-        Set-ResourceNames
+        Set-Resources
         # Setup Variables
         $dict = $using:parallelResults
         $config = $using:config
@@ -810,7 +816,7 @@ function Add-AzureMultiUserSteps() {
     # }
     # else { return }
 }
-function Set-AzureMultiUserDoNotDelete() {
+function Set-AzureMultiUserDoNotDelete {
     $counter = 0; $userChoices = Foreach ($i in $existingUsers) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; userName = $i.displayName; userType = $i.type; id = $i.id }
@@ -830,7 +836,7 @@ function Set-AzureMultiUserDoNotDelete() {
     }
     Add-AzureMultiUserSteps
 }
-function Add-AzureMultiUser() {
+function Add-AzureMultiUser {
     # Create user accounts
     while (-not $addUserCount) {
         $addUserResponse = read-host -prompt "How many attendee accounts to generate? <enter> to cancel"
@@ -860,13 +866,13 @@ function Add-AzureMultiUser() {
     }
     Add-AzureMultiUserSteps
 }
-function Get-AzureMultiUser() {
+function Get-AzureMultiUser {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.userPrincipalName
 }
-function Remove-AzureMultiUser() {
+function Remove-AzureMultiUser {
     # Get normal users only
     $normalUsers = $existingUsers | where-object { $_.type -eq "normal" }
     # Save functions to string to use in parallel processing
@@ -904,7 +910,7 @@ function Remove-AzureMultiUser() {
     }
     Add-AzureMultiUserSteps
 }
-function Get-AzureMultiUserRegion() {
+function Get-AzureMultiUserRegion {
     $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended'].{ name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
@@ -921,107 +927,92 @@ function Get-AzureMultiUserRegion() {
     # Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
     Add-AzureMultiUserSteps
 }
-function Set-AzureMultiUserCreateCluster() {
-    if (-not $muCreateClusters) {
-        write-host "setting to true"
-        $script:muCreateClusters = $true
+function Set-AzureMultiUserCreateCluster {
+    if ($config.muCreateClusters -eq $true) {
+        $config.muCreateClusters -eq $false
+        $config.muDeployDynatrace = $false
     }
     else {
-        $script:muCreateClusters = $false
-        # Need to disable the option to deploy Dynatrace
-        $script:muDeployDynatrace = $false
+        $config.muCreateClusters -eq $true
     }
     Add-AzureMultiUserSteps
 }
-function Set-AzureMultiUserCreateWebApp() {
-    if (-not $muCreateWebApp) {
-        write-host "setting to true"
-        $script:muCreateWebApp = $true
+function Set-AzureMultiUserCreateWebApp {
+    if ($config.muCreateWebApp -eq $true) {
+        $config.muCreateWebApp = $false
     }
     else {
-        $script:muCreateWebApp = $false
+        $config.muCreateWebApp = $true
     }
     Add-AzureMultiUserSteps
 }
-function Set-AzureMultiUserDeployDynatrace() {
-    if (-not $muDeployDynatrace) {
-        Send-Update -t 0 -c "Checking for csv files in current directory"
-        $localCsv = @(get-childitem -include *.csv -path * -name)
-        Send-Update -t 0 -c "Found $($localCsv.count) possible files"
-        if (-not $localCsv) {
-            Send-Update -t 2 -c "No local CSV found. Aborting"
-            return
-        }
-        $i = 0
-        do {
-            $currentCSV = $localCsv[$i] | Import-Csv
-            $possibleTenants = $currentCSV | where-object { $_.username -eq "" -and $null -ne $_.tenant -and $null -ne $_.token }
-            if ($possibleTenants.count -gt 0) {
-                $script:selectedCSV = $localCsv[$i]
-                Send-Update -t 1 -c "Found $($possibleTenants.count) usable tenant/tokens in $($localCsv[$i])"
-            }
-            else {
-                Send-Update -t 1 -c "No viable tenants in $($localCsv[$i])"
-            }
-            $i++
-        } until ($selectedCsv -or $i -ge $localCsv.count - 1)
-        if (-not $selectedCsv) {
-            Send-Update -t 2 -c "No valid csv found. CSV required with tenant & token columns populated and a BLANK username column to update when done."
-            return
-        }
-        Send-Update -t 0 -c "Valid tenant/token list, setting to true"
-        $script:muDeployDynatrace = $true
-        # Need to create clusters if we're deploying Dynatrace
-        # TODO Turn below back on
-        $script:muCreateClusters = $true
+function Set-AzureMultiUserDeployDynatrace {
+    if ($config.muDeployDynatrace -eq $true) {
+        $config.muDeployDynatrace = $false
     }
     else {
-        $script:muDeployDynatrace = $false
+        $config.muDeployDynatrace = $true
+        $config.muCreateClusters = $true
     }
     Add-AzureMultiUserSteps
 }
 
 # Azure Functions
-function Add-AzureSteps() {
+function Add-AzureSteps {
     # Get Azure specific properties from current choice
     if ($impersonateUser) {
         Set-Prefs -k "userName" -v $impersonateUser
-        write-host "WTF"
-        Send-Update -t 1 -c "Impersonating $impersonateUser !"
+        Send-Update -t 1 -c "Impersonating $impersonateUser"
     }
     else {
         $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
         Set-Prefs -k "userName" -v $($userProperties.userid)
     }
-    Set-ResourceNames
-    Get-AzureGroup
+    Set-Resources
+    Get-AzureStatus
+    ### Group Actions (Y / N)
     if ($config.azureGroupStatus -eq $true) {
-        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $config.azureGroup -f "Remove-AzureResourceGroup"
+        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $config.azureGroup -f "Remove-AzureGroup"
     }
     else {
-        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup"
+        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureGroup"
         return
     }
-    Get-AzureCluster
-    # if ($aksExists) {
-    #     send-Update -content "yes" -type 1
-    #     Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
-    #     #Add-Choice -k "AZCRED" -d "Refresh k8s credential" -f "Get-AKSCluster -c $targetCluster -g $targetGroup"
-    #     #Refresh cluster credentials
-    #     Get-AKSCluster -g $targetGroup -c $targetCluster
-    #     #Record the region for Azure DNS k8s annotation later
-    #     Set-Prefs -k "k8sregion" -v ($aksExists | ConvertFrom-Json).location
-    #     # Add optional Azure webapp components
-    #     Add-AzureWebAppSteps
-    #     #We have a cluster so add common things to do with it
-    #     Add-CommonSteps
-    # }
-    # else {
-    #     send-Update -content "no" -type 1
-    #     Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster -g $targetGroup -c $targetCluster"
-    # }
+    ### Cluster Actions (Multiple)
+    if ($config.azureClusterStatus -eq "Stopped") {
+        Send-Update -t 1 -c "Azure: Starting Cluster. Let's GOO!" -r "az aks start -g $($config.azureGroup) -n $($config.azureCluster)"
+        Set-Prefs -k "azureClusterStatus" -v "Running"
+    }
+    if ($config.azureClusterStatus -eq "Running") {
+        Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster"
+        Send-Update -t 1 -o -e -c "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $($config.azureGroup) -n $($config.azureCluster) --overwrite-existing --only-show-errors"
+    }
+    if ($config.azureClusterStatus -eq $false) {
+        Add-Choice -k "AZAKS" -d "Required: Create AKS Cluster" -c "" -f "Add-AKSCluster"
+        if ($config.quickDeploy -eq $true) {
+            Add-AKSCluster
+        }
+        else {
+            return
+        }
+    }
+    ### Web Service Plan ( Multiple )
+    if ($config.azureWebAppStatus -eq "Stopped") {
+        Send-Update -t 1 -c "Azure: Starting Web App." -r "az webapp start -g $($config.azureGroup) -n $($config.AzureWebApp)"
+        Set-Prefs -k "azureWebAppStatus" -v "Running"
+    }
+    if ($config.azureWebAppStatus -eq "Running") {
+        Add-Choice -d "Remove Azure Web App/Plan" -c "$($config.azureServicePlan) / $($config.azureWebApp)" -f "Remove-AzureWebApp" -key "AZRWA"
+    }
+    if ($config.azureWebAppStatus -eq $false) {
+        Add-Choice -d "Deploy Azure Web App/Plan" -f "Add-AzureWebApp" -key "AZAWA"
+        if ($config.quickDeploy -eq "true") {
+            Add-AzureWebApp
+        }
+    }
+    Add-CommonSteps
 }
-function Add-AzureGroup($targetGroup) {
+function Add-AzureGroup {
     $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
@@ -1034,77 +1025,81 @@ function Add-AzureGroup($targetGroup) {
         $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
         if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
+    Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $($config.azureGroup) --location $locationId -o none"
     Add-AzureSteps
 }
-function Get-AzureGroup {
-    $key = "azureGroupStatus"
+function Get-AzureStatus {
+    #Group
     $groupExists = Send-Update -t 1 -content "Azure: Resource group $($config.azureGroup) exists?" -run "az group exists -g $($config.azureGroup)" -append
     if ($groupExists -eq "true") {
         Send-Update -t 1 -content " yes."
-        set-prefs -k $key -v $true
+        set-prefs -k "azureGroupStatus" -v $true
     }
     else {
         Send-Update -t 1 -content " no."
-        Set-Prefs -k $key -v $false
+        Set-Prefs -k "azureGroupStatus" -v $false
+        return
     }
-}
-function Remove-AzureGroup($targetGroup) {
-    Send-Update -t 1 -content "Azure: Remove Resource Group" -run "az group delete -n $targetGroup"
-    Add-AzureSteps
-}
-function Add-AzureWebAppSteps() {
-    $planExists = Send-Update -t 1 -a -c "Check for Azure Web App plan" -r "az appservice plan list --query ""[?name=='$webASPName']""" | Convertfrom-Json
-    if ($planExists) {
-        #check for Web App
-        Send-Update -t 1 -c " yes" 
-        $webAppExists = Send-Update -t 1 -a -c "check for Azure Web App" -r "az webapp list --query ""[?name=='$webAppName']""" | Convertfrom-Json
-    }
-    if ($webAppExists) {
-        Send-Update -t 1 -c " yes"
-        Add-Choice -d "Remove Azure Web App/Plan" -c "$webASPName / $webAppName" -f "Remove-AzureWebApp" -key "AZRWA"
+    #Cluster
+    $aksExists = Send-Update -t 1 -e -append -content "Azure: AKS Cluster exists?" -run "az aks show -n $($config.azureCluster) -g $($config.azureGroup) --query '{id:id, location:location, state:powerState.code, provision:provisioningState}'" | ConvertFrom-Json
+    if ($aksExists.state) {
+        Send-Update -t 1 -content " yes:$($aksExists.state)"
+        Set-Prefs -k "azureClusterStatus" -v $aksExists.state
     }
     else {
-        Send-Update -t 1 -c " no"
-        Add-Choice -d "Deploy Azure Web App/Plan" -f "Add-AzureWebApp" -key "AZAWA"
+        Send-Update -t 1 -content " no."
+        Set-Prefs -k "azureClusterStatus" -v $false
+    }
+    #ServicePlan
+    $planExists = Send-Update -t 1 -append -c "Azure: Web App Plan exists?" -r "az appservice plan list --query ""[?name=='$($config.azureServicePlan)']""" | Convertfrom-Json
+    if ($planExists) {
+        Send-Update -t 1 -c " yes."
+        Set-Prefs -k "azureServicePlanStatus" -v $true
+    }
+    else {
+        Send-Update -t 1 -c " no."
+        Set-Prefs - k "azureServicePlanStatus" -v $false
+        Set-Prefs -k "azureWebAppStatus" -v $false
+        return
+    }
+    #WebApp
+    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)'].{state:state}""" | Convertfrom-Json
+    if ($webAppExists.state) {
+        Send-Update -t 1 -c " yes:$($webAppExists.state)"
+        Set-Prefs -k "azureWebAppStatus" -v $webAppExists.state
+    }
+    else {
+        Send-Update -t 1 -c " no."
+        Set-Prefs -k "azureWebAppStatus" -v $false
     }
 }
-function Add-AzureWebApp() {
-    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.webASPName) --resource-group $($config.resourceGroup) --sku B2" -o
-    Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.resourceGroup) --name $($config.webAppName) --plan $($config.webASPName) --runtime 'dotnet:6'" -o
+function Remove-AzureGroup {
+    Set-Prefs -k "quickDeploy" -v $false
+    Send-Update -t 1 -content "Azure: Remove Resource Group" -run "az group delete -n $($config.azureGroup)"
     Add-AzureSteps
 }
-function Remove-AzureWebApp() {
-    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete  --resource-group $($config.resourceGroup) --name $($config.webAppName)"
-    Send-Update -c "Removing Azure Web App Plan" -t 1 -r "az appservice plan delete --resource-group $($config.resourceGroup) --name $($config.webASPName)"
+function Add-AzureWebApp {
+    Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.azureServicePlan) --resource-group $($config.azureGroup) --sku B2" -o
+    Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.azureGroup) --name $($config.azureWebApp) --plan $($config.azureServicePlan) --runtime 'dotnet:6'" -o
     Add-AzureSteps
 }
-function Add-AKSCluster() {
-    param(
-        [string] $g, #resource group
-        [string] $c #cluster name
-    )
-    Send-Update -o -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $g -n $c --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys"
-    Get-AKSCluster -g $g -c $c
+function Remove-AzureWebApp {
+    Set-Prefs -k "quickDeploy" -v $false
+    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete  --resource-group $($config.azureGroup) --name $($config.azureWebApp)"
+    Send-Update -c "Removing Azure Web App Plan" -t 1 -r "az appservice plan delete --resource-group $($config.azureGroup) --name $($config.azureServicePlan) -y"
     Add-AzureSteps
-    Add-CommonSteps
+}
+function Add-AKSCluster {
+    Send-Update -o -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $($config.azureGroup) -n $($config.azureCluster) --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys --only-show-errors"
+    Add-AzureSteps
 } 
-function Remove-AKSCluster() {
-    param(
-        [string] $g, #resource group
-        [string] $c #cluster name
-    )
-    Send-Update -t 1 -content "Azure: Remove AKS Cluster" -run "az aks delete -g $g -n $c"
+function Remove-AKSCluster {
+    Send-Update -t 1 -content "Azure: Remove AKS Cluster" -run "az aks delete -g $($config.azureGroup) -n $($config.azureCluster)"
     Add-AzureSteps
-}
-function Get-AKSCluster() {
-    $aksExists = Send-Update -t 1 -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $($config.azureCluster) -g $($config.azureGroup) --query '{id:id, location:location, state:powerState.code, provision:provisioningState}'" -append
-
-    Send-Update -t 1 -o -e -c "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
 }
 
 # AWS MU Functions
-function Add-AWSMultiUserSteps() {
+function Add-AWSMultiUserSteps {
     # Setup Variables
     if ($network) { $stackId = $network } else { $stackId = $config.AWSregion.replace("-", '') }
     Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
@@ -1232,7 +1227,7 @@ function Add-AWSMultiUserSteps() {
     Add-Choice -k "AWSMDL" -d " List current Attendee Accounts" -f Get-AWSMultiUser
     Add-Choice -k "AWSMDU" -d " View/Change DoNotDelete users" -f Set-AWSMultiUserDoNotDelete -c "Currently: $($doNotDeleteUsers.count)"
 }
-function Set-AWSMultiUserDoNotDelete() {
+function Set-AWSMultiUserDoNotDelete {
     # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName,id:name }""" | Convertfrom-Json
     $counter = 0; $userChoices = Foreach ($i in $muUsers) {
         $counter++
@@ -1254,7 +1249,7 @@ function Set-AWSMultiUserDoNotDelete() {
     }
     Add-AWSMultiUserSteps
 }
-function Get-AWSMultiUser() {
+function Get-AWSMultiUser {
     # $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
     write-host ""
     write-host "`rPasswords for accounts is: 1Dynatrace##"
@@ -1263,7 +1258,7 @@ function Get-AWSMultiUser() {
     write-host ""
     $muUsers | Format-table -Property userName
 }
-function Remove-AWSMultiUser() {
+function Remove-AWSMultiUser {
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
     $SendUpdateDef = ${function:Send-Update}.ToString()
@@ -1301,7 +1296,7 @@ function Remove-AWSMultiUser() {
     } -ThrottleLimit 8
     Add-AWSMultiUserSteps
 }
-function Add-AWSMultiUser() {
+function Add-AWSMultiUser {
     # Create user accounts
 
     while (-not $addUserCount) {
@@ -1342,7 +1337,7 @@ function Add-AWSMultiUser() {
     }
     Add-AWSMultiUserSteps
 }
-function Set-AWSMultiUserCreateCluster() {
+function Set-AWSMultiUserCreateCluster {
     if (-not $muCreateClusters) {
         $script:muCreateClusters = $true
     }
@@ -1353,7 +1348,7 @@ function Set-AWSMultiUserCreateCluster() {
 }
 
 # AWS Functions
-function Add-AWSSteps() {
+function Add-AWSSteps {
     # Get AWS specific properties from current choice
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     # Save region to use in commands
@@ -1647,7 +1642,7 @@ function Remove-AWSCluster {
 }
 
 # GCP MU Functions
-function Add-GCPMultiUser() {
+function Add-GCPMultiUser {
     # Create user accounts
     while (-not $addUserCount) {
         $addUserResponse = read-host -prompt "How many attendee accounts to generate? <enter> to cancel"
@@ -1685,14 +1680,14 @@ function Add-GCPMultiUser() {
     Add-GCPMultiUserSteps
 
 }
-function Get-GCPMultiUser() {
+function Get-GCPMultiUser {
     $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.preferredMemberKey.id
 
 }
-function Remove-GCPMultiUser() {
+function Remove-GCPMultiUser {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     foreach ($user in $existingUsers) {
         if ($user.userPrincipalName -contains "@suchcodewow.io") {
@@ -1731,7 +1726,7 @@ function Remove-GCPMultiUser() {
     }
     Add-GCPMultiUserSteps
 }
-function Add-GCPMultiUserCluster() {
+function Add-GCPMultiUserCluster {
     $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json 
     $possibleRegions = Send-Update -t 1 -c "Pull valid US Regions" -r "gcloud compute zones list --filter='name ~ us-.*' --sort-by name --format=json" | Convertfrom-Json
     $usedRegions = Send-Update -t 1 -c "Get all existing clusters" -r "gcloud container clusters list --format=json" | Convertfrom-Json
@@ -1780,7 +1775,7 @@ function Add-GCPMultiUserCluster() {
         Send-Update -t 1 -c "Creating $($clusterToCreate.cluster)" -r "gcloud container clusters create -m e2-standard-4 --num-nodes=1 --disk-size=25 --zone=$($clusterToCreate.region) $($clusterToCreate.cluster) --user-output-enabled=false"
     } -ThrottleLimit 10
 }
-function Remove-GCPMultiUserCluster() {
+function Remove-GCPMultiUserCluster {
     $items = Send-Update -t 1 -c "Get all clusters" -r "gcloud container clusters list --format=json" | Convertfrom-Json
     # Save functions to string to use in parallel processing
     $GetUsernameDef = ${function:Get-UserName}.ToString()
@@ -1795,7 +1790,7 @@ function Remove-GCPMultiUserCluster() {
         Send-Update -t 1 -c "Removing cluster $($item.name)" -r "gcloud container clusters delete $($item.name) --zone=$($item.zone) --quiet"
     } -ThrottleLimit 10
 }
-function Add-GCPMultiUserSteps() {
+function Add-GCPMultiUserSteps {
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
     Add-Choice -k "GCPMCU" -d "Create Attendee Accounts" -f Add-GCPMultiUser -c "Current users: $($existingUsers.count)"
@@ -1813,7 +1808,7 @@ function Add-GCPMultiUserSteps() {
 }
 
 # GCP Functions
-function Add-GCPSteps() {
+function Add-GCPSteps {
     # Add GCP specific steps
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
     # get current project
@@ -2215,7 +2210,7 @@ function Get-DynatraceToken {
 }
 
 # Application Functions
-function Add-CommonSteps() {
+function Add-CommonSteps {
     # Get namespaces so we know what's installed or not
     $existingNamespaces = Send-Update -c "Getting Namespaces" -t 0 -r "(kubectl get ns -o json  | Convertfrom-Json).items.metadata.name"
     Send-Update -c "Namespaces: $existingNamespaces" -t 0
@@ -2309,7 +2304,7 @@ function Add-CommonSteps() {
         }
     }
 }
-function Get-CustomSteps() {
+function Get-CustomSteps {
     #Stub out using custom files
     Param(
         [string] $namespace #namespace to parse
@@ -2330,7 +2325,7 @@ function Get-CustomSteps() {
         }
     }
 }
-function Get-Apps() {
+function Get-Apps {
     foreach ($yaml in $config.yamlList) {
         # Get base yaml file for kubernetes
         [uri]$uri = $yaml
