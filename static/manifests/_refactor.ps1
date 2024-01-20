@@ -657,24 +657,25 @@ function Add-AzureMultiUserSteps {
     # Refresh from cache here!!
 }
 function Get-AzureMultiUserEvent {
-    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query ""{ [].displayName:displayName}""" | Convertfrom-Json
-    $counter = 0; $locationChoices = Foreach ($i in $allGroups) {
+    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query '{ [].displayName:displayName}'" | Convertfrom-Json
+    $counter = 0; $eventChoices = Foreach ($i in $allGroups) {
         if ($i.displayName.substring(0,6) -eq "event-") {
             $counter++
             New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName }
         }
     }
     $counter++
-    $locationChoices.add(New-object PSCustomObject -Property @{Option = $counter; displayName = "All Attendees" })
-    $locationChoices | sort-object -property Option | format-table -Property Option, name | Out-Host
-    while (-not $locationId) {
-        $locationSelected = read-host -prompt "Which region for your resource group? <enter> to cancel"
-        if (-not $locationSelected) { return }
-        $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
-        if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    $eventChoices.add | New-object PSCustomObject -Property @{Option = $counter; displayName = "All Attendees" }
+    # $counter++
+    # $eventChoices.add | New-object PSCustomObject -Property @{Option = $counter; displayName = "New Event->" }
+    $eventChoices | sort-object -property Option | format-table -Property Option, displayName | Out-Host
+    while (-not $eventName) {
+        $eventSelected = read-host -prompt "Which event? <enter> to cancel"
+        if (-not $eventSelected) { return }
+        $eventName = $eventChoices | Where-Object -FilterScript { $_.Option -eq $eventSelected } | Select-Object -ExpandProperty id -first 1
+        if (-not $eventName) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    Set-Prefs -k muAzureRegion -v $locationId
-    # Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
+    Set-Prefs -k "eventName" -v $eventName
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUserStatus {
