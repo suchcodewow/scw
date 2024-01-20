@@ -5,6 +5,7 @@ param (
     [switch] $cloudCommands, # enable to show commands
     [switch] $logReset, # enable to reset log between runs
     [int] $users, # Users to create, switches to multiuser mode
+    [string] $impersonate, #User Name to use instead of default (not used in multiUser mode)
     [string] $network, # Specify cloudformation stack in AWS (vs default group 'scw-AWSStack')
     [switch] $aws, # use aws
     [switch] $azure, # use azure
@@ -83,6 +84,7 @@ function Get-Prefs {
     if ($azure) { Set-Prefs -k "useAzure" -v $true } else { Set-Prefs -k "useAzure" }
     if ($gcp) { Set-Prefs -k "useGCP" -v $true } else { Set-Prefs -k "useGCP" }
     if ($multiUserMode) { Set-Prefs -k "multiUserMode" -v $true } else { Set-Prefs -k "multiUserMode" }
+    if ($impersonate) { $script:impersonateUser }
     # If no cloud selected, use all
     if ((-not $config.useAWS) -and (-not $config.useAzure) -and (-not $config.useGCP)) { Set-Prefs -k "useAWS" -v $true; Set-Prefs -k "useAzure" -v $true; Set-Prefs -k "useGCP" -v $true }
     # Set Script level variables and housekeeping stuffs
@@ -108,6 +110,7 @@ function Get-Prefs {
         Get-FunctionAsScriptBlock -Name $_.Name -Definition $_.Definition
     }
     write-host
+    Get-Providers
 }
 function Set-Prefs {
     #muReady
@@ -981,21 +984,25 @@ function Set-AzureMultiUserDeployDynatrace() {
 # Azure Functions
 function Add-AzureSteps() {
     # Get Azure specific properties from current choice
-    $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
-    Set-Prefs -k "userName" -v $($userProperties.userid)
-    # Set-Prefs -k "subscriptionId" -v $($userProperties.id)
+    if ($impersonateUser) {
+        Set-Prefs -k "userName" -v $impersonateUser
+        write-host "WTF"
+        Send-Update -t 1 -c "Impersonating $impersonateUser !"
+    }
+    else {
+        $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
+        Set-Prefs -k "userName" -v $($userProperties.userid)
+    }
     Set-ResourceNames
     Get-AzureGroup
     if ($config.azureGroupStatus -eq $true) {
-        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $targetGroup -f "Remove-AzureResourceGroup $targetGroup"
+        Add-Choice -k "AZRG" -d "Delete Resource Group & all content" -c $config.azureGroup -f "Remove-AzureResourceGroup"
     }
     else {
-        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup $targetGroup"
+        Add-Choice -k "AZRG" -d "Required: Create Resource Group" -c "" -f "Add-AzureResourceGroup"
         return
     }
-    # #AKS Cluster Check
-    # $targetCluster = "scw-AKS-$($userProperties.userid)"
-    # $aksExists = Send-Update -t 1 -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $targetCluster -g $targetGroup --query '{id:id, location:location}'" -append
+    Get-AzureCluster
     # if ($aksExists) {
     #     send-Update -content "yes" -type 1
     #     Add-Choice -k "AZAKS" -d "Delete AKS Cluster" -c $targetCluster -f "Remove-AKSCluster -c $targetCluster -g $targetGroup"
@@ -1091,10 +1098,8 @@ function Remove-AKSCluster() {
     Add-AzureSteps
 }
 function Get-AKSCluster() {
-    param(
-        [string] $g, #resource group
-        [string] $c #cluster name
-    )
+    $aksExists = Send-Update -t 1 -e -content "Azure: AKS Cluster exists?" -run "az aks show -n $($config.azureCluster) -g $($config.azureGroup) --query '{id:id, location:location, state:powerState.code, provision:provisioningState}'" -append
+
     Send-Update -t 1 -o -e -c "Azure: Get AKS Crendentials" -run "az aks get-credentials --admin -g $g -n $c --overwrite-existing"
 }
 
@@ -2396,8 +2401,8 @@ function Add-App {
     Send-Update -c " Activated!" -t 1
     Add-CommonSteps
 }
+
 Get-Prefs
-Get-Providers
 while ($choices.count -gt 0) {
     $cmd = Get-Choice($choices)
     if ($cmd) {
