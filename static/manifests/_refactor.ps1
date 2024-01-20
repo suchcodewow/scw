@@ -642,16 +642,42 @@ function Add-AzureMultiUserSteps {
     # Region Selected
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) { return }
+    Add-Choice -k 'AZME' -d "Select/Create Event" -f Get-AzureMultiUserEvent -c $config.muEvent
+    if (-not $config.muEvent) { return }
     if (-not $muSetupDone) {
         Set-Prefs -k "muCreateClusters" -v $false
         Set-Prefs -k "muDeployDynatrace" -v $false
         Set-Prefs -k "muCreateWebApp" -v $false
+        $script:muSetupDone = $true
     }
     # Add toggles for content
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "$($config.muCreateClusters)" -f Set-AzureMultiUserCreateCluster
     ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($config.muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
     Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "$($config.muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
-    # User Options
+    # Refresh from cache here!!
+}
+function Get-AzureMultiUserEvent {
+    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query ""{ [].displayName:displayName}""" | Convertfrom-Json
+    $counter = 0; $locationChoices = Foreach ($i in $allGroups) {
+        if ($i.displayName.substring(0,6) -eq "event-") {
+            $counter++
+            New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName }
+        }
+    }
+    $counter++
+    $locationChoices.add(New-object PSCustomObject -Property @{Option = $counter; displayName = "All Attendees" })
+    $locationChoices | sort-object -property Option | format-table -Property Option, name | Out-Host
+    while (-not $locationId) {
+        $locationSelected = read-host -prompt "Which region for your resource group? <enter> to cancel"
+        if (-not $locationSelected) { return }
+        $locationId = $locationChoices | Where-Object -FilterScript { $_.Option -eq $locationSelected } | Select-Object -ExpandProperty id -first 1
+        if (-not $locationId) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    Set-Prefs -k muAzureRegion -v $locationId
+    # Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
+    Add-AzureMultiUserSteps
+}
+function Get-AzureMultiUserStatus {
     $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
     $ignoreList = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
     # Remove ignored users
@@ -929,30 +955,30 @@ function Get-AzureMultiUserRegion {
 }
 function Set-AzureMultiUserCreateCluster {
     if ($config.muCreateClusters -eq $true) {
-        $config.muCreateClusters -eq $false
-        $config.muDeployDynatrace = $false
+        Set-Prefs -k "muCreateClusters" -v $false
+        Set-Prefs -k "muDeployDynatrace" -v $false
     }
     else {
-        $config.muCreateClusters -eq $true
+        Set-Prefs -k "muCreateClusters" -v $true 
     }
     Add-AzureMultiUserSteps
 }
 function Set-AzureMultiUserCreateWebApp {
     if ($config.muCreateWebApp -eq $true) {
-        $config.muCreateWebApp = $false
+        Set-Prefs -k "muCreateWebApp" -v $false
     }
     else {
-        $config.muCreateWebApp = $true
+        Set-Prefs -k "muCreateWebApp" -v $true
     }
     Add-AzureMultiUserSteps
 }
 function Set-AzureMultiUserDeployDynatrace {
     if ($config.muDeployDynatrace -eq $true) {
-        $config.muDeployDynatrace = $false
+        Set-Prefs -k "muDeployDynatrace" -v $false
     }
     else {
-        $config.muDeployDynatrace = $true
-        $config.muCreateClusters = $true
+        Set-Prefs -k "muDeployDynatrace" -v $true
+        Set-Prefs -k "muCreateClusters" -v $true
     }
     Add-AzureMultiUserSteps
 }
