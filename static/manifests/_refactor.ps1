@@ -664,24 +664,24 @@ function Get-AzureMultiUserEvent {
             New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName.substring(6) }
         }
     }
-    $counter++
-    $eventChoices += New-object PSCustomObject -Property @{Option = $counter; displayName = "(All Attendees)" }
     # $counter++
-    # $eventChoices.add | New-object PSCustomObject -Property @{Option = $counter; displayName = "New Event->" }
+    # $eventChoices += New-object PSCustomObject -Property @{Option = $counter; displayName = "(All Attendees)" }
     $eventChoices | sort-object -property Option | format-table -Property Option, displayName | Out-Host
     while (-not $eventName) {
-        $eventSelected = read-host -prompt "Which event? <c> to create new <enter> to cancel"
+        $eventSelected = read-host -prompt "Which event? <c> to create <a> for ALL <enter> to cancel"
         if (-not $eventSelected) { return }
         if ($eventSelected -eq "c") {
             $eventName = Read-Host -prompt "New event name?"
             Send-Update -t 0 -content "Creating group: event-$eventName" -r "az ad group create --display-name event-$eventName --mail-nickname $eventName --only-show-errors"
+        }
+        elseif ($eventSelected -eq "a") {
+            $eventName = "all"
         }
         else {
             $eventName = $eventChoices | Where-Object -FilterScript { $_.Option -eq $eventSelected } | Select-Object -ExpandProperty displayName -first 1
         }
         if (-not $eventName) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
-    if ($eventName -eq "(ALl Attendees)") { $eventName = "all" }
     Set-Prefs -k "muEvent" -v $eventName
     Add-AzureMultiUserSteps
 }
