@@ -66,7 +66,9 @@ function Get-Prefs {
     # Setup default single-user config file
     $script:configFile = "pepper.conf"
     # Ensure clean config if multiUser mode!
-    if ((Test-Path $configFile) -and -not $multiUserMode) {
+    # TODO figure out if we need to delete config?
+    # if ((Test-Path $configFile) -and -not $multiUserMode) {
+    if (test-path $configFile) {
         $script:config = Get-Content $configFile -Raw | ConvertFrom-Json -AsHashtable
     }
     else {
@@ -92,9 +94,6 @@ function Get-Prefs {
     [System.Collections.ArrayList]$script:providerList = @()
     [System.Collections.ArrayList]$script:choices = @()
     $script:ProgressPreference = "SilentlyContinue"
-    # $script:muCreateClusters = $false
-    # $script:muCreateWebApp = $false
-    # $script:muDeployDynatrace = $false
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
     Set-Prefs -k yamlList -v @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic", "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
     if ($outputLevel -eq 0) {
@@ -106,7 +105,6 @@ function Get-Prefs {
         $script:providerColumns = @("option", "provider", "name")
     }
     # Load preferences/settings.  Access with $config variable anywhere.  Set-Prefs automatically updates $config variable and saves to file
-    # Set with Set-Prefs function
     $script:muFunctions = Get-ChildItem Function: | Where-Object { $_.Definition -like '*#muReady*' } | ForEach-Object {
         Get-FunctionAsScriptBlock -Name $_.Name -Definition $_.Definition
     }
@@ -642,21 +640,29 @@ function Add-AzureMultiUserSteps {
     # Region Selected
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) { return }
+    ### We have a region, event?
     Add-Choice -k 'AZME' -d "Select/Create Event" -f Get-AzureMultiUserEvent -c $config.muEvent
     if (-not $config.muEvent) { return }
+    ### We have a region and event set options & get status
     if (-not $muSetupDone) {
         Set-Prefs -k "muCreateClusters" -v $false
         Set-Prefs -k "muDeployDynatrace" -v $false
         Set-Prefs -k "muCreateWebApp" -v $false
         $script:muSetupDone = $true
     }
-    # Add toggles for content
+    Get-AzureMultiUserCache
+    ### Options for events AND Account level
+    Add-Choice -k "AZMUR" -d "Delete Event/Accounts/Content" -f Remove-AzureMultiUser -c "put cached info here"
+    Add-Choice -k "AZMCS" -d "Get Status of users" -f Get-AzureMultiUserStatus -c "make a note of oldest file"
+    if ($config.muEvent -eq "Attendees") { return }
+    ### Options for events only
+    Add-Choice -k "AZMCU" -d "Create Accounts" -f Add-AzureMultiUser
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "$($config.muCreateClusters)" -f Set-AzureMultiUserCreateCluster
     ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($config.muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
     Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "$($config.muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
-    # Refresh from cache here!!
 }
 function Get-AzureMultiUserEvent {
+    ### Get existing groups
     $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query '[].{displayName:displayName}'" | Convertfrom-Json
     $counter = 0; $eventChoices = Foreach ($i in $allGroups) {
         if ($i.displayName.substring(0,6) -eq "event-") {
@@ -664,95 +670,98 @@ function Get-AzureMultiUserEvent {
             New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName.substring(6) }
         }
     }
-    # $counter++
-    # $eventChoices += New-object PSCustomObject -Property @{Option = $counter; displayName = "(All Attendees)" }
     $eventChoices | sort-object -property Option | format-table -Property Option, displayName | Out-Host
     while (-not $eventName) {
         $eventSelected = read-host -prompt "Which event? <c> to create <a> for ALL <enter> to cancel"
         if (-not $eventSelected) { return }
+        ### Create a new event
         if ($eventSelected -eq "c") {
             $eventName = Read-Host -prompt "New event name?"
-            Send-Update -t 0 -content "Creating group: event-$eventName" -r "az ad group create --display-name event-$eventName --mail-nickname $eventName --only-show-errors"
+            $eventCreated = Send-Update -t 0 -content "Creating group: event-$eventName" -r "az ad group create --display-name event-$eventName --mail-nickname $eventName --only-show-errors"
+            if ($eventCreated) { Send-Update -t 1 -content "Event event-$eventName created!" }
         }
         elseif ($eventSelected -eq "a") {
-            $eventName = "all"
+            ### Special selection for all
+            $eventName = "Attendees"
         }
         else {
             $eventName = $eventChoices | Where-Object -FilterScript { $_.Option -eq $eventSelected } | Select-Object -ExpandProperty displayName -first 1
+            if ($eventName) { $eventName = "event-$eventName" }
         }
-        if (-not $eventName) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+        if ( -not $eventName) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
     }
+    # if ($eventName -eq "all") {
+    #     $groupName = "Attendees"
+    # }
+    # else {
+    #     $groupName = "event-$($config.muEvent)"
+    # }
     Set-Prefs -k "muEvent" -v $eventName
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUserStatus {
-    $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    $ignoreList = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
+    # Event to AD group
+    $script:existingUsers = Send-Update -c "Get Attendees" -r "az ad group member list --group $($config.muEvent)" | Convertfrom-Json
+    # $ignoreList = Send-Update -c "Get Ignored" -r "az ad group member list --group IgnoreAutomation" | Convertfrom-Json
     # Remove ignored users
-    foreach ($user in $existingUsers) {
-        if ($user.DisplayName -in $ignoreList.DisplayName) {
-            $user | Add-Member -NotePropertyName "type" -NotePropertyValue "ignore"
-        }
-        else {
-            $user | Add-Member -NotePropertyName "type" -NotePropertyValue "normal"
+    # foreach ($user in $existingUsers) {
+    #     if ($user.DisplayName -in $ignoreList.DisplayName) {
+    #         $user | Add-Member -NotePropertyName "type" -NotePropertyValue "ignore"
+    #     }
+    #     else {
+    #         $user | Add-Member -NotePropertyName "type" -NotePropertyValue "normal"
 
-        }
-    }
+    #     }
+    # }
     # pair up normal users with a Dynatrace tenant if option selected
-    if ($muDeployDynatrace) { 
-        Send-Update -t 0 -c "Load tenant list"
-        $tenantList = $selectedCsv | import-csv | where-object { $_.username -eq "" }
-        $normalUserCount = $existingUsers | where-object { $_.type -eq "normal" }
-        if ($normaluserCount.count -gt $tenantList.count) {
-            while (-not $choice) {
-                $userChoice = read-host -prompt "$($normaluserCount.count) attendees but only $($tenantList.count) tenants. OK to assign multiple users per tenant? (y/n)"
-                if ($userChoice -eq "y" -or $userChoice -eq "n") {
-                    $choice = $userChoice
-                }
-                else {
-                    write-host "y / n ONLY please."
-                }
-            }
-            if ($choice -eq "n") {
-                write-host "Turning off Dynatrace Autodeploy"
-                $muDeployDynatrace = $false
-                Add-AzureMultiUserSteps
-                return
-            }
-        }
-        Send-Update -t 0 -c "Viable Tenants: $($tenantList.count) / Normal users: $($normalUserCount.count)"
-        $i = 0
-        foreach ($user in $existingUsers | where-object { $_.type -eq "normal" }) {
-            $user | Add-Member -NotePropertyName "tenant" -NotePropertyValue $tenantList[$i].tenant
-            $user | Add-Member -NotePropertyName "token" -NotePropertyValue $tenantList[$i].token
-            if ($i -ge $tenantList.count - 1) {
-                Send-Update -t 1 -c "Starting over with first tenant to assign more attendees."
-                $i = 0
-            }
-            else { $i++ }
-        }
-    }
-    $ignoredUsers = $existingUsers | where-object { $_.type -eq "ignore" }
+    # if ($muDeployDynatrace) { 
+    #     Send-Update -t 0 -c "Load tenant list"
+    #     $tenantList = $selectedCsv | import-csv | where-object { $_.username -eq "" }
+    #     $normalUserCount = $existingUsers | where-object { $_.type -eq "normal" }
+    #     if ($normaluserCount.count -gt $tenantList.count) {
+    #         while (-not $choice) {
+    #             $userChoice = read-host -prompt "$($normaluserCount.count) attendees but only $($tenantList.count) tenants. OK to assign multiple users per tenant? (y/n)"
+    #             if ($userChoice -eq "y" -or $userChoice -eq "n") {
+    #                 $choice = $userChoice
+    #             }
+    #             else {
+    #                 write-host "y / n ONLY please."
+    #             }
+    #         }
+    #         if ($choice -eq "n") {
+    #             write-host "Turning off Dynatrace Autodeploy"
+    #             $muDeployDynatrace = $false
+    #             Add-AzureMultiUserSteps
+    #             return
+    #         }
+    #     }
+    #     Send-Update -t 0 -c "Viable Tenants: $($tenantList.count) / Normal users: $($normalUserCount.count)"
+    #     $i = 0
+    #     foreach ($user in $existingUsers | where-object { $_.type -eq "normal" }) {
+    #         $user | Add-Member -NotePropertyName "tenant" -NotePropertyValue $tenantList[$i].tenant
+    #         $user | Add-Member -NotePropertyName "token" -NotePropertyValue $tenantList[$i].token
+    #         if ($i -ge $tenantList.count - 1) {
+    #             Send-Update -t 1 -c "Starting over with first tenant to assign more attendees."
+    #             $i = 0
+    #         }
+    #         else { $i++ }
+    #     }
+    # }
+    # $ignoredUsers = $existingUsers | where-object { $_.type -eq "ignore" }
     # Create a parallel-compliant library
     $parallelResults = [System.Collections.Concurrent.ConcurrentBag[object]]::new()
     # Parallel Execution Mode
-    $existingUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
+    $existingUsers | ForEach-Object -ThrottleLimit 50 -Parallel {
+        # Setup for Parellel
         $using:muFunctions | ForEach-Object { . $_ }
         Set-Prefs -u $_.DisplayName
         Set-Resources
-        # Setup Variables
         $dict = $using:parallelResults
         $config = $using:config
+        Get-AzureStatus
         # $muCreateClusters = $using:muCreateClusters
         # $muCreateWebApp = $using:muCreateWebApp
         # $muDeployDynatrace = $using:muDeployDynatrace
-        # Setup core variables
-        # $userName = $_.DisplayName
-        # $type = $_.type
-        # $resourceGroup = "scw-group-$userName"
-        # $targetCluster = "scw-AKS-$userName"
-        # $webASPName = "scw-asp-$userName"
-        # $webAppName = "scw-webapp-$userName"
         # $tenantid = $_.tenant
         # $k8stoken = $_.token
         # Action/Status ONLY if normal (i.e. not ignored) user
@@ -850,6 +859,9 @@ function Get-AzureMultiUserStatus {
     # }
     # else { return }
 }
+function Get-AzureMultiUserCache {
+
+}
 function Set-AzureMultiUserDoNotDelete {
     $counter = 0; $userChoices = Foreach ($i in $existingUsers) {
         $counter++
@@ -882,66 +894,51 @@ function Add-AzureMultiUser {
             write-host "`r`nPositives integers only"            
         }
     }
-    # Save functions to string to use in parallel processing
-    $GetUsernameDef = ${function:Get-UserName}.ToString()
-    $SendUpdateDef = ${function:Send-Update}.ToString()
     # Create user accounts
     1..$addUserCount | ForEach-Object -Parallel {
-        # Import functions and variables from main script
-        if ($using:showCommands) { $script:showCommands = $true }
-        ${function:Get-UserName} = $using:GetUsernameDef
-        ${function:Send-Update} = $using:SendUpdateDef
+        $using:muFunctions | ForEach-Object { . $_ }
+        # 
         # Create User
         Do {
             $newUserName = Get-UserName
             $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
         } Until ($user)
-        Send-Update -t 0 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
+        Set-Prefs -u $newUserName
+        Set-Resources
+        Send-Update -t 1 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
+        Send-Update -t 1 -c "Adding $newUserName to $($config.muEvent)" -r "az ad group member add --group $($config.muEvent) --member-id $($user.id)"
     }
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUser {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
-    write-host "`rPasswords for accounts is: 1Dynatrace##"
+    write-host "`rPassword for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.userPrincipalName
 }
 function Remove-AzureMultiUser {
-    # Get normal users only
-    $normalUsers = $existingUsers | where-object { $_.type -eq "normal" }
-    # Save functions to string to use in parallel processing
-    $GetUsernameDef = ${function:Get-UserName}.ToString()
-    $SendUpdateDef = ${function:Send-Update}.ToString()
-    # Remove user accounts and all related content
-    $normalUsers | ForEach-Object -ThrottleLimit 15 -Parallel {
-        # Import functions and variables from main script
-        if ($using:showCommands) { $script:showCommands = $true }
-        ${function:Get-UserName} = $using:GetUsernameDef
-        ${function:Send-Update} = $using:SendUpdateDef
-        # $dict = $using:parallelResults
-        $config = $using:config
-        $muCreateClusters = $using:muCreateClusters
-        $muCreateWebApp = $using:muCreateWebApp
-        # Setup core variables
-        $userName = $_.DisplayName
-        $id = $_.id
-        # $type = $_.type
-        $resourceGroup = "scw-group-$userName"
-        # $targetCluster = "scw-AKS-$userName"
-        # $webASPName = "scw-asp-$userName"
-        # $webAppName = "scw-webapp-$userName"
+    $eventUsers = Send-Update -t 1 -c "Get Group Attendees" -r "az ad group member list --group $($config.muEvent) --query '[].{displayName:displayName}'" | Convertfrom-Json | Select-Object -expandproperty displayName
+    $eventUsers | ForEach-Object -ThrottleLimit 50 -Parallel {
+        $using:muFunctions | ForEach-Object { . $_ }
+        Set-Prefs -u $_
         # Delete User and all resources
-        Send-Update -t 1 -c "$userName : Remove resource group and content" -r "az group delete --resource-group $resourceGroup -y"
-        Send-Update -t 1 -c "$userName : Remove account" -r "az ad user delete --id $id"
+        Send-Update -t 1 -c "$userName : Remove resource group and content" -r "az group delete --resource-group $($config.azureGroup) -y"
+        Send-Update -t 1 -c "$userName : Remove account" -r "az ad user delete --id $($config.loginEmail)"
         # Confirm Delete
         Do {
             Start-sleep -s 2
-            $userExists = Send-Update -t 0 -e -c "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
+            $userExists = Send-Update -t 0 -e -c "Checking if user still exists" -r "az ad user show --id $($config.loginEmail)" | Convertfrom-Json
         } until (-not $userExists)
-
-
-
+        #Cleanup config from deleted account
+        if (Test-Path $configFile) { Remove-Item $configFile }
     }
+    if ($config.muEvent -eq "Attendees") {
+        Send-Update -t 1 -c "NOT deleting core group Attendees"
+    }
+    else {
+        Send-Update -t 1 -c "Removing event: $($config.muEvent)" -r "az ad group delete --group $($config.muEvent)"
+    }
+    Set-Prefs -k "muEvent"
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUserRegion {
