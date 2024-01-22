@@ -639,8 +639,8 @@ function Set-Provider {
 
 # Azure MU Functions
 function Add-AzureMultiUserSteps {
-    if (-not (test-path "./scwKube")) { create-item "./scwKube" }
-    if (-not (test-path "./scwYaml")) { create-item "./scwYaml" }
+    if (-not (test-path "./scwKube")) { New-Item "./scwKube" }
+    if (-not (test-path "./scwYaml")) { New-Item "./scwYaml" }
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) { return }
     ### We have a region, event?
@@ -674,11 +674,12 @@ function Get-AzureMultiUserEvent {
             New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName.substring(6) }
         }
     }
+    ### Select event
     $eventChoices | sort-object -property Option | format-table -Property Option, displayName | Out-Host
     while (-not $eventName) {
         $eventSelected = read-host -prompt "Which event? <c> to create <a> for ALL <enter> to cancel"
         if (-not $eventSelected) { return }
-        ### Create a new event
+        ### Or create a new event
         if ($eventSelected -eq "c") {
             $newName = Read-Host -prompt "New event name?"
             $eventName = "event-$newName"
@@ -712,13 +713,14 @@ function Get-AzureMultiUserCache {
     if (-not (test-path "./scwConfig/")) { return }
     $configAll = foreach ($i in Get-ChildItem -path "./scwConfig/*.conf") { $i | Get-Content | Convertfrom-Json }
     $configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
+    write-host $configEvent.count
+    write-host $config.muEvent
     $script:attendeeCount = $configEvent.count
     $script:azureGroups = ($configEvent | where-object { $_.azureGroupStatus -eq $true }).count
     $script:azureClustersRunning = ($configEvent | where-object { $_.azureClusterStatus -eq "Running" }).count
     $script:azureWebAppsRunning = ($configEvent | where-object { $_.azureWebAppStatus -eq "Running" }).count
     $script:DynatraceStatus = ($configEvent | where-object { $_.dynatraceStatus -eq $true }).count
 }
-#now
 function Update-AzureMultiUser {
     $eventAttendees = Send-Update -t 1 -c "Get Group Attendees" -r "az ad group member list --group $($config.muEvent) --query '[].{displayName:displayName}'" | Convertfrom-Json | Select-Object -expandproperty displayName
     $eventAttendees | ForEach-Object -ThrottleLimit 50 -Parallel {
@@ -794,7 +796,7 @@ function Add-AzureMultiUser {
         }
     }
     # Create user accounts
-    1..$addUserCount | ForEach-Object -Parallel {
+    1..$addUserCount | ForEach-Object -Parallel -ThrottleLimit 5055 {
         $using:muFunctions | ForEach-Object { . $_ }
         # Create User
         Do {
@@ -809,7 +811,7 @@ function Add-AzureMultiUser {
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUser {
-    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
+    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group $($config.muEvent)" | Convertfrom-Json
     write-host "`rPassword for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.userPrincipalName
@@ -1923,10 +1925,6 @@ function Set-DTConfig {
         While (-not $cleantenantID) {
             $tenantID = read-Host -Prompt "Dynatrace Tenant ID <enter> to cancel"
             if (-not $tenantID) {
-                # Set-Prefs -k tenantID
-                # Set-Prefs -k writeToken
-                # Set-Prefs -k k8stoken
-                # Add-CommonSteps
                 return
             }
             if ($Matches) { Clear-Variable Matches }
