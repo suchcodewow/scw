@@ -667,7 +667,7 @@ function Add-AzureMultiUserSteps {
 }
 function Get-AzureMultiUserEvent {
     ### Get existing groups
-    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query '[].{displayName:displayName}'" | Convertfrom-Json
+    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query '[].{displayName:displayName}'" | Convertfrom-Json | sort-object -property displayName
     $counter = 0; $eventChoices = Foreach ($i in $allGroups) {
         if ($i.displayName.substring(0,6) -eq "event-") {
             $counter++
@@ -796,14 +796,23 @@ function Add-AzureMultiUser {
             write-host "`r`nPositives integers only"            
         }
     }
+    $userPrefix = read-host -prompt "Attendee prefix? <enter> for Madlibs style"
+    
     # Create user accounts
-    1..$addUserCount | ForEach-Object -Parallel -ThrottleLimit 5055 {
+    1..$addUserCount | ForEach-Object -ThrottleLimit 50 -Parallel {
         $using:muFunctions | ForEach-Object { . $_ }
+        $userPrefix = $using:userPrefix
         # Create User
-        Do {
-            $newUserName = Get-UserName
+        if ($userPrefix) {
+            $newUserName = "$userPrefix$_"
             $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
-        } Until ($user)
+        }
+        else {
+            Do {
+                $newUserName = Get-UserName
+                $user = Send-Update -t 1 -c "Creating user $newUserName" -r "az ad user create --display-name $newUserName --password 1Dynatrace## --force-change-password-next-sign-in false --user-principal-name $newUserName@suchcodewow.io" | ConvertFrom-Json
+            } Until ($user)
+        }
         Set-Prefs -u $newUserName
         Set-Resources
         Send-Update -t 1 -c "Adding $newUserName to attendees group" -r "az ad group member add --group Attendees --member-id $($user.id)"
@@ -1002,6 +1011,12 @@ function Get-AzureStatus {
     else {
         Send-Update -t 1 -content " no."
         Set-Prefs -k "azureClusterStatus" -v $false
+    }
+    #Dynatrace (tenant/token available)
+    if (test-path "scw.csv") {
+        $scwCsv = Get-Content "scw.csv" | ConvertFrom-Csv | where-object { $_.user -eq $config.loginEmail }
+        Set-Prefs -k tenant -v $scwCsv.tenant
+        Set-PRefs -k token -v $scwCsv.token
     }
     #ServicePlan
     $planExists = Send-Update -t 1 -append -c "Azure: Web App Plan exists?" -r "az appservice plan list --query ""[?name=='$($config.azureServicePlan)']""" | Convertfrom-Json
@@ -1317,7 +1332,7 @@ function Set-AWSMultiUserCreateCluster {
     Add-AWSMultiUserSteps
 }
 
-# AWS Functions
+#AWS Functions
 function Add-AWSSteps {
     # Get AWS specific properties from current choice
     $userProperties = $choices | where-object { $_.key -eq "TARGET" } | select-object -expandproperty callProperties
