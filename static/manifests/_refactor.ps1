@@ -707,6 +707,7 @@ function Get-AzureMultiUserStatus {
         Set-Resources
         Get-AzureStatus
     }
+    Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUserCache {
     # Get available config files
