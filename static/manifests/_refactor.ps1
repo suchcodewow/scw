@@ -121,7 +121,7 @@ function Set-Prefs {
     )
     if ($u) {
         # Switch context for multiUser mode
-        $script:configFile = "./scwConfig/$u.conf"
+        $script:configFile = "~/scwConfig/$u.conf"
         $importFile = "pepper.conf"
         if (Test-Path $configFile) {
             $script:config = Get-Content $configFile -Raw | ConvertFrom-Json -AsHashtable
@@ -637,10 +637,10 @@ function Set-Provider {
     }
 }
 
-# Azure MU Functions
+# Azure MU Main Functions
 function Add-AzureMultiUserSteps {
-    if (-not (test-path "./scwKube")) { New-Item "./scwKube" }
-    if (-not (test-path "./scwYaml")) { New-Item "./scwYaml" }
+    if (-not (test-path -Path "~/scwKube/")) { New-Item "~/scwKube/" -ItemType Directory }
+    if (-not (test-path -Path "~/scwYaml/")) { New-Item "~/scwYaml/" -ItemType Directory }
     Add-Choice -k "AZMCR" -d "Select Region" -f Get-AzureMultiUserRegion -c $config.muAzureRegion 
     if (-not $config.muAzureRegion) { return }
     ### We have a region, event?
@@ -651,53 +651,22 @@ function Add-AzureMultiUserSteps {
         Set-Prefs -k "muCreateClusters" -v $false
         Set-Prefs -k "muDeployDynatrace" -v $false
         Set-Prefs -k "muCreateWebApp" -v $false
+        Set-Prefs -k "muRunning" -v $true
         $script:muSetupDone = $true
     }
     Get-AzureMultiUserCache
     ### Options for events AND Account level
-    Add-Choice -k "AZMUR" -d "Delete Event/Accounts/Content" -f Remove-AzureMultiUser -c "Resource Groups: $azureGroups / Clusters: $azureClustersRunning / Dynatrace: $dynatraceStatus / Web Apps: $azureWebAppsRunning"
-    Add-Choice -k "AZMCS" -d "Refresh Event Status" -f Get-AzureMultiUserStatus 
+    Add-Choice -k "AZMUR" -d "Delete Event/Accounts/Content" -f Remove-AzureMultiUser -c "RG: $azureGroups k8s: [$azureClustersRunning/$azureClustersStopped] DT: [$dynatraceRunning/$dynatracePartial] Apps: [$azureWebAppsRunning/$azureWebAppsStopped]"
+    Add-Choice -k "AZMCS" -d "Refresh Event Status" -f Get-AzureMultiUserStatus
+    Add-Choice -k "AZML" -d "List Attendees" -f Get-AzureMultiUser -c "Currently: $attendeeCount"
     if ($config.muEvent -eq "Attendees") { return }
     ### Options for events only
-    Add-Choice -k "AZMCU" -d "Create Accounts" -f Add-AzureMultiUser -c "Currently: $attendeeCount"
+    Add-Choice -k "AZMCU" -d "Create Accounts" -f Add-AzureMultiUser
     Add-Choice -k "AZMCT" -d "[toggle] Auto-create AKS clusters?" -c "$($config.muCreateClusters)" -f Set-AzureMultiUserCreateCluster
-    ADd-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($config.muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
+    Add-Choice -k "AZMDDT" -d "[toggle] Auto-Deploy Dynatrace?" -c "$($config.muDeployDynatrace)" -f Set-AzureMultiUserDeployDynatrace
     Add-Choice -k "AZMCWA" -d "[toggle] Auto-create Azure Web App?" -c "$($config.muCreateWebApp)" -f Set-AzureMultiUserCreateWebApp
-    Add-Choice -k "AZMGO" -d "Deploy new resources" -c "" -f Update-AzureMultiUser
-}
-function Get-AzureMultiUserEvent {
-    ### Get existing groups
-    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query '[].{displayName:displayName}'" | Convertfrom-Json | sort-object -property displayName
-    $counter = 0; $eventChoices = Foreach ($i in $allGroups) {
-        if ($i.displayName.substring(0,6) -eq "event-") {
-            $counter++
-            New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName.substring(6) }
-        }
-    }
-    ### Select event
-    $eventChoices | sort-object -property Option | format-table -Property Option, displayName | Out-Host
-    while (-not $eventName) {
-        $eventSelected = read-host -prompt "Which event? <c> to create <a> for ALL <enter> to cancel"
-        if (-not $eventSelected) { return }
-        ### Or create a new event
-        if ($eventSelected -eq "c") {
-            $newName = Read-Host -prompt "New event name?"
-            $eventName = "event-$newName"
-            $eventCreated = Send-Update -t 1 -content "Creating group: $eventName" -r "az ad group create --display-name $eventName --mail-nickname $eventName --only-show-errors"
-            if ($eventCreated) { Send-Update -t 1 -content "Event $eventName created!" }
-        }
-        elseif ($eventSelected -eq "a") {
-            ### Special selection for all
-            $eventName = "Attendees"
-        }
-        else {
-            $eventName = $eventChoices | Where-Object -FilterScript { $_.Option -eq $eventSelected } | Select-Object -ExpandProperty displayName -first 1
-            if ($eventName) { $eventName = "event-$eventName" }
-        }
-        if ( -not $eventName) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
-    }
-    Set-Prefs -k "muEvent" -v $eventName
-    Add-AzureMultiUserSteps
+    Add-Choice -k "AZCR" -d "[toggle] Deployed resources running?" -c "$($config.muRunning)" -f Set-AzureMultiUserRunning
+    Add-Choice -k "AZMGO" -d "Deploy/Update resources" -c "" -f Update-AzureMultiUser
 }
 function Get-AzureMultiUserStatus {
     $eventAttendees = Send-Update -t 1 -c "Get Group Attendees" -r "az ad group member list --group $($config.muEvent) --query '[].{displayName:displayName}'" | Convertfrom-Json | Select-Object -expandproperty displayName
@@ -711,16 +680,17 @@ function Get-AzureMultiUserStatus {
 }
 function Get-AzureMultiUserCache {
     # Get available config files
-    if (-not (test-path "./scwConfig/")) { return }
-    $configAll = foreach ($i in Get-ChildItem -path "./scwConfig/*.conf") { $i | Get-Content | Convertfrom-Json }
+    if (-not (test-path "~/scwConfig/")) { return }
+    $configAll = foreach ($i in Get-ChildItem -path "~/scwConfig/*.conf") { $i | Get-Content | Convertfrom-Json }
     $configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
-    write-host $configEvent.count
-    write-host $config.muEvent
     $script:attendeeCount = $configEvent.count
     $script:azureGroups = ($configEvent | where-object { $_.azureGroupStatus -eq $true }).count
     $script:azureClustersRunning = ($configEvent | where-object { $_.azureClusterStatus -eq "Running" }).count
+    $script:azureClustersStopped = ($configEvent | where-object { $_.azureClusterStatus -eq "Stopped" }).count
     $script:azureWebAppsRunning = ($configEvent | where-object { $_.azureWebAppStatus -eq "Running" }).count
-    $script:DynatraceStatus = ($configEvent | where-object { $_.dynatraceStatus -eq $true }).count
+    $script:azureWebAppsStopped = ($configEvent | where-object { $_.azureWebAppStatus -eq "Stopped" }).count
+    $script:DynatraceRunning = ($configEvent | where-object { $_.dynatraceStatus -eq "Running" }).count
+    $script:DynatracePartial = ($configEvent | where-object { $_.dynatraceStatus -eq "Partial" }).count
 }
 function Update-AzureMultiUser {
     $eventAttendees = Send-Update -t 1 -c "Get Group Attendees" -r "az ad group member list --group $($config.muEvent) --query '[].{displayName:displayName}'" | Convertfrom-Json | Select-Object -expandproperty displayName
@@ -735,11 +705,11 @@ function Update-AzureMultiUser {
             $changes++
             Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $($config.azureGroup) --location $($config.muAzureRegion) -o none"
         }
-        if ($config.azureClusterStatus -ne "Running" -and $config.muCreateClusters -eq $true) {
+        if ($config.azureClusterStatus -eq $false -and $config.muCreateClusters -eq $true) {
             $changes++
             Send-Update -o -t 1 -content "Azure: Create AKS Cluster" -run "az aks create -g $($config.azureGroup) -n $($config.azureCluster) --node-count 1 --node-vm-size 'Standard_D4s_v5' --generate-ssh-keys --only-show-errors"
         }
-        if ($config.azureWebAppStatus -ne "Running" -and $config.muCreateWebApp -eq $true) {
+        if ($config.azureWebAppStatus -eq $false -and $config.muCreateWebApp -eq $true) {
             $changes++
             Send-Update -c "Creating Azure Web App Plan" -t 1 -r "az appservice plan create --name $($config.azureServicePlan) --resource-group $($config.azureGroup) --sku B2" -o
             Send-Update -c "creating Azure Web App" -t 1 -r "az webapp create --resource-group $($config.azureGroup) --name $($config.azureWebApp) --plan $($config.azureServicePlan) --runtime 'dotnet:6'" -o        
@@ -747,42 +717,65 @@ function Update-AzureMultiUser {
         ### If changes made refresh
         if ($changes -gt 0) { Get-AzureStatus;$changes = 0 }
         ### Get cluster credentials, deploy Dynatrace
-        if ($config.dynatraceTenant -and $config.dynatraceToken -and $config.muDeployDynatrace) {
+        if ($config.muDeployDynatrace -eq $true -and $config.dynatraceStatus -ne "Running") {
+            if ($config.dynatraceTenant -and $config.dynatraceToken) {
+                $changes++
+                if ($config.dynatraceTenant.substring(0, 8) = "https://") {
+                    $url = $config.dynatraceTenant.substring(8).replace(".sprint.apps",".sprint")
+                }
+                else {
+                    $url = $config.dynatraceTenant.replace(".sprint.apps",".sprint")                
+                }
+                Add-DynakubeYaml -muUsername $config.userName -c "k8s$($confiig.userName)" -token $config.dynatraceToken -url $url
+
+                $kubeCmd = "kubectl --kubeconfig ./scwKube/$($config.userName).kube"
+                Send-Update -c "Add Dynatrace Namespace" -t 1 -r "$kubeCmd create ns dynatrace"
+                Send-Update -c "Waiting 10s for activation" -a -t 1
+                $counter = 0
+                While ($namespaceState.status.phase -ne "Active") {
+                    if ($counter -ge 10) {
+                        Send-Update -t 2 -c " Failed to create namespace!"
+                        break
+                    }
+                    $counter++
+                    Send-Update -c " $($counter)..." -t 1 -a
+                    Start-Sleep -s 1
+                    #Query for namespace viability
+                    $namespaceState = Send-Update -t 1 -c "Checking namespace state for: $targetCluster" -r "$kubeCmd get ns dynatrace -ojson " | Convertfrom-Json
+                }
+                Send-Update -c " Activated!" -t 1
+                Send-Update -c "Loading Operator" -t 1 -r "$kubeCmd apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
+                Send-Update -c "Waiting for pod to activate" -t 1 -r "$kubeCmd -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
+                Send-Update -c "Loading dynakube.yaml" -t 1 -r "$kubeCmd apply -f ./scwYaml/$($config.userName)-dynakube.yaml"
+            }
+            else {
+                Send-Update -t 2 -c "$($config.userName): Dynatrace deploy failed! url: $($url) token: $($config.dynatraceToken)"
+            }
         }
-        #             if ($tenantID -and $k8stoken -and -not $dynatraceState) {
-        #                 # Wait 5 minutes for AKS cluster to hopefully be available
-        #                 # Start-Sleep -seconds 300
-        #                 # We need Dynatrace.  Generate DynaKube.yaml
-        #                 Send-Update -t 1 -c "Generating Dynatrace Yaml for $userName"
-        #                 if ($tenantid.substring(0, 8) = "https://") {
-        #                     $url = $tenantid.substring(8)
-        #                 }
-        #                 else {
-        #                     $url = $tenantid                   
-        #                 }
-        #                 Add-DynakubeYaml -muUsername $userName -c "k8s$userName" -token $k8stoken -url $url
-        #                 # Deploy Dynatrace steps.
-        #                 Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl --kubeconfig $($userName).kube create ns dynatrace"
-        #                 Send-Update -c "Waiting 10s for activation" -a -t 1
-        #                 $counter = 0
-        #                 While ($namespaceState.status.phase -ne "Active") {
-        #                     if ($counter -ge 10) {
-        #                         Send-Update -t 2 -c " Failed to create namespace!"
-        #                         break
-        #                     }
-        #                     $counter++
-        #                     Send-Update -c " $($counter)..." -t 1 -a
-        #                     Start-Sleep -s 1
-        #                     #Query for namespace viability
-        #                     $namespaceState = Send-Update -t 1 -c "Checking namespace state for: $targetCluster" -r "kubectl --kubeconfig drysmoke.kube get ns dynatrace -ojson " | Convertfrom-Json
-        #                 }
-        #                 Send-Update -c " Activated!" -t 1
-        #                 Send-Update -c "Loading Operator" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
-        #                 Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl --kubeconfig $($userName).kube -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
-        #                 Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl --kubeconfig $($userName).kube apply -f $($userName)-dynakube.yaml"
-        #                 $dynatraceState = $true
-        #             }
+        if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
+            $changes++
+            Send-Update -t 1 -c "Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+        }
+        if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
+            $changes++
+            Send-Update -t 1 -c "Putting Web App $($config.azureWebApp) to sleep." -r "az webapp stop -g $($config.azureGroup) -n $($config.azureWebApp)"
+    
+        }
+        if ($config.azureClusterStatus -eq "Stopped" -and $config.muRunning -eq $true) {
+            $changes++
+            Send-Update -t 1 -c "Waking $($config.azureCluster) up." -r "az aks start -g $($config.azureGroup) -n $($config.azureCluster)"
+        }
+        if ($config.azureWebAppStatus -eq "Stopped" -and $config.muRunning -eq $true) {
+            $changes++
+            Send-Update -t 1 -c "Waking $($config.azureWebApp) up." -r "az webapp start -g $($config.azureGroup) -n $($config.azureWebApp)"
+    
+        }
+        ### If changes made refresh
+        if ($changes -gt 0) { Get-AzureStatus;$changes = 0 }
     }
+    ### Stop services if option picked
+
+    Add-AzureMultiUserSteps
 }
 function Add-AzureMultiUser {
     # Create user accounts
@@ -819,12 +812,6 @@ function Add-AzureMultiUser {
         Send-Update -t 1 -c "Adding $newUserName to $($config.muEvent)" -r "az ad group member add --group $($config.muEvent) --member-id $($user.id)"
     }
     Add-AzureMultiUserSteps
-}
-function Get-AzureMultiUser {
-    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group $($config.muEvent)" | Convertfrom-Json
-    write-host "`rPassword for accounts is: 1Dynatrace##"
-    write-host ""
-    $existingUsers.userPrincipalName
 }
 function Remove-AzureMultiUser {
     $eventAttendees = Send-Update -t 1 -c "Get Group Attendees" -r "az ad group member list --group $($config.muEvent) --query '[].{displayName:displayName}'" | Convertfrom-Json | Select-Object -expandproperty displayName
@@ -867,6 +854,56 @@ function Get-AzureMultiUserRegion {
     Set-Prefs -k muAzureRegion -v $locationId
     # Send-Update -t 1 -c "Azure: Create Resource Group" -run "az group create --name $targetGroup --location $locationId -o none"
     Add-AzureMultiUserSteps
+}
+# Azure MU Helpers
+function Get-AzureMultiUserEvent {
+    ### Get existing groups
+    $allGroups = Send-Update -t 0 -content "Azure: Get Events" -run "az ad group list --query '[].{displayName:displayName}'" | Convertfrom-Json | sort-object -property displayName
+    $counter = 0; $eventChoices = Foreach ($i in $allGroups) {
+        if ($i.displayName.substring(0,6) -eq "event-") {
+            $counter++
+            New-object PSCustomObject -Property @{Option = $counter; displayName = $i.displayName.substring(6) }
+        }
+    }
+    ### Select event
+    $eventChoices | sort-object -property Option | format-table -Property Option, displayName | Out-Host
+    while (-not $eventName) {
+        $eventSelected = read-host -prompt "Which event? <c> to create <a> for ALL <enter> to cancel"
+        if (-not $eventSelected) { return }
+        ### Or create a new event
+        if ($eventSelected -eq "c") {
+            $newName = Read-Host -prompt "New event name?"
+            $eventName = "event-$newName"
+            $eventCreated = Send-Update -t 1 -content "Creating group: $eventName" -r "az ad group create --display-name $eventName --mail-nickname $eventName --only-show-errors"
+            if ($eventCreated) { Send-Update -t 1 -content "Event $eventName created!" }
+        }
+        elseif ($eventSelected -eq "a") {
+            ### Special selection for all
+            $eventName = "Attendees"
+        }
+        else {
+            $eventName = $eventChoices | Where-Object -FilterScript { $_.Option -eq $eventSelected } | Select-Object -ExpandProperty displayName -first 1
+            if ($eventName) { $eventName = "event-$eventName" }
+        }
+        if ( -not $eventName) { write-host -ForegroundColor red "`r`nHey, just what you see pal." }
+    }
+    Set-Prefs -k "muEvent" -v $eventName
+    Add-AzureMultiUserSteps
+}
+function Get-AzureMultiUser {
+    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group $($config.muEvent)" | Convertfrom-Json
+    write-host "`rPassword for accounts is: 1Dynatrace##"
+    write-host ""
+    $existingUsers.userPrincipalName | sort-object
+}
+function Set-AzureMultiUserRunning {
+    if ($config.muRunning -eq $true) {
+        Set-Prefs -k "muRunning" -v $false
+    }
+    else {
+        Set-Prefs -k "muRunning" -v $true 
+    }
+    Add-AzureMultiUserSteps  
 }
 function Set-AzureMultiUserCreateCluster {
     if ($config.muCreateClusters -eq $true) {
@@ -1007,16 +1044,18 @@ function Get-AzureStatus {
     if ($aksExists.state) {
         Send-Update -t 1 -content " yes:$($aksExists.state)"
         Set-Prefs -k "azureClusterStatus" -v $aksExists.state
+        if ($aksExists.state -eq "Stopped") { Set-Prefs -k "dynatraceStatus" -v $false }
     }
     else {
         Send-Update -t 1 -content " no."
         Set-Prefs -k "azureClusterStatus" -v $false
+        Set-Prefs -k "dynatraceStatus" -v $false
     }
     #Dynatrace (tenant/token available)
     if (test-path "scw.csv") {
         $scwCsv = Get-Content "scw.csv" | ConvertFrom-Csv | where-object { $_.user -eq $config.loginEmail }
-        Set-Prefs -k tenant -v $scwCsv.tenant
-        Set-PRefs -k token -v $scwCsv.token
+        Set-Prefs -k "dynatraceTenant" -v $scwCsv.tenant
+        Set-PRefs -k "dynatraceToken" -v $scwCsv.token
     }
     #ServicePlan
     $planExists = Send-Update -t 1 -append -c "Azure: Web App Plan exists?" -r "az appservice plan list --query ""[?name=='$($config.azureServicePlan)']""" | Convertfrom-Json
@@ -1028,7 +1067,6 @@ function Get-AzureStatus {
         Send-Update -t 1 -c " no."
         Set-Prefs -k "azureServicePlanStatus" -v $false
         Set-Prefs -k "azureWebAppStatus" -v $false
-        return
     }
     #WebApp
     $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)'].{state:state}""" | Convertfrom-Json
@@ -1043,20 +1081,26 @@ function Get-AzureStatus {
     #Dynatrace
     if ($config.azureClusterStatus -eq "Running") {
         if ($config.multiUserMode -eq $true) {
-            az aks get-credentials --file "./scwKube/$($config.userName).kube" -g $($config.azureGroup) -n $($config.azureCluster) --overwrite-existing --only-show-errors
-            $allNamespaces = Send-Update -t 1 -c "Get Kubernetes Namespaces MU" -r "kubectl --kubeconfig ./scwKube/$($config.userName).kube get ns -ojson" | convertfrom-json | select-object -expandproperty items
+            $kubeFile = "--file '~/scwKube/$($config.userName).kube'"
+            $kube = "--kubeconfig ./scwKube/$($config.userName).kube"
         }
-        else {
-            az aks get-credentials -g $($config.azureGroup) -n $($config.azureCluster) --overwrite-existing --only-show-errors
-            $allNamespaces = Send-Update -t 1 -c "Get Kubernetes Namespaces" -r "kubectl get ns -ojson" | convertfrom-json | select-object -expandproperty items
-        }
+        Send-Update -t 1 -c "Refresh k8s credentials" -r "az aks get-credentials $kubeFile -g $($config.azureGroup) -n $($config.azureCluster) --overwrite-existing --only-show-errors"
+        $allNamespaces = Send-Update -t 1 -c "Get Kubernetes Namespaces" -r "kubectl $kube get ns -ojson" | convertfrom-json | select-object -expandproperty items
         if ($allNamespaces.metadata.name -contains "dynatrace") {
-            Set-Prefs -k "dynatraceStatus" -v $true
+            $allPods = Send-Update -t 1 -c "Dynatrace Namespace exists, check Ready Podcount" -r "kubectl $kube get pods -n dynatrace -ojson" | Convertfrom-Json
+            $runningPods = ($allPods.items.status.containerStatuses.ready | Where-Object { $_ -eq "True" }).count
+            if ($runningPods -eq 5) {
+                Set-Prefs -k "dynatraceStatus" -v "Running"
+            }
+            else {
+                Set-Prefs -k "dynatraceStatus" -v "Partial"
+            }
         }
         else {
             Set-Prefs -k "dynatraceStatus" -v $false
         }
     }
+    
 }
 function Remove-AzureGroup {
     Set-Prefs -k "quickDeploy" -v $false
@@ -2014,6 +2058,7 @@ function Set-DTConfig {
     Add-CommonSteps
 }
 function Add-DynakubeYaml {
+    #muReady
     param (
         [string] $token, # Dynatrace API token
         [string] $url, # URL To Dynatrace tenant
@@ -2091,7 +2136,12 @@ spec:
         cpu: 500m
         memory: 1.5Gi
 "@
-    $dynaKubeContent | out-File -FilePath "$($configName)-dynakube.yaml"
+    if ($config.multiUserMode -eq $true) {
+        $dynaKubeContent | out-File -FilePath "~/scwYaml/$($configName)-dynakube.yaml"
+    }
+    else {
+        $dynaKubeContent | out-File -FilePath "dynakube.yaml"
+    }
 }
 function Add-Dynatrace {
     Send-Update -c "Add Dynatrace Namespace" -t 1 -r "kubectl create ns dynatrace"
@@ -2188,6 +2238,7 @@ function Get-DynatraceToken {
     write-host "export RESOURCE_GROUP=$($config.resourceGroup)"
     write-host "export EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
     write-host ""
+    read-host -prompt "Press the <any> key to continue"
 }
 
 # Application Functions
@@ -2281,27 +2332,6 @@ function Add-CommonSteps {
             else {
                 # Yaml is available but not yet applied.  Add option to apply it
                 Add-Choice -k "INST$ns" -d "$($ns): Deploy App" -f "Add-App -y $($app.name) -n $ns"
-            }
-        }
-    }
-}
-function Get-CustomSteps {
-    #Stub out using custom files
-    Param(
-        [string] $namespace #namespace to parse
-    )
-    $jsonFile = "$($namespace).json"
-    if (test-path($jsonFile)) {
-        $jsonContent = Send-Update -c "Loading custom config json" -t 0 -r "Get-Content $jsonFile" | Convertfrom-Json
-        foreach ($step in $jsonContent.$($config.provider)) {
-            if ($step.key -and $step.description -and $step.dependsOnKey -in $choices.key) {
-                $Params = @{}
-                $Params['key'] = $step.key
-                $Params['description'] = "$($ns): $($step.description)"
-                if ($step.current) { $Params['current'] = $step.current }
-                if ($step.function) { $Params['function'] = $step.function }
-                if ($step.properties) { $Params['properties'] = $step.properties }
-                Add-Choice @Params
             }
         }
     }
