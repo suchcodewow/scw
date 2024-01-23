@@ -4,48 +4,17 @@ sidebar_position: 1
 
 # Azure & Dynatrace: Intro
 
-Welcome to the Azure & Dynatrace 2024 Hot session!
+## A) Introduction
 
-## Setup
+This quick guide essentially condenses a dynabank workshop event down to the deployment steps used.  
+It's useful for testing new content or to quickly setup/confirm a working environment ahead of an event.
 
-### Tab 1: University
-
-Confirm login to [Azure portal](https://portal.azure.com) with [yourmadlibsname]@suchcodewow.io. Password provided.
-
-### Tab 2: This guide
-
-### Azure: Command Line
-
-Use University terminal (or Azure Portal console if not registered) to reach an Azure prompt. Make sure to pick BASH!
-
-If using Unversity terminal, run `az login` and follow prompts to connect to Azure. Use the [yourmadlibsname]@suchcodewow.io and password.
-
-#### Pepper
-
-While at the command line, run Pepper:
-
-```bash
-curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pepper.ps1 -c
-```
-
-Pepper will take an inventory of what is loaded. Confirm:
-
-| Component        | Name                                         |
-| ---------------- | -------------------------------------------- |
-| Resource group   | scw-group-[yourmadlibsname]                  |
-| AKS cluster      | scw-AKS-[yourmadlibsname]                    |
-| App Service Plan | scw-ASP-[yourmadlibsname]                    |
-| Web App          | scw-webapp-[yourmadlibsname]                 |
-| Dynatrace        | tenant shown on spreadsheet & 5/5 pods ready |
-
-### Dynatrace
-
-Login to Dynatrace tenant using URL, class name, password. Provided in class spreadsheet.
-
-## A) Environments
+## B) Before Starting
 
 All Dynabank workshop events use the Dynatrace Cloud Learning (DLF) Facilities. Essentially these are "blank" cloud environments in all 3 major providers (Azure, AWS, and GCP).  
 To start, you would either need an attendee account in the DLF for your cloud choice, or you'd need an account in another cloud environment that has access to all components you want to install.
+
+This guide assumes you created (or had someone create) a DLF account for you to use.
 
 ## C) Starting the assistant
 
