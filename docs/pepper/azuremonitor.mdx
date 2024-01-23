@@ -3,3 +3,21 @@ sidebar_position: 5
 ---
 
 # Hands On: Azure Monitor
+
+### Service Principal
+
+To Deploy the service-principal,
+Go to the Terminal Command line /Azure CLI
+Run this command after adding the values from the previous command
+
+```bash
+az ad sp create-for-rbac --name <YourServicePrincipalName> --role reader --scopes /subscriptions/9939cbf8-8de6-49a1-a641-b664b214838f --query "{ClientID:appId,TenantID:tenant,SecretKey:password}"
+```
+
+The Command should give you the ClientID, TennatID and SecretKey
+Next Navigate to your Dynatrace Tenant Provided for you
+Go to Settings --> Cloud and Virtualization --> Azure
+Click on Connect New instance
+Fill in the connection name
+Add the ClientID, SecretKey and TenantID that exported from the Terminal Command line /Azure CLI
+Click Connect --> Your Azure Instance is now connected in Dynatrace
