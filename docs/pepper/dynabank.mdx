@@ -3,3 +3,68 @@ sidebar_position: 2
 ---
 
 # Hands On: Dynabank
+
+## Deploy Dynabank
+
+1. In tab #1 University Terminal, make sure Pepper is running and select the option to `Download demo apps yaml files`.
+   This will pull the yaml blueprints for Dynabank (dbic) and any other demo apps packaged for deployment.
+
+1. Select the option to `Deploy: dbic`. Use the `refresh pods` option over a few minutes until you have all pods deployed.
+
+At this point, Pepper should provide the URL to your environment. Where available, you'll also get a more 'friendly' link.
+
+## (Quickly) Explore Dynabank
+
+### A) Smartscape
+
+1. In your Dynatrace tenant, select the "Smartscape" option from the menu. You'll see that Dynatrace has already generated a topology view.
+   ![smartscape](/img/explore1.jpg)
+2. Click any components in Dynatrace to show the automatically tracked vertical relationships for that entity.
+   ![verticalsmartscape](/img/explore2.jpg)
+
+This visibility is unparalled when planning to move applications to another data center or cloud; All dependencies are clearly visible.
+
+### B) Services View
+
+![services](/img/explore3.jpg)
+
+1. Select "Services" on the left menu. Dynatrace shows all detected services and key metrics for each.
+2. Select the "OrdersAPI" service to see a dashboard and further drilldowns for it:
+
+- The top left block shows what calls this service, what this service depends on, and where it's running
+- Bottom left shows service KPI's like failure rate & throughput
+- Dynatrace always keeps everything connected. The right side shows ways to view the service flow, back up the chain, and individual traces
+
+### C) Kubernetes View
+
+1. Select "Kubernetes" from the left menu (under ), then click on the cluster matching your id.
+
+You'll see a cluster overview, namespaces, workloads, and the option to turn on cluster events.
+![services](/img/explore10.jpg)
+
+2. Try clicking on the "dbic" namespace on the lower right to see infrastructure metrics.
+
+3. From here, check out the services running and click ordersAPI.
+
+4. On this page, you can see Dynatrace automatically building visibility up to the services provided & down into the infrastructure.
+
+### D) Databases View
+
+![services](/img/explore4.jpg)
+
+1. Select "Databases" on the left menu, then "dbic". Similar to services, Dynatrace constantly tracks service dependencies, and underlying infrastructure at all times.
+2. Database calls from any source are shown here with the ability to reverse back up the chain with the "view backtrace" button.
+
+### E) Application View
+
+![services](/img/explore6.jpg)
+
+1. Select "Frontend" on the left menu (under "Applications & Microservices")
+2. Select "My Web Application"
+3. Select "1 service" in the lower right of top box.
+   ![appservice](/img/appservice.jpg)
+4. Select "view service flow" to show this applications ecosystem front to back.
+
+:::tip
+It's easy to split applications into their own views. It's done by selecting the "..." in the applications view and "editing detection settings"
+:::
