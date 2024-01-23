@@ -648,9 +648,9 @@ function Add-AzureMultiUserSteps {
     if (-not $config.muEvent) { return }
     ### We have a region and event set options & get status
     if (-not $muSetupDone) {
-        Set-Prefs -k "muCreateClusters" -v $false
-        Set-Prefs -k "muDeployDynatrace" -v $false
-        Set-Prefs -k "muCreateWebApp" -v $false
+        Set-Prefs -k "muCreateClusters" -v $true
+        Set-Prefs -k "muDeployDynatrace" -v $true
+        Set-Prefs -k "muCreateWebApp" -v $true
         Set-Prefs -k "muRunning" -v $true
         $script:muSetupDone = $true
     }
@@ -726,8 +726,7 @@ function Update-AzureMultiUser {
                 else {
                     $url = $config.dynatraceTenant.replace(".sprint.apps",".sprint")                
                 }
-                Add-DynakubeYaml -muUsername $config.userName -c "k8s$($confiig.userName)" -token $config.dynatraceToken -url $url
-
+                Add-DynakubeYaml -muUsername $config.userName -c "k8s$($config.userName)" -token $config.dynatraceToken -url $url
                 $kubeCmd = "kubectl --kubeconfig ./scwKube/$($config.userName).kube"
                 Send-Update -c "Add Dynatrace Namespace" -t 1 -r "$kubeCmd create ns dynatrace"
                 Send-Update -c "Waiting 10s for activation" -a -t 1
@@ -873,7 +872,7 @@ function Get-AzureMultiUserEvent {
         ### Or create a new event
         if ($eventSelected -eq "c") {
             $newName = Read-Host -prompt "New event name?"
-            $eventName = "event-$newName"
+            $eventName = ("event-$newName").tolower()
             $eventCreated = Send-Update -t 1 -content "Creating group: $eventName" -r "az ad group create --display-name $eventName --mail-nickname $eventName --only-show-errors"
             if ($eventCreated) { Send-Update -t 1 -content "Event $eventName created!" }
         }
@@ -1037,7 +1036,6 @@ function Get-AzureStatus {
     else {
         Send-Update -t 1 -content " no."
         Set-Prefs -k "azureGroupStatus" -v $false
-        return
     }
     #Cluster
     $aksExists = Send-Update -t 1 -e -append -content "Azure: AKS Cluster exists?" -run "az aks show -n $($config.azureCluster) -g $($config.azureGroup) --query '{id:id, location:location, state:powerState.code, provision:provisioningState}'" | ConvertFrom-Json
@@ -1100,7 +1098,6 @@ function Get-AzureStatus {
             Set-Prefs -k "dynatraceStatus" -v $false
         }
     }
-    
 }
 function Remove-AzureGroup {
     Set-Prefs -k "quickDeploy" -v $false
