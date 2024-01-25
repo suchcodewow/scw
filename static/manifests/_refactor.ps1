@@ -682,7 +682,7 @@ function Get-AzureMultiUserCache {
     # Get available config files
     if (-not (test-path "~/scwConfig/")) { return }
     $configAll = foreach ($i in Get-ChildItem -path "~/scwConfig/*.conf") { $i | Get-Content | Convertfrom-Json }
-    $configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
+    $script:configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
     $script:attendeeCount = $configEvent.count
     $script:azureGroups = ($configEvent | where-object { $_.azureGroupStatus -eq $true }).count
     $script:azureClustersRunning = ($configEvent | where-object { $_.azureClusterStatus -eq "Running" }).count
@@ -890,10 +890,10 @@ function Get-AzureMultiUserEvent {
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUser {
-    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group $($config.muEvent)" | Convertfrom-Json
-    write-host "`rPassword for accounts is: 1Dynatrace##"
-    write-host ""
-    $existingUsers.userPrincipalName | sort-object
+    if ($configEvent) {
+        $configEvent | format-table muEvent, userName, azureCluster,azureClusterStatus,DynatraceTenant, dynatraceStatus, azureWebApp,azureWebAppStatus -wrap
+        
+    }
 }
 function Set-AzureMultiUserRunning {
     if ($config.muRunning -eq $true) {
@@ -1052,8 +1052,14 @@ function Get-AzureStatus {
     #Dynatrace (tenant/token available)
     if (test-path "scw.csv") {
         $scwCsv = Get-Content "scw.csv" | ConvertFrom-Csv | where-object { $_.user -eq $config.loginEmail }
-        Set-Prefs -k "dynatraceTenant" -v $scwCsv.tenant
+        if ($scwCsv.tenant.count -eq 1) { Set-Prefs -k "dynatraceTenant" -v $scwCsv.tenant } else { Set-Prefs -k "dynatraceTenant" -v "! $($scwCsv.tenant.count) found" }
+        if ($scwCsv.token.count -eq 1) { Set-Prefs -k "dynatraceToken" -v $scwCsv.token } else { Set-Prefs -k "dynatraceToken" -v "! $($scwCsv.token.count) found" }
+
         Set-PRefs -k "dynatraceToken" -v $scwCsv.token
+    }
+    else {
+        Set-Prefs -k "dynatraceTenant" -v "!csv"
+        Set-PRefs -k "dynatraceToken" -v "!csv"
     }
     #ServicePlan
     $planExists = Send-Update -t 1 -append -c "Azure: Web App Plan exists?" -r "az appservice plan list --query ""[?name=='$($config.azureServicePlan)']""" | Convertfrom-Json
@@ -1067,7 +1073,7 @@ function Get-AzureStatus {
         Set-Prefs -k "azureWebAppStatus" -v $false
     }
     #WebApp
-    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)'].{state:state}""" | Convertfrom-Json
+    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)']. { state:state }""" | Convertfrom-Json
     if ($webAppExists.state) {
         Send-Update -t 1 -c " yes:$($webAppExists.state)"
         Set-Prefs -k "azureWebAppStatus" -v $webAppExists.state
@@ -1111,7 +1117,7 @@ function Add-AzureWebApp {
 }
 function Remove-AzureWebApp {
     Set-Prefs -k "quickDeploy" -v $false
-    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete  --resource-group $($config.azureGroup) --name $($config.azureWebApp)"
+    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete --resource-group $($config.azureGroup) --name $($config.azureWebApp)"
     Send-Update -c "Removing Azure Web App Plan" -t 1 -r "az appservice plan delete --resource-group $($config.azureGroup) --name $($config.azureServicePlan) -y"
     Add-AzureSteps
 }
