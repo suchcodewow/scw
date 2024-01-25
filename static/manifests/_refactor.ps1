@@ -891,8 +891,9 @@ function Get-AzureMultiUserEvent {
 }
 function Get-AzureMultiUser {
     if ($configEvent) {
-        $configEvent | format-table muEvent, userName, azureCluster,azureClusterStatus,DynatraceTenant, dynatraceStatus, azureWebApp,azureWebAppStatus -wrap
-        
+        $configEvent | format-table muEvent, loginEmail, azureCluster,azureClusterStatus,azureWebApp,azureWebAppStatus,DynatraceTenant, dynatraceStatus -wrap
+        $configEvent | select-object muEvent, loginEmail, azureCluster,azureClusterStatus,azureWebApp,azureWebAppStatus,DynatraceTenant, dynatraceToken, dynatraceStatus | export-csv "output.csv"
+        write-host "csv version saved to: output.csv"
     }
 }
 function Set-AzureMultiUserRunning {
