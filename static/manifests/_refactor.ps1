@@ -753,12 +753,22 @@ function Update-AzureMultiUser {
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
-            Send-Update -t 1 -c "Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+            $counter = 0
+            Do {
+                $counter++
+                if ($counter -gt 1) {
+                    $msgLevel = 2
+                    $msgRetry = "RETRY [$counter]: "
+                }
+                else {
+                    $msgLevel = 1
+                }
+                $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+            } until ($success)
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
             Send-Update -t 1 -c "Putting Web App $($config.azureWebApp) to sleep." -r "az webapp stop -g $($config.azureGroup) -n $($config.azureWebApp)"
-    
         }
         if ($config.azureClusterStatus -eq "Stopped" -and $config.muRunning -eq $true) {
             $changes++
@@ -891,7 +901,7 @@ function Get-AzureMultiUserEvent {
 }
 function Get-AzureMultiUser {
     if ($configEvent) {
-        $configEvent | format-table muEvent, loginEmail, azureCluster,azureClusterStatus,azureWebApp,azureWebAppStatus,DynatraceTenant, dynatraceStatus -wrap
+        $configEvent | format-table muEvent, loginEmail, azureClusterStatus,azureWebAppStatus, dynatraceStatus,DynatraceTenant -wrap
         $configEvent | select-object muEvent, loginEmail, azureCluster,azureClusterStatus,azureWebApp,azureWebAppStatus,DynatraceTenant, dynatraceToken, dynatraceStatus | export-csv "output.csv"
         write-host "csv version saved to: output.csv"
     }
@@ -1011,7 +1021,7 @@ function Add-AzureSteps {
     Add-CommonSteps
 }
 function Add-AzureGroup {
-    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended'].{ name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; id = $i.id; name = $i.name }
@@ -1074,7 +1084,7 @@ function Get-AzureStatus {
         Set-Prefs -k "azureWebAppStatus" -v $false
     }
     #WebApp
-    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)']. { state:state }""" | Convertfrom-Json
+    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)'].{ state:state }""" | Convertfrom-Json
     if ($webAppExists.state) {
         Send-Update -t 1 -c " yes:$($webAppExists.state)"
         Set-Prefs -k "azureWebAppStatus" -v $webAppExists.state
@@ -1261,7 +1271,6 @@ function Add-AWSMultiUserSteps {
     Add-Choice -k "AWSMDU" -d " View/Change DoNotDelete users" -f Set-AWSMultiUserDoNotDelete -c "Currently: $($doNotDeleteUsers.count)"
 }
 function Set-AWSMultiUserDoNotDelete {
-    # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName,id:name }""" | Convertfrom-Json
     $counter = 0; $userChoices = Foreach ($i in $muUsers) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; userName = $i.userName; userType = $i.userType }
