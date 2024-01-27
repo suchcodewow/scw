@@ -8,9 +8,7 @@ Our company has instructed us to build and deploy a modern quoting service.
 
 We've developed Instamation (tm) and chosen to deploy it as an Azure Web App for easy scalability and configuration.
 
-## Azure Web App (Instamation)
-
-### Deploy
+## Deploy
 
 1. In the Azure Console, go to "App Services."
 1. Type your class id (sessionX#) into the filter top right.
@@ -38,13 +36,13 @@ https://github.com/suchcodewow/instamationsvc
 
 When this appears, it means your service is working! You are ready to move to the next step.
 
-#### Tab 6: Instamation Web App
+### Tab 6: Instamation Web App
 
 Slide the tab for your Azure Web App into the 6th slot.
 
 1. Copy the URL of your azure web service from the address bar at the top of your browser to use later.
 
-### Dynatrace Extension
+## Dynatrace Extension
 
 1. In the inset-menu, click on _Extensions_ within the _Development Tools_ section.
 1. Click Add in the main window. Search/Find Dynatrace Oneagent and select it:
@@ -62,7 +60,7 @@ Slide the tab for your Azure Web App into the 6th slot.
 For most Dynatrace deployments, only the Environment ID is needed. Since we're using Dynatrace tenants that contain the word 'sprint' instead of the normal 'live', we need to specify the Server URL.
 :::
 
-### Dynabank & Azure Web App
+## Dynabank & Azure Web App
 
 1. In Tab #6 showing the Instamation service API response, copy the URL from the address bar.
 1. In Dynabank, Log-in using any random name provided with the orange button top right.
@@ -85,41 +83,3 @@ For most Dynatrace deployments, only the Environment ID is needed. Since we're u
 1. Make sure the hub namespace matches below & select the shown event hub.
    ![dynabankwebapp1](/img/appdiagnostic.png)
 1. Click _save_ in the top left corner.
-
-#### Dynabank & APIM
-
-Once the Dynabank business teams confirmed initial success of Instamation, our next goal is to configure it to use Azure API Management.
-
-1. In Azure, search for 'APIM' and click on _API Management services_.
-1. Click on the APIM for your region in the format _scw-[region]-apim_.
-1. Click on _API's_ from the inset-left menu:
-   ![apim1](/img/apim1.png)
-1. And then click on _App Service_.
-   ![apim2](/img/apim2.png)
-1. Click the `Browese` button.
-1. Type in your id (sessionX#). You should see ONE matching App Service. Select the App Service & click select at the bottom.
-1. Copy the name provided into the API URL suffix box. Your Base URL should look something like:
-
-```bash
-https://scw-useast2-apim.azure-api.net/scw-webapp-colossalcactus
-```
-
-1. Click _Create_.
-1. Find your API in the list, click on it (blue highlight), and then click _Settings_ at the top of the details box to the right (green highlight):
-   ![apim3](/img/apim3.png)
-1. Uncheck the _Subscription required_ option box (blue highlight). Click Save (green highlight). This will allow all connections to reach your Instamation service.
-   ![apim4](/img/apim4.png)
-
-:::tip Lab vs Real World
-In a real-world scenario we wouldn't go without a subscription/authorization mechanism. We're doing it here to keep the focus on Observability vs application configuration. Dynatrace will detect all traffic just fine with any configuration.
-:::
-
-1. Before leaving this screen, find the _Base URL_ of your service and copy it.
-1. Confirm it worked by pasting this URL into a new tab of your browser. You should see your service respond just fine behind the apim!
-1. In your Dynabank Operations portal (click orange button top right -> Operations), you can replace the Instamation Web App with the APIM version and click _save_. You should receive the same _succesfully configured_ message.
-
-## Conclusion
-
-Congratulations! You've helped Dynabank modernize speclaity quoting leveraging easy deployments in Azure. With Dynatrace, we've extended visibility into our entire application ecosystem throughout Azure.
-
-In Dynatrace, go back to the services page. Dynatrace automatically stitches together calls from the specialtyAPI out to the Azure Web App through the APIM.
