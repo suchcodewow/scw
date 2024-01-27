@@ -2253,6 +2253,30 @@ function Get-DynatraceToken {
     write-host ""
     read-host -prompt "Press the <any> key to continue"
 }
+function Set-DTSetting {
+    $headers = @{
+        Accept         = "application/json; charset=utf-8"
+        "Content-Type" = "application/json; charset=utf-8"
+        Authorization  = "Api-Token $($config.token))"
+    }
+    #   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
+    #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
+    #   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_NODEJS_BIZEVENTS_HTTP_INCOMING"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_DOTNET_LOG_ENRICHMENT"}}]'
+    #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"DOTNET_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+
+    $data = @{
+        scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload", "logs.ingest", "openTelemetryTrace.ingest")
+        name                = "SCW Token"
+        personalAccessToken = $false
+    }
+    $body = $data | ConvertTo-Json
+    $response = Invoke-RestMethod -Method Post -Uri "https://$tenantURL/api/v2/apiTokens" -Headers $headers -Body $body
+}
 
 # Application Functions
 function Add-CommonSteps {
@@ -2434,3 +2458,67 @@ while ($choices.count -gt 0) {
 #     $using:muFunctions | ForEach-Object { . $_ }
 #     Set-Prefs -u $_
 # }
+
+#   # Enable Log Ingest
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
+
+#   # Enable Node.js Fetch OneAgent feature
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
+
+#   # Enable BizEvents
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Bearer $BEARER_TOKEN" \
+#   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
+
+#   # Enable Node.js - Trace/span context enrichment for logs [Opt-In]
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT"}}]'
+
+#   # Enable Node.js - Trace/span context enrichment for unstructured logs [Opt-In]
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+
+#   # Enable Node.js Business Events [Opt-In] AND the sub-selector to enabled
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_NODEJS_BIZEVENTS_HTTP_INCOMING"}}]'
+
+#   # Enable .NET - Trace/span context enrichment for logs [Opt-In] AND the sub-selector to enabled
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_DOTNET_LOG_ENRICHMENT"}}]'
+
+#   # Enable .NET - Trace/span context enrichment for unstructured logs [Opt-In]
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"DOTNET_LOG_ENRICHMENT_UNSTRUCTURED"}}]'

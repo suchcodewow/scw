@@ -13,17 +13,21 @@ We've developed Instamation (tm) and chosen to deploy it as an Azure Web App for
 ### Deploy
 
 1. In the Azure Console, go to "App Services."
-1. Find and click on your webapp. It will be in the _format scw-webapp-[classname]_.
+1. Type your class id (sessionX#) into the filter top right.
+1. You should see just ONE web app and click to select. It will be in the _format scw-webapp-[classname]_.
 1. Select the Deployment Center (blue highlight) then External Git as the source (green highlight).  
    ![awa1](/img/awa1.png)
-1. Copy the following service repository link into the repository field and type `main` for the branch (blue highlight) then Save (green highlight).
+1. Copy the following service repository link into the repository field:
 
 ```bash
 https://github.com/suchcodewow/instamationsvc
 ```
 
-![awa2](/img/awa2.png)
-
+1. Type `main` for the branch (blue highlight) then Save (green highlight).
+   :::tip
+   The "example/grey" branch example is also named main. You do need to type `main` into this field to be able to save.
+   :::
+   ![awa2](/img/awa2.png)
 1. Go back to the overview page (blue highlight) and click the default domain (green highlight) to see your new service.
    ![awa3](/img/awa3.png)
 1. The deployment will likely take a minute or two. You might see a boilerplate message the first time you click- or it might not respond. When successfully deployed, you should see a simple json response simlar to:
@@ -33,6 +37,10 @@ https://github.com/suchcodewow/instamationsvc
 ```
 
 When this appears, it means your service is working! You are ready to move to the next step.
+
+#### Tab 6: Instamation Web App
+
+Slide the tab for your Azure Web App into the 6th slot.
 
 1. Copy the URL of your azure web service from the address bar at the top of your browser to use later.
 
@@ -44,8 +52,8 @@ When this appears, it means your service is working! You are ready to move to th
 1. At the bottom of the panel, check the agreement box, then click _Add_.
 1. Hang tight for a few seconds until it loads, then click the small browse box:
    ![extension2](/img/extension2.png)
-1. Create a token in Dynatrace with the PaaS template to use here.
-1. Using the image below as a guide, paste in the URL of your tenant adding `/api` to the end. Fill in the environment ID using the first part of the URL, then paste in the Paas token created above.
+1. Briefly switch to Tab #1. In Pepper, choose the option for `Dynatrace: Token Details`. You might need to scroll up slightly to see the output.
+1. Using the image below as a guide, fill in the environment ID, token, and then the server URL.
    ![extension3](/img/extension3.png)
 1. Click _Install OneAgent_ and hang tight until you see _Enjoy monitoring from Dynatrace._ at the top of the screen.
 1. In the _Overview_ page of your web app, click the _Restart_ button.
@@ -56,20 +64,31 @@ For most Dynatrace deployments, only the Environment ID is needed. Since we're u
 
 ### Dynabank & Azure Web App
 
+1. In Tab #6 showing the Instamation service API response, copy the URL from the address bar.
 1. In Dynabank, Log-in using any random name provided with the orange button top right.
 1. Click the orange button top right and click _Operations_.
    ![dynabankwebapp1](/img/dynabankwebapp1.png)
 1. In the _Estimation Service URL box_, paste in the URL of the Instamation service, then click _save_.
-1. Confirm it worked by checking for a _successfully configured_ message. The App Name should reflect your user id. (The value is retrieved directly from your web service to make sure it worked.)
+1. Confirm it worked by checking for a _successfully configured_ message. The App Name should reflect your user id (sessionX#). (The value is retrieved directly from your web service to make sure it worked.)
    ![dynabankwebapp2](/img/dynabankwebapp2.png)
-1. New Collecticare quotes will now automatically by quoted by the Instamation Service! You can check on it by going to Administration:
+1. New Collecticare quotes will now automatically by quoted by the Instamation Service. You can check on it by going to Administration:
    ![dynabankwebapp3](/img/dynabankwebapp3.png)
-1. And reviewing new Collecticare quotes on the first administration panel. Instead of quotes showing up in the _new_ state, they will show as 'quoted' instead:
+1. Review new Collecticare quotes on the first administration panel. Instead of quotes showing up in the _new_ state, they will show as _quoted_ instead:
    ![dynabankwebapp4](/img/dynabankwebapp4.png)
+
+### Diagnostic settings
+
+1. Back in Tab #3, scroll down to diagnostic settings and click (green box).
+1. Click _Add Diagnostic Setting_.
+   ![dynabankwebapp1](/img/webappsetting.png)
+1. Click _App Service Application Logs_ (green box) and click _Stream to Event Hub_ (blue box).
+1. Make sure the hub namespace matches below & select the shown event hub.
+   ![dynabankwebapp1](/img/appdiagnostic.png)
+1. Click _save_ in the top left corner.
 
 #### Dynabank & APIM
 
-Instamation also works through Azure APIM (API Management).
+Once the Dynabank business teams confirmed initial success of Instamation, our next goal is to configure it to use Azure API Management.
 
 1. In Azure, search for 'APIM' and click on _API Management services_.
 1. Click on the APIM for your region in the format _scw-[region]-apim_.
@@ -77,7 +96,8 @@ Instamation also works through Azure APIM (API Management).
    ![apim1](/img/apim1.png)
 1. And then click on _App Service_.
    ![apim2](/img/apim2.png)
-1. In the configuration box in the _App Service_ section, Browse for and select your Instamation web application.
+1. Click the `Browese` button.
+1. Type in your id (sessionX#). You should see ONE matching App Service. Select the App Service & click select at the bottom.
 1. Copy the name provided into the API URL suffix box. Your Base URL should look something like:
 
 ```bash
@@ -91,9 +111,15 @@ https://scw-useast2-apim.azure-api.net/scw-webapp-colossalcactus
    ![apim4](/img/apim4.png)
 
 :::tip Lab vs Real World
-In a real-world scenario we wouldn't go without a subscription/authorization mechanism. We're doing it here to keep the focus on Observability vs application configuration. Dynatrace will detect all traffic just fine with security in place.
+In a real-world scenario we wouldn't go without a subscription/authorization mechanism. We're doing it here to keep the focus on Observability vs application configuration. Dynatrace will detect all traffic just fine with any configuration.
 :::
 
-4. Before leaving this screen, find the _Base URL_ of your service and copy it.
+1. Before leaving this screen, find the _Base URL_ of your service and copy it.
 1. Confirm it worked by pasting this URL into a new tab of your browser. You should see your service respond just fine behind the apim!
 1. In your Dynabank Operations portal (click orange button top right -> Operations), you can replace the Instamation Web App with the APIM version and click _save_. You should receive the same _succesfully configured_ message.
+
+## Conclusion
+
+Congratulations! You've helped Dynabank modernize speclaity quoting leveraging easy deployments in Azure. With Dynatrace, we've extended visibility into our entire application ecosystem throughout Azure.
+
+In Dynatrace, go back to the services page. Dynatrace automatically stitches together calls from the specialtyAPI out to the Azure Web App through the APIM.

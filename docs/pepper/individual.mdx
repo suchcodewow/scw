@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Azure & Dynatrace
 
-## Welcome!!
+## Welcome!
 
 Welcome to the Azure & Dynatrace 2024 Hot session!  
 We've got a jam packed session today with lots of (hopefully!) fun and informative content.
@@ -61,6 +61,8 @@ curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pe
 | Web App          | scw-webapp-[classname]                      |
 | Dynatrace        | tenant shown in University & 5/5 pods ready |
 
+3. Finally, confirm that the next step in Pepper is to download application yaml files.
+
 We'll use Pepper at several points during the session. You can leave it running. If you do exit, you can use 'up-arrow' to recall the command.  
 Or you can just copy and paste from above into your terminal again.
 
@@ -72,7 +74,7 @@ You're already here. You did it!
 
 Confirm login to [Azure portal](https://portal.azure.com) with [classname]@suchcodewow.io. Password provided in Dynatrace University.
 
-[OPTIONAL] As a DevOps Cloud admin, you can check out the resources pre-deployed for you.
+[OPTIONAL] As a Dynabank DevOps Cloud admin, you have full access to the Azure environment. You can confirm the resources below.
 
 Resources created:
 
@@ -86,30 +88,25 @@ Resources created:
 ### Tab 4: Dynatrace (Dynatrace Administrator)
 
 1. Login to Dynatrace using tenant URL and credentials provided in Dynatrace University.
-2. Confirm that Dynatrace is connected to your Azure resources & make the following updates.
-3. Open the "Apps" page.
-4. Click Kubernetes (not the "new" one).
-5. Check that you see a cluster running similar to "k8s[classname]".
+1. Open the "Apps" page.
+1. Click Kubernetes (not the "new" one).
+1. Confirm you see a cluster running similar to "k8s[classname]".
 
 :::tip
 We'll walk through these steps together, but if you're feeling a bit saucy and already ahead of the game, please feel free to check on these yourself.  
 (Honestly we're as excited as you are.)
 :::
 
-#### Confirm Logs Settings
+#### Confirm Logs Ingest
 
 1. Go to Settings -> Log Monitoring -> Log Ingest Rules.
 1. If the _[Built-in] Ingest all logs_ rule is NOT enabled, please enable it.
-1. Click _Save Changes_ bottom left of screen.
+1. Click _Save Changes_ bottom left of screen if you turned it on.
 
-#### Confirm Bizevents Settings
+#### Setup Business Event Ingest
 
-1. Go to Settings -> Preferences -> OneAgent features.
-1. In the Filter by box, type `business event` and press ENTER: ![bizevent1](/img/bizevent1.png)
-1. Toggle ON _Business Event [Opt-in]_ for .NET, Go, Java, Node.js, and Webserver. Select the drop-down arrow for each and toggle ON _Instrucmentation enabled_.
-1. Click _Save Changes_ bottom left of screen.
 1. Go to Settings -> Business Analytics -> OneAgent.
-1. Click _App new capture rule_ and name it 'AllEvents'.
+1. Click _Add new capture rule_ and name it 'AllEvents'.
 1. Click _Add trigger_ and set the following values:
 
 | Key         | Value          |
@@ -146,3 +143,24 @@ We'll walk through these steps together, but if you're feeling a bit saucy and a
 | Path        | \*              |
 
 1. Click _Save changes_ in the bottom left.
+
+#### Confirm OneAgent Settings
+
+1. Go to Settings -> Preferences -> OneAgent features.
+1. In the Filter by box, type `business event` and press ENTER.
+1. Toggle ON _Business Event [Opt-in]_ for .NET, Go, Java, Node.js, and Webserver. Select the drop-down arrow for each and toggle ON _Instrucmentation enabled_.
+   ![oneagentpref1](/img/bizevent1.png)
+1. Click _Save Changes_ bottom left of screen.
+1. Clear the Filter box (click blue x) and type `node fetch` and press ENTER.
+   ![node fetch](/img/settingfetch.png)
+1. Click _Save Changes_ bottom left of screen.
+1. Clear the Filter box (click blue x) and type `node log` and press ENTER.
+   ![node fetch](/img/nodelog.png)
+1. Click _Save Changes_ bottom left of screen.
+1. Clear the Filter box (click blue x) and type `net` and press ENTER.
+   ![node fetch](/img/settingnet.png)
+1. Click _Save Changes_ bottom left of screen.
+
+## Conclusion
+
+With configuration set, we're ready to deploy resources.

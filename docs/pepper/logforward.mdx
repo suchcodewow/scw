@@ -4,19 +4,28 @@ sidebar_position: 4
 
 # Hands On: Azure Log Forwarder
 
-## Azure Log Forwarder
+With metrics and traces automatically ingested and baselined, our company wants to include logs as well. The Collecticare development teams use logs to write out critical business information like policy estimates and quoting decisions.
+
+## Deployment
+
+1. In Tab #1, run the Pepper command to retrieve Dynatrace token information.
+1. Drag-select all EXPORT commands shown. Right-click and copy. Press _ENTER_ to quit Pepper.
+1. At the BASH command prompt, paste the EXPORT commands and press _ENTER_.
+1. Copy the Log Forwarder function below & paste it into the terminal window.
 
 ```bash
 wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/latest/download/dynatrace-azure-logs.sh -O dynatrace-azure-logs.sh && chmod +x ./dynatrace-azure-logs.sh \
 && ./dynatrace-azure-logs.sh --deployment-name $DEPLOYMENT_NAME --target-url $TARGET_URL --target-api-token $TARGET_API_TOKEN --resource-group $RESOURCE_GROUP --event-hub-connection-string $EVENT_HUB_CONNECTION_STRING --require-valid-certificate true
 ```
 
-## Fix (DO NOT USE unless instructed)
+1. It will take a few minutes to deploy all resources.
+
+### Fix (DO NOT USE unless instructed)
 
 ```bash
 wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/download/release-0.1.6/dynatrace-azure-log-forwarder.zip -O dynatrace-azure-log-forwarder.zip
 ```
 
 ```bash
-az webapp deployment source config-zip -n lognerdycoast-function -g scw-group-nerdycoast --src dynatrace-azure-log-forwarder.zip
+az webapp deployment source config-zip -n $DEPLOYMENT_NAME -g scw-group-nerdycoast --src dynatrace-azure-log-forwarder.zip
 ```
