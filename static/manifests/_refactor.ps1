@@ -716,6 +716,11 @@ function Update-AzureMultiUser {
         }
         ### If changes made refresh
         if ($changes -gt 0) { Get-AzureStatus;$changes = 0 }
+        ### Fix nodepool scaledown issue.  Microsoft should be shot.  repeatedly.
+        if ($config.azureClusterStatus -eq "Running" -and $config.azureClusterProvision -eq "Failed") {
+            Send-Update -c "Cluster $($config.azureCluster) is failed. Resetting." -r "az aks nodepool scale --cluster-name $($config.azureCluster) --resource-group $($config.azureGroup) --name nodepool1 --node-count 1"
+            Send-Update -c "Cluster $($config.azureCluster) updating to reset." -r "az aks update -n $($config.azureCluster) -g $($config.azureGroup) -y"
+        }
         ### Get cluster credentials, deploy Dynatrace
         if ($config.muDeployDynatrace -eq $true -and $config.dynatraceStatus -ne "Running") {
             if ($config.dynatraceTenant -and $config.dynatraceToken) {
@@ -752,19 +757,19 @@ function Update-AzureMultiUser {
             }
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
-            $changes++
-            $counter = 0
-            Do {
-                $counter++
-                if ($counter -gt 1) {
-                    $msgLevel = 2
-                    $msgRetry = "RETRY [$counter]: "
-                }
-                else {
-                    $msgLevel = 1
-                }
-                $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
-            } until ($success)
+            # $changes++
+            # $counter = 0
+            # Do {
+            #     $counter++
+            #     if ($counter -gt 1) {
+            #         $msgLevel = 2
+            #         $msgRetry = "RETRY [$counter]: "
+            #     }
+            #     else {
+            #         $msgLevel = 1
+            #     }
+            $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+            # } until ($success)
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
@@ -1053,6 +1058,7 @@ function Get-AzureStatus {
     if ($aksExists.state) {
         Send-Update -t 1 -content " yes:$($aksExists.state)"
         Set-Prefs -k "azureClusterStatus" -v $aksExists.state
+        Set-Prefs -k "azureClusterProvision" -v $aksExists.provision
         if ($aksExists.state -eq "Stopped") { Set-Prefs -k "dynatraceStatus" -v $false }
     }
     else {
@@ -1094,7 +1100,7 @@ function Get-AzureStatus {
         Set-Prefs -k "azureWebAppStatus" -v $false
     }
     #Dynatrace
-    if ($config.azureClusterStatus -eq "Running") {
+    if ($config.azureClusterStatus -eq "Running" -and $config.azureClusterProvision -eq "Succeeded") {
         if ($config.multiUserMode -eq $true) {
             $kubeFile = "--file '~/scwKube/$($config.userName).kube'"
             $kube = "--kubeconfig ./scwKube/$($config.userName).kube"
