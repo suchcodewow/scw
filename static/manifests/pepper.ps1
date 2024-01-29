@@ -54,7 +54,7 @@ function Send-Update {
         write-host @Params $screenOutput
     }
     if ($whatIf) { return }
-    if ($run -and $errorSuppression -and $outputSuppression) { return invoke-expression $run 2>$null 1>$null }
+    if ($run -and $errorSuppression -and $outputSuppression) { return invoke-expression $run 1>$null }
     if ($run -and $errorSuppression) { return invoke-expression $run 2>$null }
     if ($run -and $outputSuppression) { return invoke-expression $run 1>$null }
     if ($run) { return invoke-expression $run }
@@ -213,7 +213,7 @@ function Add-Choice() {
 }
 function Get-Choice() {
     # Present list of options and get selection
-    write-output $choices | sort-object -property Option | format-table  $choiceColumns | Out-Host
+    write-output $choices | sort-object -property Option | format-table $choiceColumns | Out-Host
     $cmd_selected = read-host -prompt "Which option to execute? [<enter> to quit]"
     if (-not($cmd_selected)) {
 
@@ -221,7 +221,7 @@ function Get-Choice() {
         exit
     }
     if ($cmd_selected -eq 0) { Get-Quote }
-    return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object  -first 1 
+    return $choices | Where-Object { $_.Option -eq $cmd_selected } | Select-Object -first 1 
 }
 function Get-Quote {
     $list = @("That, I DID know.", "I was having twelve percent of a moment.", "OMG, that was really violent!", "Hang on. I got you, Kid.", "And sometimes, I take out the trash.")
@@ -393,7 +393,7 @@ function Get-UserName {
         "sparkling",
         "young",
         "delicious"
-    );
+    )
       
     $Name = @(
         "apple",
@@ -586,7 +586,7 @@ function Set-Provider() {
         if (-not($newProvider)) {
             return
         }
-        $providerSelected = $providerList | Where-Object { $_.Option -eq $newProvider } | Select-Object  -first 1
+        $providerSelected = $providerList | Where-Object { $_.Option -eq $newProvider } | Select-Object -first 1
         if (-not $providerSelected) {
             write-host -ForegroundColor red "`r`nY U no pick valid option?" 
         }
@@ -794,7 +794,7 @@ function Add-AzureMultiUserSteps() {
     $muCreatedClusters = $muUsers | where-object { $_.clusterExists -eq $true }
     $muCreatedApps = $muUsers | where-object { $_.appExists -eq $true }
     $muDynatraceState = $muUsers | where-object { $_.dynatraceState -eq $true }
-    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser  -c "Users: $($muUsers.count) / Clusters: $($muCreatedClusters.count) / Dynatrace: $($muDynatraceState.count) / Webapps: $($muCreatedApps.count)"
+    Add-Choice -k "AZMCU" -d "Create Attendee Accounts" -f Add-AzureMultiUser -c "Users: $($muUsers.count) / Clusters: $($muCreatedClusters.count) / Dynatrace: $($muDynatraceState.count) / Webapps: $($muCreatedApps.count)"
     if ($existingUsers.count -gt 0) {
         Add-Choice -k "AZMDL" -d "  List current Attendee Accounts" -f Get-AzureMultiUser 
         Add-Choice -k "AZMDU" -d "  Remove Attendee Accounts" -f Remove-AzureMultiUser
@@ -890,7 +890,7 @@ function Remove-AzureMultiUser() {
         # Confirm Delete
         Do {
             Start-sleep -s 2
-            $userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
+            $userExists = Send-Update -t 0 -e -c "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
         } until (-not $userExists)
 
 
@@ -1226,7 +1226,7 @@ function Add-AWSMultiUserSteps() {
     # Now that we have list of everyone, offer options to adjust
     # $existingUsers = Send-Update -c "Get Attendees" -r "aws iam get-group --group-name Attendees --no-paginate" | Convertfrom-Json
     # $attendeeCount = $existingUsers.Users.count - 1
-    Add-Choice -k "AWSMCU" -d "Create Attendee Accounts" -f Add-AWSMultiUser  -c "Current users: $($muUsers.count)"
+    Add-Choice -k "AWSMCU" -d "Create Attendee Accounts" -f Add-AWSMultiUser -c "Current users: $($muUsers.count)"
     if ($muUsers.count -eq 0) { return }
     # We have attendees.  Provide Options to manage
     Add-Choice -k "AWSMDL" -d "  List current Attendee Accounts" -f Get-AWSMultiUser
@@ -1340,7 +1340,7 @@ function Add-AWSMultiUser() {
             $user = Send-Update -t 1 -c "Creating user $newUserName" -r "aws iam create-user --user-name $newUserName" | ConvertFrom-Json
 
         } Until ($user)
-        Send-Update -t 1 -o -c  "Add login profile for $newUserName " -r "aws iam create-login-profile --user-name $newUserName --password 1Dynatrace##"
+        Send-Update -t 1 -o -c "Add login profile for $newUserName " -r "aws iam create-login-profile --user-name $newUserName --password 1Dynatrace##"
         Send-Update -t 1 -c "Add $newUserName to group" -r "aws iam add-user-to-group --group-name Attendees --user-name $newUserName"
         Send-Update -t 1 -c "Tagging $newUserName" -r "aws iam tag-user --user-name $newUserName --tags Key=type,Value=normal"
     }
@@ -1726,7 +1726,7 @@ function Remove-GCPMultiUser() {
             # Confirm Delete
             Do {
                 Start-sleep -s 2
-                $userExists = Send-Update -t 0 -e -c  "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
+                $userExists = Send-Update -t 0 -e -c "Checking if user still exists" -r "az ad user show --id $($user.Id)" | Convertfrom-Json
             } until (-not $userExists)
         }
         else {
@@ -1806,7 +1806,7 @@ function Remove-GCPMultiUserCluster() {
 function Add-GCPMultiUserSteps() {
     # User Options
     $existingUsers = Send-Update -c "Get Attendees" -r "gcloud identity groups memberships list --group-email=attendees@suchcodewow.com  --filter='-roles.name:OWNER' --format=json" | Convertfrom-Json
-    Add-Choice -k "GCPMCU" -d "Create Attendee Accounts" -f Add-GCPMultiUser  -c "Current users: $($existingUsers.count)"
+    Add-Choice -k "GCPMCU" -d "Create Attendee Accounts" -f Add-GCPMultiUser -c "Current users: $($existingUsers.count)"
  
     #existingUsers fields: displayName, id, userPrincipalName
     if ($existingUsers.count -gt 0) {
@@ -1938,7 +1938,7 @@ function Get-PodReadyCount {
     param(
         [string] $namespace # namespace to count pods
     )
-    $allPods = kubectl get pods -n $namespace  -ojson | Convertfrom-Json
+    $allPods = kubectl get pods -n $namespace -ojson | Convertfrom-Json
     $totalPods = $allPods.items.count
     $runningPods = ($allPods.items.status.containerStatuses.ready | Where-Object { $_ -eq "True" }).count
     return "$runningPods/$totalPods pods READY"
@@ -2221,6 +2221,7 @@ function Get-DynatraceToken {
     write-host "export RESOURCE_GROUP=$($config.resourceGroup)"
     write-host "export EVENT_HUB_CONNECTION_STRING=""$($authRule.primaryConnectionString)"""
     write-host ""
+    read-host -prompt "press the <any> key to continue."
 }
 
 # Application Functions
@@ -2235,7 +2236,7 @@ function Add-CommonSteps() {
         if ($existingNamespaces.contains("dynatrace")) {
             # Dynatrace installed.  Add status and removal options
             Add-Choice -k "DTCFG" -d "Dynatrace: Remove" -f "Remove-NameSpace -n dynatrace" -c "DT tenant: $($config.tenantID)"
-            Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace)  -f "Get-Pods -n dynatrace"
+            Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace) -f "Get-Pods -n dynatrace"
             Add-Choice -k "TOKENDT" -d "Dynatrace: Token Details" -f Get-DynatraceToken
         }
         elseif (test-path "$($config.textUserId)-dynakube.yaml") {
@@ -2243,7 +2244,7 @@ function Add-CommonSteps() {
         }
         else {
             #3 Nothing done for dynatrace yet.  Add option to download YAML
-            Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
+            Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml" -f Set-DTConfig
         }
     }
     else {
@@ -2272,7 +2273,7 @@ function Add-CommonSteps() {
             }
         }
         # Add first Dynatrace option
-        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml"  -f Set-DTConfig
+        Add-Choice -k "DTCFG" -d "dynatrace: Create dynakube.yaml" -f Set-DTConfig
     }
     # If Dynatrace is running, we're able to download yaml and adjust as needed
     if ($DTconnected -and $existingNamespaces.contains("dynatrace")) {
@@ -2305,9 +2306,9 @@ function Add-CommonSteps() {
                 # Namespace exists- add status option
                 Add-Choice -k "STATUS$ns" -d "$($ns): Refresh/Show Pods" -c "$(Get-PodReadyCount -n $ns)" -f "Get-Pods -n $ns"
                 # add restart option
-                Add-Choice -k "RESTART$ns" -d "$($ns): Reset Pods" -c  $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
+                Add-Choice -k "RESTART$ns" -d "$($ns): Reset Pods" -c $(Get-AppUrls -n $ns ) -f "Restart-Pods -n $ns"
                 # add remove option
-                Add-Choice -k "DEL$ns" -d "$($ns): Remove Pods"  -f "Remove-NameSpace -n $ns"
+                Add-Choice -k "DEL$ns" -d "$($ns): Remove Pods" -f "Remove-NameSpace -n $ns"
                 # parse any custom options
                 # Get-CustomSteps -n $ns
             }
