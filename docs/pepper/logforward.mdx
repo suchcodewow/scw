@@ -20,7 +20,9 @@ wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/
 
 1. It will take a few minutes to deploy all resources.
 
-### Fix (DO NOT USE unless instructed)
+#### Fix (DO NOT USE unless instructed)
+
+We discovered during testing that sometimes Azure can be just a little bit grumpy about deploying all of the resources for a functino app at once. Redeploying the function app is super easy- but wanted to have these instructions ready if needed.
 
 ```bash
 wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/download/release-0.1.6/dynatrace-azure-log-forwarder.zip -O dynatrace-azure-log-forwarder.zip
