@@ -832,6 +832,7 @@ function Remove-AzureMultiUser {
     $eventAttendees | ForEach-Object -ThrottleLimit 50 -Parallel {
         $using:muFunctions | ForEach-Object { . $_ }
         Set-Prefs -u $_
+        Set-Resources
         # Delete User and all resources
         Send-Update -t 1 -c "$($config.loginEmail) : Remove resource group and content" -r "az group delete --resource-group $($config.azureGroup) -y"
         Send-Update -t 1 -c "$($config.loginEmail) : Remove account" -r "az ad user delete --id $($config.loginEmail)"
