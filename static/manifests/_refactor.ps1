@@ -758,6 +758,7 @@ function Update-AzureMultiUser {
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
             Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
@@ -1722,7 +1723,6 @@ function Get-GCPMultiUser {
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.preferredMemberKey.id
-
 }
 function Remove-GCPMultiUser {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
