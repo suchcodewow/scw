@@ -1727,7 +1727,6 @@ function Get-GCPMultiUser {
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.preferredMemberKey.id
-
 }
 function Remove-GCPMultiUser {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
