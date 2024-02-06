@@ -1423,7 +1423,6 @@ function Add-AWSSteps {
         Send-Update -c "AWS cluster role: not found" -t 1
         Set-Prefs -k AWSclusterRoleArn
     }
-
     # Component: AWS node role
     #$targetComponents++
     set-Prefs -k AWSnodeRoleName -v "scw-awsngrole-$stackId"
@@ -1437,7 +1436,6 @@ function Add-AWSSteps {
         Send-Update -c "AWS node role: not found" -t 1
         Set-Prefs -k AWSnodeRoleArn
     }
-
     # Components: Cloudformation, vpc, subnets, and security group
     set-prefs -k AWScfstack -v "scw-AWSstack-$stackId" 
     $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
@@ -1445,7 +1443,6 @@ function Add-AWSSteps {
         $componentsReady++
         Send-Update -c "Cloudformation: exists" -t 1
         Set-Prefs -k AWScfstackArn -v $($cfstackExists.Stacks.StackId)
-        
         # Get Outputs needed for cluster creation
         $cfSecurityGroup = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SecurityGroups" } | Select-Object -expandproperty OutputValue
         $cfSubnets = $cfstackExists.Stacks.Outputs | Where-Object { $_.OutputKey -eq "SubnetIds" } | Select-Object -expandproperty OutputValue
