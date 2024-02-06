@@ -716,6 +716,11 @@ function Update-AzureMultiUser {
         }
         ### If changes made refresh
         if ($changes -gt 0) { Get-AzureStatus;$changes = 0 }
+        ### Fix nodepool scaledown issue.  Microsoft should be shot.  repeatedly.
+        if ($config.azureClusterStatus -eq "Running" -and $config.azureClusterProvision -eq "Failed") {
+            Send-Update -c "Cluster $($config.azureCluster) is failed. Resetting." -r "az aks nodepool scale --cluster-name $($config.azureCluster) --resource-group $($config.azureGroup) --name nodepool1 --node-count 1"
+            Send-Update -c "Cluster $($config.azureCluster) updating to reset." -r "az aks update -n $($config.azureCluster) -g $($config.azureGroup) -y"
+        }
         ### Get cluster credentials, deploy Dynatrace
         if ($config.muDeployDynatrace -eq $true -and $config.dynatraceStatus -ne "Running") {
             if ($config.dynatraceTenant -and $config.dynatraceToken) {
@@ -752,19 +757,19 @@ function Update-AzureMultiUser {
             }
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
-            $changes++
-            $counter = 0
-            Do {
-                $counter++
-                if ($counter -gt 1) {
-                    $msgLevel = 2
-                    $msgRetry = "RETRY [$counter]: "
-                }
-                else {
-                    $msgLevel = 1
-                }
-                $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
-            } until ($success)
+            # $changes++
+            # $counter = 0
+            # Do {
+            #     $counter++
+            #     if ($counter -gt 1) {
+            #         $msgLevel = 2
+            #         $msgRetry = "RETRY [$counter]: "
+            #     }
+            #     else {
+            #         $msgLevel = 1
+            #     }
+            $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+            # } until ($success)
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
@@ -827,6 +832,7 @@ function Remove-AzureMultiUser {
     $eventAttendees | ForEach-Object -ThrottleLimit 50 -Parallel {
         $using:muFunctions | ForEach-Object { . $_ }
         Set-Prefs -u $_
+        Set-Resources
         # Delete User and all resources
         Send-Update -t 1 -c "$($config.loginEmail) : Remove resource group and content" -r "az group delete --resource-group $($config.azureGroup) -y"
         Send-Update -t 1 -c "$($config.loginEmail) : Remove account" -r "az ad user delete --id $($config.loginEmail)"
@@ -1053,6 +1059,7 @@ function Get-AzureStatus {
     if ($aksExists.state) {
         Send-Update -t 1 -content " yes:$($aksExists.state)"
         Set-Prefs -k "azureClusterStatus" -v $aksExists.state
+        Set-Prefs -k "azureClusterProvision" -v $aksExists.provision
         if ($aksExists.state -eq "Stopped") { Set-Prefs -k "dynatraceStatus" -v $false }
     }
     else {
@@ -1094,7 +1101,7 @@ function Get-AzureStatus {
         Set-Prefs -k "azureWebAppStatus" -v $false
     }
     #Dynatrace
-    if ($config.azureClusterStatus -eq "Running") {
+    if ($config.azureClusterStatus -eq "Running" -and $config.azureClusterProvision -eq "Succeeded") {
         if ($config.multiUserMode -eq $true) {
             $kubeFile = "--file '~/scwKube/$($config.userName).kube'"
             $kube = "--kubeconfig ./scwKube/$($config.userName).kube"
@@ -2173,7 +2180,7 @@ function Add-Dynatrace {
     Send-Update -c " Activated!" -t 1
     Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
     Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
-    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f $($config.textUserId)-dynakube.yaml"
+    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
     Add-CommonSteps
 }
 function Get-DTconnected {
@@ -2252,6 +2259,30 @@ function Get-DynatraceToken {
     write-host ""
     read-host -prompt "Press the <any> key to continue"
 }
+function Set-DTSetting {
+    $headers = @{
+        Accept         = "application/json; charset=utf-8"
+        "Content-Type" = "application/json; charset=utf-8"
+        Authorization  = "Api-Token $($config.token))"
+    }
+    #   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
+    #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
+    #   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_NODEJS_BIZEVENTS_HTTP_INCOMING"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_DOTNET_LOG_ENRICHMENT"}}]'
+    #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"DOTNET_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+
+    $data = @{
+        scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload", "logs.ingest", "openTelemetryTrace.ingest")
+        name                = "SCW Token"
+        personalAccessToken = $false
+    }
+    $body = $data | ConvertTo-Json
+    $response = Invoke-RestMethod -Method Post -Uri "https://$tenantURL/api/v2/apiTokens" -Headers $headers -Body $body
+}
 
 # Application Functions
 function Add-CommonSteps {
@@ -2268,7 +2299,7 @@ function Add-CommonSteps {
             Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace) -f "Get-Pods -n dynatrace"
             Add-Choice -k "TOKENDT" -d "Dynatrace: Token Details" -f Get-DynatraceToken
         }
-        elseif (test-path "$($config.textUserId)-dynakube.yaml") {
+        elseif (test-path "dynakube.yaml") {
             Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "Target DT tenant: $($config.tenantID)" -function Add-Dynatrace
         }
         else {
@@ -2433,3 +2464,67 @@ while ($choices.count -gt 0) {
 #     $using:muFunctions | ForEach-Object { . $_ }
 #     Set-Prefs -u $_
 # }
+
+#   # Enable Log Ingest
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
+
+#   # Enable Node.js Fetch OneAgent feature
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
+
+#   # Enable BizEvents
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Bearer $BEARER_TOKEN" \
+#   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
+
+#   # Enable Node.js - Trace/span context enrichment for logs [Opt-In]
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT"}}]'
+
+#   # Enable Node.js - Trace/span context enrichment for unstructured logs [Opt-In]
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+
+#   # Enable Node.js Business Events [Opt-In] AND the sub-selector to enabled
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_NODEJS_BIZEVENTS_HTTP_INCOMING"}}]'
+
+#   # Enable .NET - Trace/span context enrichment for logs [Opt-In] AND the sub-selector to enabled
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_DOTNET_LOG_ENRICHMENT"}}]'
+
+#   # Enable .NET - Trace/span context enrichment for unstructured logs [Opt-In]
+#   curl "$DT_ENV_URL/api/v2/settings/objects" \
+#   -X POST \
+#   -H 'Accept: application/json; charset=utf-8' \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
+#   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"DOTNET_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
