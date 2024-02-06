@@ -757,19 +757,8 @@ function Update-AzureMultiUser {
             }
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
-            # $changes++
-            # $counter = 0
-            # Do {
-            #     $counter++
-            #     if ($counter -gt 1) {
-            #         $msgLevel = 2
-            #         $msgRetry = "RETRY [$counter]: "
-            #     }
-            #     else {
-            #         $msgLevel = 1
-            #     }
-            $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
-            # } until ($success)
+            Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
