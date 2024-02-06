@@ -682,7 +682,7 @@ function Get-AzureMultiUserCache {
     # Get available config files
     if (-not (test-path "~/scwConfig/")) { return }
     $configAll = foreach ($i in Get-ChildItem -path "~/scwConfig/*.conf") { $i | Get-Content | Convertfrom-Json }
-    $configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
+    $script:configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
     $script:attendeeCount = $configEvent.count
     $script:azureGroups = ($configEvent | where-object { $_.azureGroupStatus -eq $true }).count
     $script:azureClustersRunning = ($configEvent | where-object { $_.azureClusterStatus -eq "Running" }).count
@@ -718,7 +718,7 @@ function Update-AzureMultiUser {
         if ($changes -gt 0) { Get-AzureStatus;$changes = 0 }
         ### Get cluster credentials, deploy Dynatrace
         if ($config.muDeployDynatrace -eq $true -and $config.dynatraceStatus -ne "Running") {
-            if ($config.dynatraceTenant -and $config.dynatraceToken) {
+            if ($config.dynatraceTenant -ne $false -and $config.dynatraceToken -ne $false) {
                 $changes++
                 if ($config.dynatraceTenant.substring(0, 8) = "https://") {
                     $url = $config.dynatraceTenant.substring(8).replace(".sprint.apps",".sprint")
@@ -818,7 +818,10 @@ function Remove-AzureMultiUser {
         $using:muFunctions | ForEach-Object { . $_ }
         Set-Prefs -u $_
         # Delete User and all resources
-        Send-Update -t 1 -c "$($config.loginEmail) : Remove resource group and content" -r "az group delete --resource-group $($config.azureGroup) -y"
+        get-AzureStatus
+        if ($config.azureGroupStatus) {
+            Send-Update -t 1 -c "$($config.loginEmail) : Remove resource group and content" -r "az group delete --resource-group $($config.azureGroup) -y"
+        }
         Send-Update -t 1 -c "$($config.loginEmail) : Remove account" -r "az ad user delete --id $($config.loginEmail)"
         # Confirm Delete
         Do {
@@ -1054,6 +1057,10 @@ function Get-AzureStatus {
         $scwCsv = Get-Content "scw.csv" | ConvertFrom-Csv | where-object { $_.user -eq $config.loginEmail }
         Set-Prefs -k "dynatraceTenant" -v $scwCsv.tenant
         Set-PRefs -k "dynatraceToken" -v $scwCsv.token
+    }
+    else {
+        Set-Prefs -k "dynatraceTenant" -v $false
+        set-Prefs -k "dynatraceToken" -v $false
     }
     #ServicePlan
     $planExists = Send-Update -t 1 -append -c "Azure: Web App Plan exists?" -r "az appservice plan list --query ""[?name=='$($config.azureServicePlan)']""" | Convertfrom-Json
