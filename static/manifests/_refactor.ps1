@@ -2254,6 +2254,7 @@ function Set-DTSetting {
         "Content-Type" = "application/json; charset=utf-8"
         Authorization  = "Api-Token $($config.token))"
     }
+    # captured options for configuring settings
     #   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
     #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
     #   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
