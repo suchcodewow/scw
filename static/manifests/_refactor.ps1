@@ -96,7 +96,7 @@ function Get-Prefs {
     [System.Collections.ArrayList]$script:choices = @()
     $script:ProgressPreference = "SilentlyContinue"
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
-    Set-Prefs -k yamlList -v @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic", "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
+    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic", "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
     if ($outputLevel -eq 0) {
         $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties")
         $script:providerColumns = @("option", "provider", "name", "identifier", "userid", "default")
@@ -683,6 +683,7 @@ function Get-AzureMultiUserCache {
     if (-not (test-path "~/scwConfig/")) { return }
     $configAll = foreach ($i in Get-ChildItem -path "~/scwConfig/*.conf") { $i | Get-Content | Convertfrom-Json }
     $script:configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
+    $script:configEvent = $configAll | where-object { $_.muEvent -eq $config.muEvent }
     $script:attendeeCount = $configEvent.count
     $script:azureGroups = ($configEvent | where-object { $_.azureGroupStatus -eq $true }).count
     $script:azureClustersRunning = ($configEvent | where-object { $_.azureClusterStatus -eq "Running" }).count
@@ -716,6 +717,11 @@ function Update-AzureMultiUser {
         }
         ### If changes made refresh
         if ($changes -gt 0) { Get-AzureStatus;$changes = 0 }
+        ### Fix nodepool scaledown issue.  Microsoft should be shot.  repeatedly.
+        if ($config.azureClusterStatus -eq "Running" -and $config.azureClusterProvision -eq "Failed") {
+            Send-Update -c "Cluster $($config.azureCluster) is failed. Resetting." -r "az aks nodepool scale --cluster-name $($config.azureCluster) --resource-group $($config.azureGroup) --name nodepool1 --node-count 1"
+            Send-Update -c "Cluster $($config.azureCluster) updating to reset." -r "az aks update -n $($config.azureCluster) -g $($config.azureGroup) -y"
+        }
         ### Get cluster credentials, deploy Dynatrace
         if ($config.muDeployDynatrace -eq $true -and $config.dynatraceStatus -ne "Running") {
             if ($config.dynatraceTenant -ne $false -and $config.dynatraceToken -ne $false) {
@@ -752,13 +758,12 @@ function Update-AzureMultiUser {
             }
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
-            $changes++
-            Send-Update -t 1 -c "Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+            Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
+
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
             Send-Update -t 1 -c "Putting Web App $($config.azureWebApp) to sleep." -r "az webapp stop -g $($config.azureGroup) -n $($config.azureWebApp)"
-    
         }
         if ($config.azureClusterStatus -eq "Stopped" -and $config.muRunning -eq $true) {
             $changes++
@@ -817,6 +822,7 @@ function Remove-AzureMultiUser {
     $eventAttendees | ForEach-Object -ThrottleLimit 50 -Parallel {
         $using:muFunctions | ForEach-Object { . $_ }
         Set-Prefs -u $_
+        Set-Resources
         # Delete User and all resources
         get-AzureStatus
         if ($config.azureGroupStatus) {
@@ -893,10 +899,11 @@ function Get-AzureMultiUserEvent {
     Add-AzureMultiUserSteps
 }
 function Get-AzureMultiUser {
-    $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group $($config.muEvent)" | Convertfrom-Json
-    write-host "`rPassword for accounts is: 1Dynatrace##"
-    write-host ""
-    $existingUsers.userPrincipalName | sort-object
+    if ($configEvent) {
+        $configEvent | format-table muEvent, loginEmail, azureClusterStatus,azureWebAppStatus, dynatraceStatus,DynatraceTenant -wrap
+        $configEvent | select-object muEvent, loginEmail, azureCluster,azureClusterStatus,azureWebApp,azureWebAppStatus,DynatraceTenant, dynatraceToken, dynatraceStatus | export-csv "output.csv"
+        write-host "csv version saved to: output.csv"
+    }
 }
 function Set-AzureMultiUserRunning {
     if ($config.muRunning -eq $true) {
@@ -1013,7 +1020,7 @@ function Add-AzureSteps {
     Add-CommonSteps
 }
 function Add-AzureGroup {
-    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName, id:name }""" | Convertfrom-Json
+    $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended'].{ name:displayName, id:name }""" | Convertfrom-Json
     $counter = 0; $locationChoices = Foreach ($i in $azureLocations) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; id = $i.id; name = $i.name }
@@ -1045,6 +1052,7 @@ function Get-AzureStatus {
     if ($aksExists.state) {
         Send-Update -t 1 -content " yes:$($aksExists.state)"
         Set-Prefs -k "azureClusterStatus" -v $aksExists.state
+        Set-Prefs -k "azureClusterProvision" -v $aksExists.provision
         if ($aksExists.state -eq "Stopped") { Set-Prefs -k "dynatraceStatus" -v $false }
     }
     else {
@@ -1055,7 +1063,9 @@ function Get-AzureStatus {
     #Dynatrace (tenant/token available)
     if (test-path "scw.csv") {
         $scwCsv = Get-Content "scw.csv" | ConvertFrom-Csv | where-object { $_.user -eq $config.loginEmail }
-        Set-Prefs -k "dynatraceTenant" -v $scwCsv.tenant
+        if ($scwCsv.tenant.count -eq 1) { Set-Prefs -k "dynatraceTenant" -v $scwCsv.tenant } else { Set-Prefs -k "dynatraceTenant" -v "! $($scwCsv.tenant.count) found" }
+        if ($scwCsv.token.count -eq 1) { Set-Prefs -k "dynatraceToken" -v $scwCsv.token } else { Set-Prefs -k "dynatraceToken" -v "! $($scwCsv.token.count) found" }
+
         Set-PRefs -k "dynatraceToken" -v $scwCsv.token
     }
     else {
@@ -1074,7 +1084,7 @@ function Get-AzureStatus {
         Set-Prefs -k "azureWebAppStatus" -v $false
     }
     #WebApp
-    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)'].{state:state}""" | Convertfrom-Json
+    $webAppExists = Send-Update -t 1 -a -c "Azure: Web App exists?" -r "az webapp list --query ""[?name=='$($config.azureWebApp)'].{ state:state }""" | Convertfrom-Json
     if ($webAppExists.state) {
         Send-Update -t 1 -c " yes:$($webAppExists.state)"
         Set-Prefs -k "azureWebAppStatus" -v $webAppExists.state
@@ -1084,7 +1094,7 @@ function Get-AzureStatus {
         Set-Prefs -k "azureWebAppStatus" -v $false
     }
     #Dynatrace
-    if ($config.azureClusterStatus -eq "Running") {
+    if ($config.azureClusterStatus -eq "Running" -and $config.azureClusterProvision -eq "Succeeded") {
         if ($config.multiUserMode -eq $true) {
             $kubeFile = "--file '~/scwKube/$($config.userName).kube'"
             $kube = "--kubeconfig ./scwKube/$($config.userName).kube"
@@ -1118,7 +1128,7 @@ function Add-AzureWebApp {
 }
 function Remove-AzureWebApp {
     Set-Prefs -k "quickDeploy" -v $false
-    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete  --resource-group $($config.azureGroup) --name $($config.azureWebApp)"
+    Send-Update -c "Removing Azure Web App" -t 1 -r "az webapp delete --resource-group $($config.azureGroup) --name $($config.azureWebApp)"
     Send-Update -c "Removing Azure Web App Plan" -t 1 -r "az appservice plan delete --resource-group $($config.azureGroup) --name $($config.azureServicePlan) -y"
     Add-AzureSteps
 }
@@ -1261,7 +1271,6 @@ function Add-AWSMultiUserSteps {
     Add-Choice -k "AWSMDU" -d " View/Change DoNotDelete users" -f Set-AWSMultiUserDoNotDelete -c "Currently: $($doNotDeleteUsers.count)"
 }
 function Set-AWSMultiUserDoNotDelete {
-    # $azureLocations = Send-Update -t 1 -content "Azure: Available resource group locations?" -run "az account list-locations --query ""[?metadata.regionCategory=='Recommended']. { name:displayName,id:name }""" | Convertfrom-Json
     $counter = 0; $userChoices = Foreach ($i in $muUsers) {
         $counter++
         New-object PSCustomObject -Property @{Option = $counter; userName = $i.userName; userType = $i.userType }
@@ -1718,7 +1727,6 @@ function Get-GCPMultiUser {
     write-host "`rPasswords for accounts is: 1Dynatrace##"
     write-host ""
     $existingUsers.preferredMemberKey.id
-
 }
 function Remove-GCPMultiUser {
     $existingUsers = Send-Update -t 0 -c "Get Attendees" -r "az ad group member list --group Attendees" | Convertfrom-Json
@@ -2165,7 +2173,7 @@ function Add-Dynatrace {
     Send-Update -c " Activated!" -t 1
     Send-Update -c "Loading Operator" -t 1 -r "kubectl apply -f https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml"
     Send-Update -c "Waiting for pod to activate" -t 1 -r "kubectl -n dynatrace wait pod --for=condition=ready --selector=app.kubernetes.io/name=dynatrace-operator,app.kubernetes.io/component=webhook --timeout=300s"
-    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f $($config.textUserId)-dynakube.yaml"
+    Send-Update -c "Loading dynakube.yaml" -t 1 -r "kubectl apply -f dynakube.yaml"
     Add-CommonSteps
 }
 function Get-DTconnected {
@@ -2244,6 +2252,31 @@ function Get-DynatraceToken {
     write-host ""
     read-host -prompt "Press the <any> key to continue"
 }
+function Set-DTSetting {
+    $headers = @{
+        Accept         = "application/json; charset=utf-8"
+        "Content-Type" = "application/json; charset=utf-8"
+        Authorization  = "Api-Token $($config.token))"
+    }
+    # captured options for configuring settings
+    #   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
+    #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
+    #   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_NODEJS_BIZEVENTS_HTTP_INCOMING"}}]'
+    #   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_DOTNET_LOG_ENRICHMENT"}}]'
+    #   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"DOTNET_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
+
+    $data = @{
+        scopes              = @("activeGateTokenManagement.create", "entities.read", "settings.read", "settings.write", "DataExport", "InstallerDownload", "logs.ingest", "openTelemetryTrace.ingest")
+        name                = "SCW Token"
+        personalAccessToken = $false
+    }
+    $body = $data | ConvertTo-Json
+    $response = Invoke-RestMethod -Method Post -Uri "https://$tenantURL/api/v2/apiTokens" -Headers $headers -Body $body
+}
 
 # Application Functions
 function Add-CommonSteps {
@@ -2260,7 +2293,7 @@ function Add-CommonSteps {
             Add-Choice -k "STATUSDT" -d "Dynatrace: Show Pods" -c $(Get-PodReadyCount -n dynatrace) -f "Get-Pods -n dynatrace"
             Add-Choice -k "TOKENDT" -d "Dynatrace: Token Details" -f Get-DynatraceToken
         }
-        elseif (test-path "$($config.textUserId)-dynakube.yaml") {
+        elseif (test-path "dynakube.yaml") {
             Add-Choice -k "DTCFG" -d "dynatrace: Deploy to k8s" -c "Target DT tenant: $($config.tenantID)" -function Add-Dynatrace
         }
         else {
@@ -2285,7 +2318,7 @@ function Add-CommonSteps {
                     Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
                 }
                 # Yaml files depend on URLs/tokens, remove them
-                foreach ($yaml in $config.yamlList) {
+                foreach ($yaml in $yamlList) {
                     [uri]$uri = $yaml
                     $yamlName = "$($uri.Segments[-1]).yaml"
                     if (test-path $yamlName) { remove-item $yamlName }
@@ -2299,7 +2332,7 @@ function Add-CommonSteps {
     # If Dynatrace is running, we're able to download yaml and adjust as needed
     if ($DTconnected -and $existingNamespaces.contains("dynatrace")) {
         [System.Collections.ArrayList]$yamlReady = @()
-        foreach ($yaml in $config.yamlList) {
+        foreach ($yaml in $yamlList) {
             [uri]$uri = $yaml
             $yamlName = "$($uri.Segments[-1]).yaml"
             $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
@@ -2316,7 +2349,7 @@ function Add-CommonSteps {
             $downloadType = "<not done>"
         }
         else {
-            $downloadType = "$($yamlReady.count)/$($config.yamlList.count) downloaded"
+            $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
         }
         Add-Choice -k "DLAPPS" -d "Download demo apps yaml files" -f Get-Apps -c $downloadType
         # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
@@ -2341,7 +2374,7 @@ function Add-CommonSteps {
     }
 }
 function Get-Apps {
-    foreach ($yaml in $config.yamlList) {
+    foreach ($yaml in $yamlList) {
         # Get base yaml file for kubernetes
         [uri]$uri = $yaml
         $yamlName = "$($uri.Segments[-1]).yaml"
@@ -2356,7 +2389,7 @@ function Get-Apps {
             $jsonFile.RawContent | Out-file -Filepath $jsonName
         }
     }
-    Send-Update -c "Downloaded $($config.yamlList.count)" -type 1
+    Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
 }
 function Get-AppUrls {
@@ -2420,8 +2453,3 @@ while ($choices.count -gt 0) {
     }
     else { write-host -ForegroundColor red "`r`nY U no pick existing option?" }
 }
-# Example parallel run:
-# 1..2 | ForEach-Object -ThrottleLimit 15 -Parallel {
-#     $using:muFunctions | ForEach-Object { . $_ }
-#     Set-Prefs -u $_
-# }
