@@ -96,7 +96,7 @@ function Get-Prefs {
     [System.Collections.ArrayList]$script:choices = @()
     $script:ProgressPreference = "SilentlyContinue"
     # Any yaml here will be available for installation- file should be namespace (i.e. x.yaml = x namescape)
-    Set-Prefs -k yamlList -v @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic", "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
+    $script:yamlList = @("https://raw.githubusercontent.com/suchcodewow/dbic/main/deploy/dbic", "https://raw.githubusercontent.com/suchcodewow/bobbleneers/main/bnos" )
     if ($outputLevel -eq 0) {
         $script:choiceColumns = @("Option", "description", "current", "key", "callFunction", "callProperties")
         $script:providerColumns = @("option", "provider", "name", "identifier", "userid", "default")
@@ -757,19 +757,7 @@ function Update-AzureMultiUser {
             }
         }
         if ($config.azureClusterStatus -eq "Running" -and $config.muRunning -eq $false) {
-            # $changes++
-            # $counter = 0
-            # Do {
-            #     $counter++
-            #     if ($counter -gt 1) {
-            #         $msgLevel = 2
-            #         $msgRetry = "RETRY [$counter]: "
-            #     }
-            #     else {
-            #         $msgLevel = 1
-            #     }
-            $success = Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
-            # } until ($success)
+            Send-Update -t $msgLevel -c "$($msgRetry)Putting Cluster $($config.azureCluster) to sleep." -r "az aks stop -g $($config.azureGroup) -n $($config.azureCluster)"
         }
         if ($config.azureWebAppStatus -eq "Running" -and $config.muRunning -eq $false) {
             $changes++
@@ -2325,7 +2313,7 @@ function Add-CommonSteps {
                     Send-Update -c "Dynatrace connection invalid, remove namespace" -r "Remove-NameSpace -n dynatrace" -t 1
                 }
                 # Yaml files depend on URLs/tokens, remove them
-                foreach ($yaml in $config.yamlList) {
+                foreach ($yaml in $yamlList) {
                     [uri]$uri = $yaml
                     $yamlName = "$($uri.Segments[-1]).yaml"
                     if (test-path $yamlName) { remove-item $yamlName }
@@ -2339,7 +2327,7 @@ function Add-CommonSteps {
     # If Dynatrace is running, we're able to download yaml and adjust as needed
     if ($DTconnected -and $existingNamespaces.contains("dynatrace")) {
         [System.Collections.ArrayList]$yamlReady = @()
-        foreach ($yaml in $config.yamlList) {
+        foreach ($yaml in $yamlList) {
             [uri]$uri = $yaml
             $yamlName = "$($uri.Segments[-1]).yaml"
             $yamlNameSpace = [System.IO.Path]::GetFileNameWithoutExtension($yamlName)
@@ -2356,7 +2344,7 @@ function Add-CommonSteps {
             $downloadType = "<not done>"
         }
         else {
-            $downloadType = "$($yamlReady.count)/$($config.yamlList.count) downloaded"
+            $downloadType = "$($yamlReady.count)/$($yamlList.count) downloaded"
         }
         Add-Choice -k "DLAPPS" -d "Download demo apps yaml files" -f Get-Apps -c $downloadType
         # Add options to kubectl apply, delete, or get status (show any external svcs here in current)
@@ -2381,7 +2369,7 @@ function Add-CommonSteps {
     }
 }
 function Get-Apps {
-    foreach ($yaml in $config.yamlList) {
+    foreach ($yaml in $yamlList) {
         # Get base yaml file for kubernetes
         [uri]$uri = $yaml
         $yamlName = "$($uri.Segments[-1]).yaml"
@@ -2396,7 +2384,7 @@ function Get-Apps {
             $jsonFile.RawContent | Out-file -Filepath $jsonName
         }
     }
-    Send-Update -c "Downloaded $($config.yamlList.count)" -type 1
+    Send-Update -c "Downloaded $($yamlList.count)" -type 1
     Add-CommonSteps
 }
 function Get-AppUrls {
@@ -2460,72 +2448,3 @@ while ($choices.count -gt 0) {
     }
     else { write-host -ForegroundColor red "`r`nY U no pick existing option?" }
 }
-# Example parallel run:
-# 1..2 | ForEach-Object -ThrottleLimit 15 -Parallel {
-#     $using:muFunctions | ForEach-Object { . $_ }
-#     Set-Prefs -u $_
-# }
-
-#   # Enable Log Ingest
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d '[{"schemaId":"builtin:logmonitoring.log-storage-settings","schemaVersion":"1.0.7","scope":"environment","value":{"enabled":true,"config-item-title":"Ingest all logs","send-to-storage":true,"matchers":[]}}]'
-
-#   # Enable Node.js Fetch OneAgent feature
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_FETCH"}}]'
-
-#   # Enable BizEvents
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Bearer $BEARER_TOKEN" \
-#   -d '[{"schemaId":"builtin:bizevents.http.incoming","schemaVersion":"1.0.2","scope":"environment","value":{"enabled":true,"ruleName":"all events","triggers":[{"source":{"dataSource":"request.path"},"type":"EXISTS"}],"event":{"provider":{"sourceType":"constant.string","source":"AzureHoT"},"type":{"sourceType":"constant.string","source":"Request - Path"},"category":{"sourceType":"constant.string","source":"Request - Path"},"data":[{"name":"response","source":{"sourceType":"response.body","path":"*"}}]}}}]'
-
-#   # Enable Node.js - Trace/span context enrichment for logs [Opt-In]
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT"}}]'
-
-#   # Enable Node.js - Trace/span context enrichment for unstructured logs [Opt-In]
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"NODEJS_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
-
-#   # Enable Node.js Business Events [Opt-In] AND the sub-selector to enabled
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_NODEJS_BIZEVENTS_HTTP_INCOMING"}}]'
-
-#   # Enable .NET - Trace/span context enrichment for logs [Opt-In] AND the sub-selector to enabled
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d '[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"instrumentation":true,"key":"SENSOR_DOTNET_LOG_ENRICHMENT"}}]'
-
-#   # Enable .NET - Trace/span context enrichment for unstructured logs [Opt-In]
-#   curl "$DT_ENV_URL/api/v2/settings/objects" \
-#   -X POST \
-#   -H 'Accept: application/json; charset=utf-8' \
-#   -H 'Content-Type: application/json; charset=utf-8' \
-#   -H "Authorization: Api-Token $DYNATRACE_TOKEN" \
-#   -d $'[{"schemaId":"builtin:oneagent.features","schemaVersion":"1.5.9","scope":"environment","value":{"enabled":true,"key":"DOTNET_LOG_ENRICHMENT_UNSTRUCTURED"}}]'
