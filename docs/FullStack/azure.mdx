@@ -4,3 +4,175 @@ title: "A) Azure Specific"
 ---
 
 ![Azure Overview](/img/azureoverview.png)
+
+## Instamation on Azure (Azure Web App)
+
+Our company has instructed us to build and deploy a modern quoting service.
+
+We've developed Instamation (tm) and chosen to deploy it as an Azure Web App for easy scalability and configuration.
+
+### Deploy
+
+1. In the Azure Console, go to "App Services."
+1. Type your class id (sessionX#) into the filter top right.
+1. You should see just ONE web app and click to select. It will be in the _format scw-webapp-[classname]_.
+1. Select the Deployment Center (blue highlight) then External Git as the source (green highlight).  
+   ![awa1](/img/awa1.png)
+1. Copy the following service repository link into the repository field:
+
+```bash
+https://github.com/suchcodewow/instamationsvc
+```
+
+1. Type `main` for the branch (blue highlight) then Save (green highlight).
+   :::tip
+   The "example/grey" branch example is also named main. You do need to type `main` into this field to be able to save.
+   :::
+   ![awa2](/img/awa2.png)
+1. Go back to the overview page (blue highlight) and click the default domain (green highlight) to see your new service.
+   ![awa3](/img/awa3.png)
+1. The deployment will likely take a minute or two. You might see a boilerplate message the first time you click- or it might not respond. When successfully deployed, you should see a simple json response simlar to:
+
+```bash
+{"status":"ready","appname":"scw-webapp-[classname]"}
+```
+
+When this appears, it means your service is working! You are ready to move to the next step.
+
+### Dynatrace Extension
+
+1. In the inset-menu, click on _Extensions_ within the _Development Tools_ section.
+1. Click Add in the main window. Search/Find Dynatrace Oneagent and select it:
+   ![extension1](/img/extension1.png)
+1. At the bottom of the panel, check the agreement box, then click _Add_.
+1. Hang tight for a few seconds until it loads, then click the small browse box:
+   ![extension2](/img/extension2.png)
+1. Briefly switch to Tab #1. In Pepper, choose the option for `Dynatrace: Token Details`. You might need to scroll up slightly to see the output.
+1. Using the image below as a guide, fill in the environment ID, token, and then the server URL.
+   ![extension3](/img/extension3.png)
+1. Click _Install OneAgent_ and hang tight until you see _Enjoy monitoring from Dynatrace._ at the top of the screen.
+1. In the _Overview_ page of your web app, click the _Restart_ button.
+
+### Dynabank & Azure Web App
+
+1. In Tab #6 showing the Instamation service API response, copy the URL from the address bar.
+1. In Dynabank, Log-in using any random name provided with the orange button top right.
+1. Click the orange button top right and click _Operations_.
+   ![dynabankwebapp1](/img/dynabankwebapp1.png)
+1. In the _Estimation Service URL box_, paste in the URL of the Instamation service, then click _save_.
+1. Confirm it worked by checking for a _successfully configured_ message. The App Name should reflect your user id (sessionX#). (The value is retrieved directly from your web service to make sure it worked.)
+   ![dynabankwebapp2](/img/dynabankwebapp2.png)
+1. New Collecticare quotes will now automatically by quoted by the Instamation Service. You can check on it by going to Administration:
+   ![dynabankwebapp3](/img/dynabankwebapp3.png)
+1. Review new Collecticare quotes on the first administration panel. Instead of quotes showing up in the _new_ state, they will show as _quoted_ instead:
+   ![dynabankwebapp4](/img/dynabankwebapp4.png)
+
+#### Diagnostic settings
+
+1. Back in Tab #3, scroll down to diagnostic settings and click (green box).
+1. Click _Add Diagnostic Setting_.
+   ![dynabankwebapp1](/img/webappsetting.png)
+1. Click _App Service Application Logs_ (green box) and click _Stream to Event Hub_ (blue box).
+1. Make sure the hub namespace matches below & select the shown event hub.
+   ![dynabankwebapp1](/img/appdiagnostic.png)
+1. Click _save_ in the top left corner.
+
+## Hands On: API Mgmt
+
+### Deployment
+
+Once the Dynabank business teams confirmed initial success of Instamation, our next goal is to configure it to use Azure API Management.
+
+1. In Tab #3 Azure Portal, search for 'APIM' and click on _API Management services_.
+1. Click on the APIM for your region in the format _scw-[region]-apim_.
+1. Click on _API's_ from the inset-left menu:
+   ![apim1](/img/apim1.png)
+1. And then click on _App Service_.
+   ![apim2](/img/apim2.png)
+1. Click the `Browese` button.
+1. Type in your id (sessionX#). You should see ONE matching App Service. Select the App Service & click select at the bottom.
+1. Copy the name provided into the API URL suffix box. Your Base URL should look something like:
+
+```bash
+https://scw-useast2-apim.azure-api.net/scw-webapp-colossalcactus
+```
+
+1. Click _Create_.
+1. Find your API in the list, click on it (blue highlight), and then click _Settings_ at the top of the details box to the right (green highlight):
+   ![apim3](/img/apim3.png)
+1. Uncheck the _Subscription required_ option box (blue highlight). Click Save (green highlight). This will allow all connections to reach your Instamation service.
+   ![apim4](/img/apim4.png)
+
+:::tip Lab vs Real World
+In a real-world scenario we wouldn't go without a subscription/authorization mechanism. We're doing it here to keep the focus on Observability vs application configuration. Dynatrace will detect all traffic just fine with any configuration.
+:::
+
+1. Before leaving this screen, find the _Base URL_ of your service and copy it.
+1. Confirm it worked by pasting this URL into a new tab of your browser. You should see your service respond just fine behind the apim!
+1. In your Dynabank Operations portal (click orange button top right -> Operations), you can replace the Instamation Web App with the APIM version and click _save_. You should receive the same _succesfully configured_ message.
+
+## Hands On: Azure Log Forwarder
+
+With metrics and traces automatically ingested and baselined, our company wants to include logs as well. The Collecticare development teams use logs to write out critical business information like policy estimates and quoting decisions.
+
+### Deployment
+
+1. In Tab #1, run the Pepper command to retrieve Dynatrace token information.
+1. Drag-select all EXPORT commands shown. Right-click and copy. Press _ENTER_ to quit Pepper.
+1. At the BASH command prompt, paste the EXPORT commands and press _ENTER_.
+1. Copy the Log Forwarder function below & paste it into the terminal window.
+
+```bash
+wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/latest/download/dynatrace-azure-logs.sh -O dynatrace-azure-logs.sh && chmod +x ./dynatrace-azure-logs.sh \
+&& ./dynatrace-azure-logs.sh --deployment-name $DEPLOYMENT_NAME --target-url $TARGET_URL --target-api-token $TARGET_API_TOKEN --resource-group $RESOURCE_GROUP --event-hub-connection-string $EVENT_HUB_CONNECTION_STRING --require-valid-certificate true
+```
+
+1. It will take a few minutes to deploy all resources.
+
+## Hands On: Azure Monitor
+
+### Deployment: Service Principal
+
+1. On Tab #1 in the terminal, exit Pepper if it is running.
+1. Run the command below to generate a Service Principal/App Registration:
+
+```bash
+az ad sp create-for-rbac --name $DEPLOYMENT_NAME --role reader --scopes /subscriptions/9939cbf8-8de6-49a1-a641-b664b214838f --query "{ClientID:appId,TenantID:tenant,SecretKey:password}"
+```
+
+1. In Tab #4 Dynatrace, Open the Settings App --> Cloud and Virtualization --> Azure.
+1. Click on Connect New instance.
+1. Choose a name for the connection.
+1. Add the ClientID, SecretKey and TenantID that exported from the Terminal Command line /Azure CLI.
+1. Click Connect. That's it!
+1. Open the Azure App in Dynatrace to see all resources.
+
+:::tip
+Since we're running many copies of Dynabank in a 'multiverse' kind of scenario, you'll obviously see them all in our Azure Classroom.  
+But it does show how easily Dynatrace provides full visibility into an Azure environment with all services instantly tracked, organized, and tagged for easy business organization.
+:::
+
+## Bonus Hands On: Grail!
+
+### Introduction
+
+The deployment of Instamation by Dynabank after the Collecticare acquisition was a great success technical success.  
+With Dynatrace, we have full visibility into the entire quoting process and can see that quotes are fast and error free.
+
+A big win!
+
+Except that... the underwriting department is in a complete PANIC!
+![troubleshoot](/img/troubleshoot1.jpg)
+The automated instamation quoting system has produced quotes for $1 on extremely expensive items that will cause serious financial problems for Dynabank.
+
+We can easily double-check that all quotes work technically. What could be going on?
+
+### Logs and Business Events on Grail
+
+With the Grail framework powering Log and Business Event ingestion, we can quickly dive into problems in business flows beyond technical issues.
+
+1. Download this [Grail notebook template](/manifests/ditl.json).
+1. On Tab #4 Dynatrace, open the Notebooks App.
+1. Click to create a new notebook.
+1. On the left inset panel, choose _Upload_.
+1. We'll step through each example to see how Grail powers solutions beyond technical issues.
