@@ -2,113 +2,112 @@
 sidebar_position: 1
 ---
 
-# Azure & Dynatrace
+# Azure & Dynatrace: Intro
 
-## Welcome!
+## A) Introduction
 
-Welcome to the Azure & Dynatrace 2024 Hot session!  
-We've got a jam packed session today with lots of (hopefully!) fun and informative content.
+This quick guide essentially condenses a dynabank workshop event down to the deployment steps used.  
+It's useful for testing new content or to quickly setup/confirm a working environment ahead of an event.
 
-[Download the most up-to-date powerpoint deck here](/manifests/azureperform2024.pdf).
+## B) Before Starting
 
-## Initial Setup
+All Dynabank workshop events use the Dynatrace Cloud Learning (DLF) Facilities. Essentially these are "blank" cloud environments in all 3 major providers (Azure, AWS, and GCP).  
+To start, you would either need an attendee account in the DLF for your cloud choice, or you'd need an account in another cloud environment that has access to all components you want to install.
 
-We'll be playing the roles of Customer, Developer, Operations, & Dynatrace Admin today around the fictional organization of "Dynabank".  
-During setup, we're recommending you keep several tabs open in your browser to help keep things organized.
+This guide assumes you created (or had someone create) a DLF account for you to use.
 
-Recommended browser tabs and corresponding credentials:
+## C) Starting the assistant
 
-- Non-fiction: Dynatrace University (your real-life account)
-- Non-fiction: Azure Dynatrace HoT Guide
-- Dev / Ops: Azure Portal login (sessionX#@suchcodewow.io)
-- Dynatrace Admin: Dynatrace login (attendee#@dynatracelabs.com)
+Log into a cloud shell using the account provided.  
+Then, run this command to get started:
 
-As we deploy resources, you'll also have:
-
-- Customer: dynabankinsuracart.com (logins randomly assigned in demo app)
-- Developer: Instamation Service Web App API
-
-### Tab 1: Dynatrace University (your real-life account)
-
-Use your "normal" non-fiction email and password for Dynatrace University.  
-(You likely already have this running and used it in order to reach this guide.)
-
-#### Azure Terminal
-
-When you start the University terminal, you'll need to run the one-time command to link Azure.
-
-```bash
-az login
+```
+curl https://www.suchcodewow.io/manifests/pepper.ps1 > ~/pepper.ps1 && pwsh ~/pepper.ps1 -c
 ```
 
-1. Select the code with a mouse drag, and then right-click and choose "copy". DON'T use copy shortcut (ctrl+c).
-2. Click to follow the link and ENSURE you login with your fictional Devops account (sessionX#@suchcode.io)!
-3. Enter the code and wait for login to complete. You'll see some data fly by in the terminal when done.
+## D) Cloud specific steps
 
-#### Pepper
+### Quick overview
 
-1. Once connected, start Pepper:
+Follow the steps shown in Pepper for your cloud provider. Typically this will be 1-2 pre-requisites and then kubernetes. Jump to [Common Steps](http://localhost:3000/docs/pepper/individual#e-common-steps) when you reach the **Dynakube** step.
 
-```bash
-curl https://www.suchcodewow.io/manifests/pepper.ps1 -s > ~/pepper.ps1 && pwsh ~/pepper.ps1 -c
-```
+### What are these steps doing in my provider?
 
-2. Pepper will take an inventory of what is loaded. Check that you see the following resources:
+Pepper will determine which cloud environments you can access. When running in the DLF, there will be only one option and Pepper will choose that as default. If you have more than you, the first option to `switch cloud provider` allows you to pick something different.
 
-| Component        | Name                                        |
-| ---------------- | ------------------------------------------- |
-| Resource group   | scw-group-[classname]                       |
-| AKS cluster      | scw-AKS-[classname]                         |
-| App Service Plan | scw-ASP-[classname]                         |
-| Web App          | scw-webapp-[classname]                      |
-| Dynatrace        | tenant shown in University & 5/5 pods ready |
+#### Azure
 
-3. Finally, confirm that the next step in Pepper is to download application yaml files.
-
-We'll use Pepper at several points during the session. You can leave it running. If you do exit, you can use 'up-arrow' to recall the command.  
-Or you can just copy and paste from above into your terminal again.
-
-### Tab 2: Azure Dynatrace HoT Guide
-
-You're already here. You did it!
-
-### Tab 3: Azure Portal Login (sessionX#@suchcodewow.io)
-
-Confirm login to [Azure portal](https://portal.azure.com) with [classname]@suchcodewow.io. Password provided in Dynatrace University.
-
-[OPTIONAL] As a Dynabank DevOps Cloud admin, you have full access to the Azure environment. You can confirm the resources below.
+Azure setup will deploy a resource group first. When you create it, you'll have option to select which region to use. Generally, useast2, uswest2-3 are good choices. (Sometimes useast1 has trouble with enough space to deploy!) All other content you choose to deploy with Pepper will be located in that resource group/zone.  
+Next, you'll have the option to deploy Azure Kubernetes Services (AKS). This will build a 1 node 4cpu cluster sufficient to run Dynabank.  
+You also have the option to deploy an Azure Web app. If you deploy this, Pepper will create an Azure web services plan with the B1 (basic) settings and create an azure web app on top.
 
 Resources created:
 
-| Component        | Name                   |
-| ---------------- | ---------------------- |
-| Resource group   | scw-group-[classname]  |
-| AKS cluster      | scw-AKS-[classname]    |
-| App Service Plan | scw-ASP-[classname]    |
-| Web App          | scw-webapp-[classname] |
+| Component        | Name            |
+| ---------------- | --------------- |
+| Resource group   | scw-group-[ID]  |
+| AKS cluster      | scw-AKS-[ID]    |
+| App Service Plan | scw-ASP-[ID]    |
+| Web App          | scw-webapp-[ID] |
 
-### Tab 4: Dynatrace (Dynatrace Administrator)
+#### AWS
 
-1. Login to Dynatrace using tenant URL and credentials provided in Dynatrace University.
-1. Open the "Apps" page.
-1. Click Kubernetes (not the "new" one).
-1. Confirm you see a cluster running similar to "k8s[classname]".
+AWS requires significantly more steps than the other two clouds due to significant pre-requisites. If you used a DLF admin account and Pepper to create your account, you will likely have the pre-requisites already done. If not detected, Pepper will install those first.  
+The AWS commands will use whichever region is currently configured! If you are in the cloud shell, this will typically be the region selected at the top of the UI.  
+If you are using Pepper in a local terminal, use `aws configure` to change your settings/region.  
+Once the pre-requisites are installed, Pepper will be ready to deploy Elastic Kubernetes Services (EKS). This will create a 1 node 4cpu cluster (Cluster itself & a nodegroup) sufficient to run Dynabank.
 
-:::tip
-We'll walk through these steps together, but if you're feeling a bit saucy and already ahead of the game, please feel free to check on these yourself.  
-(Honestly we're as excited as you are.)
-:::
+Resources created:
 
-#### Confirm Logs Ingest
+| Type      | Component            | Name                         |
+| --------- | -------------------- | ---------------------------- |
+| pre-req   | AWS Role             | scw-awsrole-[REGION]         |
+| pre-req   | AWS nodegroup Role   | scw-AWSnodeRoleName-[REGION] |
+| pre-req   | Cloudformation stack | scw-AWScfstack-[REGION]      |
+| component | EKS Cluster          | scw-AWS-[ID]                 |
+| component | EKS Nodegroup        | scw-AWSNG--[ID]              |
+
+#### GCP
+
+Google Cloud will deploy into your current project. This can be selected with the initial startup options in Pepper, or you can configure it in the command window before starting.
+Google is fairly straightforward and will simply deploy Google Kubernetes Enginer (GKE). You'll have a 1cpu 4node cluster sufficient to run Dynabank.
+
+Resources created:
+
+| Component | Name          |
+| --------- | ------------- |
+| Cluster   | scw-gke--[ID] |
+
+## E) Dynatrace Configuration
+
+We'll switch to Dynatrace to create a token needed to connect kubernetes to your tenant.
+
+While we're here, we'll also configure Dynatrace to ensure you are ingesting all metrics, logs, and traces available.
+
+In Dynatrace:
+
+### Create a token
+
+1. open Access tokens settings:
+   ![menu](/img/deploy1.jpg)
+1. Then create a new token with the `API write` permission.
+   ![API Token](/img/token.jpg)
+1. Save the token value (i.e. Notepad, Onenote) then click _Done_.
+1. Copy the URL of your Dynatrace tenant from the top of your browser and save the URL value with the token value.
+
+### Logs
 
 1. Go to Settings -> Log Monitoring -> Log Ingest Rules.
-1. If the _[Built-in] Ingest all logs_ rule is NOT enabled, please enable it.
-1. Click _Save Changes_ bottom left of screen if you turned it on.
+1. Toggle on [Built-in] Ingest all logs then click _Save changes_ bottom left of screen.
 
-#### Setup Business Event Ingest
+### Bizevents
 
+1. Go to Settings -> Preferences -> OneAgent features.
+1. In the Filter by box, type `business event` and press ENTER: ![bizevent1](/img/bizevent1.png)
+1. Toggle ON _Business Event [Opt-in]_ for .NET, Go, Java, Node.js, and Webserver. Select the drop-down arrow for each and toggle ON _Instrucmentation enabled_.
+1. Click _Save Changes_ bottom left of screen.
 1. Go to Settings -> Business Analytics -> OneAgent.
-1. Click _Add new capture rule_ and name it 'AllEvents'.
+1. Click _App new capture rule_ and name it 'AllEvents'.
 1. Click _Add trigger_ and set the following values:
 
 | Key         | Value          |
@@ -138,6 +137,14 @@ We'll walk through these steps together, but if you're feeling a bit saucy and a
 
 1. Click _Add data field_ again and then set the following values:
 
+| Key         | Value          |
+| ----------- | -------------- |
+| Field name  | requestbody    |
+| Data source | Request - Body |
+| Path        | \*             |
+
+1. Click _Add data field_ again and then set the following values:
+
 | Key         | Value           |
 | ----------- | --------------- |
 | Field name  | responsebody    |
@@ -146,23 +153,185 @@ We'll walk through these steps together, but if you're feeling a bit saucy and a
 
 1. Click _Save changes_ in the bottom left.
 
-#### Confirm OneAgent Settings
+## F) Common steps
 
-1. Go to Settings -> Preferences -> OneAgent features.
-1. In the Filter by box, type `business event` and press ENTER.
-1. Toggle ON _Business Event [Opt-in]_ for .NET, Go, Java, Node.js, and Webserver. Select the drop-down arrow for each and toggle ON _Instrucmentation enabled_.
-   ![oneagentpref1](/img/bizevent1.png)
-1. Click _Save Changes_ bottom left of screen.
-1. Clear the Filter box (click blue x) and type `node fetch` and press ENTER.
-   ![node fetch](/img/settingfetch.png)
-1. Click _Save Changes_ bottom left of screen.
-1. Clear the Filter box (click blue x) and type `node log` and press ENTER.
-   ![node fetch](/img/nodelog.png)
-1. Click _Save Changes_ bottom left of screen.
-1. Clear the Filter box (click blue x) and type `net` and press ENTER.
-   ![node fetch](/img/settingnet.png)
-1. Click _Save Changes_ bottom left of screen.
+### Create dynakube.yaml
 
-## Conclusion
+:::tip About the dynakube.yaml
+It's recommended to let Pepper generate the dynakube.yaml as it is tuned for this event:
 
-With configuration set, we're ready to deploy resources.
+- The resource limits are balanced for the kubernetes cluster size used
+- Cloud metric support is built-in
+- It saves a step in downloading the dynakube.yaml to your computer & uploading the file through cloud shell.
+
+:::
+
+1. In Pepper, select the option to `create: dynakube.yaml`. Provide the URL of your tenant (ex: abc12345.live.dynatrace.com). Don't worry about the https:// or if you have extra characters. Pepper will automatically trim what you enter.
+
+1. Then, paste in the token you created.
+
+:::tip Pasting into cloud shell is hard
+Each cloud vendor picked different methods to copy and paste. FUN!
+
+Azure: right-click in the shell window and select 'paste'.
+
+AWS: ctrl+v works just fine (right click and select `paste` works too.)
+
+GCP: ctrl+v only
+:::
+
+Pepper will confirm that your URL and token combination is valid and then create a custom dynakube.yaml.
+
+### Deploy Dynatrace
+
+:::tip Dynatrace deployment options
+This guide shows how to use Pepper to deploy Dynatrace.
+
+However, it's perfectly viable to drop out of Pepper at this point & use the 'Deploy Dynatrace' app and select Kubernetes install. You'd just need to download dynakube.yaml and upload it to your cloud shell.
+
+Keep in mind that you won't have the tweaks mentioned above.
+:::
+
+1. Select the option to deploy dynatrace.
+
+### Hang tight!
+
+Pepper will query the Dynatrace namespace and report how many pods are ready. There is an option to `refresh` the dynatrace namespace.
+
+Hang tight for 1-2 minutes using the refresh option until you have 5/5 pods ready. This is an important step! If you move forward before 5/5 pods ready, Dynatrace won't catch your deployment and won't monitor Dynabank.
+
+1. Refresh the pods a few times over a couple of minutes until you have 5/5 pods.
+
+### Deploy Dynabank
+
+1. Once you have 5/5 pods ready in Dynatrace, select the option to `Download demo apps yaml files`.
+   This will pull the yaml blueprints for Dynabank (dbic) and any other demo apps packaged for deployment.
+
+1. Select the option to `Deploy: dbic`. Use the `refresh pods` option over a few minutes until you have all pods deployed.
+
+At this point, Pepper should provide the URL to your environment. Where available, you'll also get a more 'friendly' link.
+
+## G) Cloud-specific deployments
+
+### Azure Web App
+
+#### Deploy
+
+:::tip Prequisite!
+Make sure to deploy the Azure web app framework with Pepper prior to completing these steps.
+:::
+
+1. In the Azure Console, go to "App Services."
+1. Find and click on your webapp. It will be in the _format scw-webapp-[yourid]_.
+1. Select the Deployment Center (blue highlight) then External Git as the source (green highlight).  
+   ![awa1](/img/awa1.png)
+1. Copy the following service repository link into the repository field and type `main` for the branch (blue highlight) then Save (green highlight).
+
+```bash
+https://github.com/suchcodewow/instamationsvc
+```
+
+![awa2](/img/awa2.png)
+
+1. Go back to the overview page (blue highlight) and click the default domain (green highlight) to see your new service.
+   ![awa3](/img/awa3.png)
+1. The deployment will likely take a minute or two. You might see a boilerplate message the first time you click- or it might not respond. When successfully deployed, you should see a simple json response simlar to:
+
+```bash
+{"status":"ready","appname":"scw-webapp-colossalcactus"}
+```
+
+When this appears, it means your service is working! You are ready to move to the next step.
+
+1. Copy the URL of your azure web service from the address bar at the top of your browser to use later.
+
+#### Dynatrace Extension
+
+1. In the inset-menu, click on _Extensions_ within the _Development Tools_ section.
+1. Click Add in the main window. Search/Find Dynatrace Oneagent and select it:
+   ![extension1](/img/extension1.png)
+1. At the bottom of the panel, check the agreement box, then click _Add_.
+1. Hang tight for a few seconds until it loads, then click the small browse box:
+   ![extension2](/img/extension2.png)
+1. Create a token in Dynatrace with the PaaS template to use here.
+1. Using the image below as a guide, paste in the URL of your tenant adding `/api` to the end. Fill in the environment ID using the first part of the URL, then paste in the Paas token created above.
+   ![extension3](/img/extension3.png)
+1. Click _Install OneAgent_ and hang tight until you see _Enjoy monitoring from Dynatrace._ at the top of the screen.
+1. In the _Overview_ page of your web app, click the _Restart_ button.
+
+:::tip Lab vs Real World
+For most Dynatrace deployments, only the Environment ID is needed. Since we're using Dynatrace tenants that contain the word 'sprint' instead of the normal 'live', we need to specify the Server URL.
+:::
+
+#### Dynabank & Azure Web App
+
+1. In Dynabank, Log-in using any random name provided with the orange button top right.
+1. Click the orange button top right and click _Operations_.
+   ![dynabankwebapp1](/img/dynabankwebapp1.png)
+1. In the _Estimation Service URL box_, paste in the URL of the Instamation service, then click _save_.
+1. Confirm it worked by checking for a _successfully configured_ message. The App Name should reflect your user id. (The value is retrieved directly from your web service to make sure it worked.)
+   ![dynabankwebapp2](/img/dynabankwebapp2.png)
+1. New Collecticare quotes will now automatically by quoted by the Instamation Service! You can check on it by going to Administration:
+   ![dynabankwebapp3](/img/dynabankwebapp3.png)
+1. And reviewing new Collecticare quotes on the first administration panel. Instead of quotes showing up in the _new_ state, they will show as 'quoted' instead:
+   ![dynabankwebapp4](/img/dynabankwebapp4.png)
+
+#### Dynabank & APIM
+
+Instamation also works through Azure APIM (API Management).
+
+1. In Azure, search for 'APIM' and click on _API Management services_.
+1. Click on the APIM for your region in the format _scw-[region]-apim_.
+1. Click on _API's_ from the inset-left menu:
+   ![apim1](/img/apim1.png)
+1. And then click on _App Service_.
+   ![apim2](/img/apim2.png)
+1. In the configuration box in the _App Service_ section, Browse for and select your Instamation web application.
+1. Copy the name provided into the API URL suffix box. Your Base URL should look something like:
+
+```bash
+https://scw-useast2-apim.azure-api.net/scw-webapp-colossalcactus
+```
+
+1. Click _Create_.
+1. Find your API in the list, click on it (blue highlight), and then click _Settings_ at the top of the details box to the right (green highlight):
+   ![apim3](/img/apim3.png)
+1. Uncheck the _Subscription required_ option box (blue highlight). Click Save (green highlight). This will allow all connections to reach your Instamation service.
+   ![apim4](/img/apim4.png)
+
+:::tip Lab vs Real World
+In a real-world scenario we wouldn't go without a subscription/authorization mechanism. We're doing it here to keep the focus on Observability vs application configuration. Dynatrace will detect all traffic just fine with security in place.
+:::
+
+4. Before leaving this screen, find the _Base URL_ of your service and copy it.
+1. Confirm it worked by pasting this URL into a new tab of your browser. You should see your service respond just fine behind the apim!
+1. In your Dynabank Operations portal (click orange button top right -> Operations), you can replace the Instamation Web App with the APIM version and click _save_. You should receive the same _succesfully configured_ message.
+
+### Azure Log Forwarder
+
+wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/latest/download/dynatrace-azure-logs.sh -O dynatrace-azure-logs.sh && chmod +x ./dynatrace-azure-logs.sh \
+&& ./dynatrace-azure-logs.sh --deployment-name $DEPLOYMENT_NAME --target-url $TARGET_URL --target-api-token $TARGET_API_TOKEN --resource-group $RESOURCE_GROUP --event-hub-connection-string $EVENT_HUB_CONNECTION_STRING --require-valid-certificate true
+
+#### Fix
+
+wget -q https://github.com/dynatrace-oss/dynatrace-azure-log-forwarder/releases/download/release-0.1.6/dynatrace-azure-log-forwarder.zip -O dynatrace-azure-log-forwarder.zip
+
+az webapp deployment source config-zip -n lognerdycoast-function -g scw-group-nerdycoast --src dynatrace-azure-log-forwarder.zip
+
+### Service Principal
+
+To Deploy the service-principal,
+Go to the Terminal Command line /Azure CLI
+Run this command after adding the values from the previous command
+
+```bash
+az ad sp create-for-rbac --name <YourServicePrincipalName> --role reader --scopes /subscriptions/9939cbf8-8de6-49a1-a641-b664b214838f --query "{ClientID:appId,TenantID:tenant,SecretKey:password}"
+```
+
+The Command should give you the ClientID, TennatID and SecretKey
+Next Navigate to your Dynatrace Tenant Provided for you
+Go to Settings --> Cloud and Virtualization --> Azure
+Click on Connect New instance
+Fill in the connection name
+Add the ClientID, SecretKey and TenantID that exported from the Terminal Command line /Azure CLI
+Click Connect --> Your Azure Instance is now connected in Dynatrace

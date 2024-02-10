@@ -1,0 +1,57 @@
+---
+pagination_prev:
+pagination_next:
+title: Deployment Comparison
+---
+
+# Dynatrace - Datadog Deployment comparison
+
+## Intro
+
+Finding the right Observability solution is exponentially more important than ever and a critical necessity!
+
+But by definition when evaluating Observability solutions, having an application to observe is equally important.
+Ideally that application is yours. But there are many times when a demo application is the best next step.
+
+To help, many Observaibility providers offer freely available demo applications to showcase the best way to reach that solution. Both Dynatrace and Datadog offer applications that accomplish this. And coincidentally built with very similar technologies and ideas. This makes them a great comparison for how quickly you can get Observaibility.
+
+### Initial Deployment Comparison
+
+Quick comparison below on Dynatrace **Dynabank** and Datadog **StoreDog**.
+
+![Comparison Overview](/img/compare1.png)
+
+Both applications are actively used today to showcase their best offerings for Observability.
+
+Both have an agent-based deployment model.
+
+### Overall Application Changes Comparison
+
+But what about configuration beyond the agent to achieve great visibility?
+
+To compare apples-to-apples, **both demo applications have a Docker Compose deployment option**. This is essentially a blueprint with all original application components combined with all necessary changes for Observability.
+
+Below is a comparison (direct from public repos) of each Docker Compose file.
+
+For readability, any lines related to the application itself are removed. This leaves only things that need to be figured out, discussed with app teams, and added.
+
+![Comparison Docker Compose](/img/compare2.png)
+
+Both applications showcase how quickly they can achieve Observability and how many changes you'll need to do in order to get it. Every line item in black above is another service potentially written by different teams using different deployment methods.
+
+### Individual Services Comparison
+
+To have a good shot at achieving Observability, the services making up your application ecosystem need instrumentation. This instrumentation gives you critical insights into end-to-end transactions of your customers/users & is paramount in having the chance to proactively find root cause.
+
+While both Datadog and Dynabank have very similar overlapping technologies. Dynabank has 8 unique technologies while StoreDog has 5.
+
+Below is a comparison of all files that require updates for either application. As before, these files contain configuration and code for both the application and the Observability platform.
+
+For readability, all application specific configuration or code lines have been removed. Comments and some function brackets remain for reference.
+
+![Comparison Application Files](/img/compare3.png)
+
+It's important to highlight that every change means two key things:
+
+- Initial implementation will take much longer. The math to calculate work hours is staggering: coordinate change with service developer X # of teams required to coordinate services changes X # of services in application X # of applications to monitor.
+- More changes means more time spent maintaining Observability instead of using it. And if the math above wasn't already overwhelming, it becomes lethal when multiplying it again with updates every time an Observability change is needed.
