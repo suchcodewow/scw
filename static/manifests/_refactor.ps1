@@ -963,7 +963,6 @@ function Set-AzureMultiUserDoNotDelete {
     }
     Add-AzureMultiUserSteps
 }
-
 # Azure Functions
 function Add-AzureSteps {
     # Get Azure specific properties from current choice
@@ -2379,7 +2378,7 @@ function Get-Apps {
         Invoke-WebRequest -Uri "$($uri.OriginalString).yaml" -OutFile $yamlName | Out-Host
         ((Get-Content -path $yamlName -Raw) -replace '<dynatraceURL>', $config.tenantID) | Set-Content -Path $yamlName
         ((Get-Content -path $yamlName -Raw) -replace '<dynatraceToken>', $config.k8stoken) | Set-Content -Path $yamlName
-        ((Get-Content -path $yamlName -Raw) -replace 'dnsplaceholder', "scw$($config.textUserId)") | Set-Content -Path $yamlName
+        ((Get-Content -path $yamlName -Raw) -replace 'dnsplaceholder', "scw$($config.userName)") | Set-Content -Path $yamlName
         # Get config options if they exist
         $jsonName = "$($uri.Segments[-1]).json"
         $jsonFile = Invoke-WebRequest -SkipHttpErrorCheck -Uri "$($uri.OriginalString).json"
