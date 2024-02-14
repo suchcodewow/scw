@@ -2404,7 +2404,7 @@ function Get-AppUrls {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
             }
             if ($namespace -eq "dbic" -and $config.provider -eq "azure") {
-                $returnList = "http://scw$($config.userName).$($config.k8sregion).cloudapp.azure.com"
+                $returnList = "http://scw$($config.userName).$($config.azureRegion).cloudapp.azure.com"
             }
             if ($service.status.loadBalancer.ingress[0].ip) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
