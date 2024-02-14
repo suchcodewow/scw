@@ -1413,7 +1413,7 @@ function Add-AWSSteps {
     # Component: AWS cluster role
     #$targetComponents++
     Set-Prefs -k AWSroleName -v "scw-awsrole-$stackId"
-    $roleExists = Send-Update -t 1 -e -c "Checking for AWS Component: cluster role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --output json" -a | Convertfrom-Json
+    $roleExists = Send-Update -t 1 -e -c "Checking for shared AWS Component: cluster role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSroleName) --output json" -a | Convertfrom-Json
     if ($roleExists) {
         Send-Update -c "AWS cluster role: exists" -t 1
         Set-Prefs -k AWSclusterRoleArn -v $($roleExists.Role.Arn)
@@ -1426,7 +1426,7 @@ function Add-AWSSteps {
     # Component: AWS node role
     #$targetComponents++
     set-Prefs -k AWSnodeRoleName -v "scw-awsngrole-$stackId"
-    $nodeRoleExists = Send-Update -t 1 -e -c "Checking for AWS Component: node role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSnodeRoleName) --output json" -a | Convertfrom-Json
+    $nodeRoleExists = Send-Update -t 1 -e -c "Checking for shared AWS Component: node role" -r "aws iam get-role --region $($config.AWSregion) --role-name $($config.AWSnodeRoleName) --output json" -a | Convertfrom-Json
     if ($nodeRoleExists) {
         Send-Update -c "AWS node role: exists" -t 1
         Set-Prefs -k AWSnodeRoleArn -v $($nodeRoleExists.Role.Arn)
@@ -1438,7 +1438,7 @@ function Add-AWSSteps {
     }
     # Components: Cloudformation, vpc, subnets, and security group
     set-prefs -k AWScfstack -v "scw-AWSstack-$stackId" 
-    $cfstackExists = Send-Update -a -e -t 1 -c "Checking for Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
+    $cfstackExists = Send-Update -a -e -t 1 -c "Checking for shared Cloudformation Stack (4 items)" -r "aws cloudformation describe-stacks --region $($config.AWSregion) --stack-name $($config.AWScfstack) --output json" | Convertfrom-Json
     if ($cfstackExists.Stacks) {
         $componentsReady++
         Send-Update -c "Cloudformation: exists" -t 1
@@ -1488,16 +1488,16 @@ function Add-AWSSteps {
     # Add component choices
     if ($componentsReady -eq $targetComponents) {
         # Need to confirm total components and if enough, provide remove components option and create cluster option
-        Add-Choice -k "AWSBITS" -d "Remove AWS Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
+        Add-Choice -k "AWSBITS" -d "Remove shared AWS components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
     }
     elseif ($componentsReady -eq 0) {
         # No components yet.  Add option to create
-        Add-Choice -k "AWSBITS" -d "Required: Create AWS Components" -f "Add-AwsComponents" -c "$componentsReady/$targetComponents deployed" 
+        Add-Choice -k "AWSBITS" -d "Required: Create shared AWS components" -f "Add-AwsComponents" -c "$componentsReady/$targetComponents deployed" 
     }
     else {
         # Some components installed- offer removal option
-        Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
-        Add-Choice -k "AWSFBITS" -d "Attempt Adding missing Components (experimental)" -f "Add-AWSComponents"
+        Add-Choice -k "AWSBITS" -d "Remove shared partial components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
+        Add-Choice -k "AWSFBITS" -d "Attempt Adding missing shared components (experimental)" -f "Add-AWSComponents"
     }
     # Check for existing cluster.
     Set-Prefs -k AWScluster -v "scw-AWS-$userid"
