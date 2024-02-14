@@ -1497,6 +1497,7 @@ function Add-AWSSteps {
     else {
         # Some components installed- offer removal option
         Add-Choice -k "AWSBITS" -d "Remove Partial Components" -c "$componentsReady/$targetComponents deployed" -f "Remove-AWSComponents"
+        Add-Choice -k "AWSFBITS" -d "Attempt Adding missing Components (experimental)" -f "Add-AWSComponents"
     }
     # Check for existing cluster.
     Set-Prefs -k AWScluster -v "scw-AWS-$userid"
