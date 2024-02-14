@@ -998,9 +998,7 @@ function Add-AzureSteps {
         if ($config.quickDeploy -eq $true) {
             Add-AKSCluster
         }
-        else {
-            return
-        }
+        else { return }
     }
     ### Web Service Plan ( Multiple )
     if ($config.azureWebAppStatus -eq "Stopped") {
@@ -1037,10 +1035,11 @@ function Add-AzureGroup {
 function Get-AzureStatus {
     #muReady
     #Group
-    $groupExists = Send-Update -t 1 -content "Azure: Resource group $($config.azureGroup) exists?" -run "az group exists -g $($config.azureGroup)" -append
-    if ($groupExists -eq "true") {
+    $groupExists = Send-Update -t 1 -content "Azure: Resource group $($config.azureGroup) exists?" -run "az group show -g $($config.azureGroup)" -append | Convertfrom-Json
+    if ($groupExists.location) {
         Send-Update -t 1 -content " yes."
         set-prefs -k "azureGroupStatus" -v $true
+        Set-Prefs -k "azureRegion" -v $groupExists.location
     }
     else {
         Send-Update -t 1 -content " no."
@@ -2405,7 +2404,7 @@ function Get-AppUrls {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].hostname)"
             }
             if ($namespace -eq "dbic" -and $config.provider -eq "azure") {
-                $returnList = "http://scw$($config.textUserId).$($config.k8sregion).cloudapp.azure.com"
+                $returnList = "http://scw$($config.userName).$($config.k8sregion).cloudapp.azure.com"
             }
             if ($service.status.loadBalancer.ingress[0].ip) {
                 $returnList = "$returnList http://$($service.status.loadBalancer.ingress[0].ip)"
